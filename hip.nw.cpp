@@ -1,0 +1,139 @@
+ava_name("HIP");
+ava_version("1.9.0");
+ava_identifier(HIP);
+ava_number(3);
+ava_cflags();
+ava_libs(-lcuda);
+ava_export_qualifier();
+
+struct hipFuncAttributes;
+typedef struct hipFuncAttributes hipFuncAttributes;
+#include "/var/local/thunt/nightwatch-combined/nwcc/hip_helpers/hip_cpp_bridge.h"
+#include <hip/hip_runtime.h>
+#include <hip/hcc_detail/hip_runtime_api.h>
+
+typedef struct {
+    /* argument types */
+    int func_argc;
+    char func_arg_is_handle[64];
+} Metadata;
+
+ava_register_metadata(Metadata);
+
+#if 0
+hipError_t
+hipGetDeviceProperties(hipDeviceProp_t* prop, int deviceId)
+{
+    ava_argument(prop) {
+        ava_out; ava_buffer(1);
+    }
+}
+#endif
+
+hipError_t
+hipMalloc(void **dptr,
+          size_t size)
+{
+    ava_argument(dptr) {
+        ava_out; ava_buffer(1); ava_element {ava_handle; ava_allocates;}
+    }
+}
+
+hipError_t
+hipFree(void* ptr)
+{
+    ava_argument(ptr) {ava_handle; ava_deallocates;}
+}
+
+hipError_t
+hipMemcpyDtoH(void* dst, hipDeviceptr_t src, size_t sizeBytes)
+{
+   ava_argument(src) ava_handle;
+   ava_argument(dst) {
+         ava_out;
+         ava_buffer(sizeBytes);
+   }
+}
+
+hipError_t
+hipMemcpyHtoD(hipDeviceptr_t dst, void* src, size_t sizeBytes)
+{
+   ava_argument(src) {
+         ava_in;
+         ava_buffer(sizeBytes);
+   }
+   ava_argument(dst) ava_handle;
+}
+
+hipError_t
+hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
+{
+
+   ava_argument(dst) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyDeviceToHost) {
+         ava_out;
+         ava_buffer(sizeBytes);
+      } else {
+         ava_handle;
+      }
+   }
+   ava_argument(src) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyHostToDevice) {
+         ava_in;
+         ava_buffer(sizeBytes);
+      } else {
+         ava_handle;
+      }
+   }
+}
+
+ava_utility size_t hipLaunchKernel_extra_size(void **extra) {
+    size_t size = 1;
+    while (extra[size - 1] != HIP_LAUNCH_PARAM_END)
+        size++;
+    return size;
+}
+
+hipError_t
+hipModuleLaunchKernel(hipFunction_t f, unsigned int gridDimX,
+                      unsigned int gridDimY, unsigned int gridDimZ,
+                      unsigned int blockDimX, unsigned int blockDimY,
+                      unsigned int blockDimZ, unsigned int sharedMemBytes,
+                      hipStream_t stream, void** kernelParams, void** extra)
+{
+    ava_argument(kernelParams) {
+        ava_in; ava_buffer(ava_metadata(f)->func_argc);
+        ava_element {
+            ava_buffer(1);
+            if (ava_metadata(f)->func_arg_is_handle[ava_index]) {
+                ava_type_cast(void*);
+                abort();
+                //ava_handle;
+            }
+            else {
+                ava_type_cast(int*);
+            }
+        }
+    }
+    ava_argument(extra) {
+        ava_in; ava_buffer(hipLaunchKernel_extra_size(extra));
+        ava_element ava_buffer(1);
+    }
+}
+
+int
+__do_c_load_executable(const char *file_buf, size_t file_len,
+                        hsa_executable_t *executable, hsa_agent_t *agent)
+{
+   ava_argument(file_buf) {
+      ava_in; ava_buffer(file_len);
+   }
+   ava_argument(executable) {
+      ava_in; ava_out; ava_buffer(1);
+   }
+   ava_argument(agent) {
+      ava_in; ava_buffer(1);
+   }
+}
