@@ -1,0 +1,37 @@
+//===----------------------------------------------------------------------===//
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+
+/**
+ * @file exception_list
+ * exceptions raised during parallel executions
+ */
+
+#pragma once
+
+namespace std {
+namespace experimental {
+namespace parallel {
+inline namespace v1 {
+
+#if 0
+class exception_list : public exception
+{
+  public:
+    typedef unspecified iterator;
+
+    size_t size() const noexcept;
+    iterator begin() const noexcept;
+    iterator end() const noexcept;
+
+    const char* what() const noexcept override;
+};
+#endif
+
+} // inline namespace v1
+} // namespace parallel
+} // namespace experimental
+} // namespace std

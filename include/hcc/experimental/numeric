@@ -1,0 +1,64 @@
+//===----------------------------------------------------------------------===//
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+
+/**
+ * @file numeric
+ * Numeric Parallel algorithms
+ *
+ *
+ * Definitions:
+ *
+ * Define GENERALIZED_SUM(op, a1, ..., aN) as follows:
+ *
+ *   - a1 when N is 1
+ *
+ *   - op(GENERALIZED_SUM(op, b1, ..., bK),
+ *     GENERALIZED_SUM(op, bM, ..., bN)) where
+ *
+ *       - b1, ..., bN may be any permutation of a1, ..., aN and
+ *       - 1 < K+1 = M ≤ N.
+ *
+ *
+ * Define GENERALIZED_NONCOMMUTATIVE_SUM(op, a1, ..., aN) as follows:
+ *
+ *   - a1 when N is 1
+ *
+ *   - op(GENERALIZED_NONCOMMUTATIVE_SUM(op, a1, ..., aK),
+ *     GENERALIZED_NONCOMMUTATIVE_SUM(op, aM, ..., aN) where
+ *
+ *       - 1 < K+1 = M ≤ N.
+ */
+
+#pragma once
+
+#include "execution_policy"
+
+#include <algorithm>
+#include <numeric>
+
+namespace std {
+namespace experimental {
+namespace parallel {
+inline namespace v1 {
+
+#include "impl/type_utils.inl"
+#include "impl/kernel_launch.inl"
+#include "impl/reduce.inl"
+#include "impl/scan.inl"
+#include "impl/transform.inl"
+#include "impl/exclusive_scan.inl"
+#include "impl/inclusive_scan.inl"
+#include "impl/transform_reduce.inl"
+#include "impl/transform_scan.inl"
+#include "impl/transform_exclusive_scan.inl"
+#include "impl/transform_inclusive_scan.inl"
+
+} // inline namespace v1
+} // namespace parallel
+} // namespace experimental
+} // namespace std
+
