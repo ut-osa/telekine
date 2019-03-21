@@ -17,7 +17,7 @@ includes = -I$(PWD)/include -I/opt/rocm/hcc/bin/../include -I/opt/rocm/hcc/bin/.
 	        -I/opt/rocm/hcc/include -I/opt/rocm/hip/include/hip/hcc_detail/cuda \
 			  -I/opt/rocm/hsa/include -I/opt/rocm/hip/include
 
-guest_includes = -I$(PWD)/inc -I$(PWD)/inc/hip -I$(PWD)/inc/hip/hcc_detail -I$(PWD)/include -I$(PWD)/include/hip/hcc_detail
+guest_includes = -I$(PWD)/guest_inc -I$(PWD)/guest_inc/hip -I$(PWD)/guest_inc/hip/hcc_detail -I$(PWD)/include -I$(PWD)/include/hip/hcc_detail -I$(PWD)/include/hsa
 
 HIP_SOs = libhc_am.so libhip_hcc.so libhsa-runtime64.so.1 libhsakmt.so.1
 
@@ -37,7 +37,7 @@ hip_nw/worker hip_nw/libguestlib.so: hip_nw/Makefile hip_cpp_bridge.so $(wildcar
 	$(MAKE) -C hip_nw
 
 hip_nw/Makefile: hip.nw.cpp hip_nw.mk
-	../nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
+	../nwcc $(guest_includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
 	cp hip_nw.mk ./hip_nw/Makefile
 
 guestshim.o: guestshim.cpp

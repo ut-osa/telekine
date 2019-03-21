@@ -298,6 +298,37 @@ void load_code_object_and_freeze_executable(
 #define MAX_AGENTS 16
 #define MAX_ISAS 16
 namespace hip_impl {
+Kernel_descriptor::Kernel_descriptor(std::uint64_t kernel_object, const std::string& name)
+  : kernel_object_{kernel_object}, name_{name}
+{
+  bool supported{false};
+  std::uint16_t min_v{UINT16_MAX};
+  auto r = hsa_system_major_extension_supported(
+      HSA_EXTENSION_AMD_LOADER, 1, &min_v, &supported);
+
+  if (r != HSA_STATUS_SUCCESS || !supported) return;
+
+  r = __do_c_query_host_address(kernel_object_, reinterpret_cast<char *>(&kernel_header_buffer));
+#if 0
+  hsa_ven_amd_loader_1_01_pfn_t tbl{};
+
+  r = hsa_system_get_major_extension_table(
+      HSA_EXTENSION_AMD_LOADER,
+      1,
+      sizeof(tbl),
+      reinterpret_cast<void*>(&tbl));
+
+  if (r != HSA_STATUS_SUCCESS) return;
+  if (!tbl.hsa_ven_amd_loader_query_host_address) return;
+
+  r = tbl.hsa_ven_amd_loader_query_host_address(
+      reinterpret_cast<void*>(kernel_object_),
+      reinterpret_cast<const void**>(&kernel_header_));
+#endif
+  if (r != HSA_STATUS_SUCCESS) return;
+  kernel_header_ = &kernel_header_buffer;
+}
+
 const unordered_map<hsa_agent_t, vector<hsa_executable_t>>&
 executables() {  // TODO: This leaks the hsa_executable_ts, it should use RAII.
     static unordered_map<hsa_agent_t, vector<hsa_executable_t>> r;
@@ -378,8 +409,8 @@ const unordered_map<uintptr_t, string>& function_names() {
     return r;
 }
 
-const unordered_map<uintptr_t, vector<pair<hsa_agent_t, Kernel_descriptor>>>& functions() {
-    static unordered_map<uintptr_t, vector<pair<hsa_agent_t, Kernel_descriptor>>> r;
+const unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>& functions() {
+    static unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>> r;
     static once_flag f;
 
     call_once(f, []() {
@@ -388,9 +419,15 @@ const unordered_map<uintptr_t, vector<pair<hsa_agent_t, Kernel_descriptor>>>& fu
 
             if (it != kernels().cend()) {
                 for (auto&& kernel_symbol : it->second) {
+                    hipFunction_t func;
+                    __do_c_get_kernel_descriptor(&kernel_symbol, it->first.c_str(),
+                                                 &func);
                     r[function.first].emplace_back(
                         agent(kernel_symbol),
+                        func);
+#if 0
                         Kernel_descriptor{kernel_object(kernel_symbol), it->first});
+#endif
                 }
             }
         }

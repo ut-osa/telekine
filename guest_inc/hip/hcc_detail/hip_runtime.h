@@ -29,6 +29,8 @@ THE SOFTWARE.
 #ifndef HIP_INCLUDE_HIP_HCC_DETAIL_HIP_RUNTIME_H
 #define HIP_INCLUDE_HIP_HCC_DETAIL_HIP_RUNTIME_H
 
+typedef struct hipFuncAttributes hipFuncAttributes;
+
 #if defined(__HCC__)
 #define __HCC_OR_HIP_CLANG__ 1
 #define __HCC_ONLY__ 1

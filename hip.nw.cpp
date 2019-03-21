@@ -36,20 +36,20 @@ hipMalloc(void **dptr,
           size_t size)
 {
     ava_argument(dptr) {
-        ava_out; ava_buffer(1); ava_element {ava_handle; ava_allocates;}
+        ava_out; ava_buffer(1); ava_element {ava_opaque;}
     }
 }
 
 hipError_t
 hipFree(void* ptr)
 {
-    ava_argument(ptr) {ava_handle; ava_deallocates;}
+    ava_argument(ptr) {ava_opaque;}
 }
 
 hipError_t
 hipMemcpyDtoH(void* dst, hipDeviceptr_t src, size_t sizeBytes)
 {
-   ava_argument(src) ava_handle;
+   ava_argument(src) ava_opaque;
    ava_argument(dst) {
          ava_out;
          ava_buffer(sizeBytes);
@@ -63,7 +63,7 @@ hipMemcpyHtoD(hipDeviceptr_t dst, void* src, size_t sizeBytes)
          ava_in;
          ava_buffer(sizeBytes);
    }
-   ava_argument(dst) ava_handle;
+   ava_argument(dst) ava_opaque;
 }
 
 hipError_t
@@ -76,7 +76,7 @@ hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
          ava_out;
          ava_buffer(sizeBytes);
       } else {
-         ava_handle;
+         ava_opaque;
       }
    }
    ava_argument(src) {
@@ -85,7 +85,7 @@ hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
          ava_in;
          ava_buffer(sizeBytes);
       } else {
-         ava_handle;
+         ava_opaque;
       }
    }
 }
@@ -97,34 +97,30 @@ ava_utility size_t hipLaunchKernel_extra_size(void **extra) {
     return size;
 }
 
-/*
 hipError_t
-hipModuleLaunchKernel(hipFunction_t f, unsigned int gridDimX,
+__do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
                       unsigned int gridDimY, unsigned int gridDimZ,
                       unsigned int blockDimX, unsigned int blockDimY,
                       unsigned int blockDimZ, unsigned int sharedMemBytes,
-                      hipStream_t stream, void** kernelParams, void** extra)
+                      hipStream_t stream, void** kernelParams, char* extra,
+                      size_t extra_size)
 {
+   ava_argument(f) {
+      ava_in; ava_buffer(1);
+      ava_element {
+         ava_handle;
+      }
+   }
     ava_argument(kernelParams) {
-        ava_in; ava_buffer(ava_metadata(f)->func_argc);
+        ava_in; ava_buffer(1);
         ava_element {
-            ava_buffer(1);
-            if (ava_metadata(f)->func_arg_is_handle[ava_index]) {
-                ava_type_cast(void*);
-                abort();
-                //ava_handle;
-            }
-            else {
-                ava_type_cast(int*);
-            }
+           ava_opaque;
         }
     }
     ava_argument(extra) {
-        ava_in; ava_buffer(hipLaunchKernel_extra_size(extra));
-        ava_element ava_buffer(1);
+        ava_in; ava_buffer(extra_size);
     }
 }
-*/
 
 hsa_status_t
 HSA_API hsa_system_major_extension_supported(
@@ -174,6 +170,18 @@ HSA_API hsa_isa_from_name(
 hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
     hsa_executable_symbol_t executable_symbol,
     hsa_executable_symbol_info_t attribute, char *value, size_t max_value)
+{
+   ava_argument(value) {
+      ava_depends_on(max_value);
+      ava_out; ava_buffer(max_value);
+   }
+}
+
+hsa_status_t HSA_API __do_c_hsa_agent_get_info(
+    hsa_agent_t agent,
+    hsa_agent_info_t attribute,
+    void* value,
+    size_t max_value)
 {
    ava_argument(value) {
       ava_depends_on(max_value);
@@ -239,4 +247,27 @@ HSA_API __do_c_query_host_address(
    ava_argument(kernel_header_) {
       ava_out; ava_buffer(sizeof(amd_kernel_code_t));
    }
+}
+
+hipError_t
+__do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
+                             const char *name, hipFunction_t *f)
+{
+   ava_argument(symbol) {
+      ava_in; ava_buffer(1);
+   }
+   ava_argument(name) {
+      ava_in; ava_buffer(strlen(name) + 1);
+   }
+   ava_argument(f) {
+      ava_out; ava_buffer(1);
+      ava_element {
+         ava_handle;
+      }
+   }
+}
+
+hsa_status_t
+HSA_API hsa_init()
+{
 }

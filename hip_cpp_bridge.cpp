@@ -12,6 +12,35 @@
 
 using std::string;
 
+hip_impl::Kernel_descriptor::Kernel_descriptor(std::uint64_t kernel_object,
+                                              const std::string& name)
+        : kernel_object_{kernel_object}, name_{name}
+{
+  bool supported{false};
+  std::uint16_t min_v{UINT16_MAX};
+  auto r = hsa_system_major_extension_supported(
+      HSA_EXTENSION_AMD_LOADER, 1, &min_v, &supported);
+
+  if (r != HSA_STATUS_SUCCESS || !supported) return;
+
+  hsa_ven_amd_loader_1_01_pfn_t tbl{};
+
+  r = hsa_system_get_major_extension_table(
+      HSA_EXTENSION_AMD_LOADER,
+      1,
+      sizeof(tbl),
+      reinterpret_cast<void*>(&tbl));
+
+  if (r != HSA_STATUS_SUCCESS) return;
+  if (!tbl.hsa_ven_amd_loader_query_host_address) return;
+
+  r = tbl.hsa_ven_amd_loader_query_host_address(
+      reinterpret_cast<void*>(kernel_object_),
+      reinterpret_cast<const void**>(&kernel_header_));
+
+  if (r != HSA_STATUS_SUCCESS) return;
+}
+
 extern "C"
 hsa_status_t HSA_API __do_c_query_host_address(
     uint64_t kernel_object_,
@@ -37,6 +66,16 @@ hsa_status_t HSA_API __do_c_query_host_address(
         return r;
 }
 
+extern "C" hipError_t
+__do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
+                             const char *name, hipFunction_t *f)
+{
+   auto descriptor = new hip_impl::Kernel_descriptor(hip_impl::kernel_object(*symbol), std::string(name));
+   *f = reinterpret_cast<hipFunction_t>(descriptor);
+   printf("XXX hipFunction %p\n", f);
+   return hipSuccess;
+}
+
 
 extern "C"
 hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
@@ -45,6 +84,17 @@ hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
 {
    return hsa_executable_symbol_get_info(executable_symbol,
                                          attribute, (void *)value);
+}
+
+extern "C"
+hsa_status_t __do_c_hsa_agent_get_info(
+    hsa_agent_t agent,
+    hsa_agent_info_t attribute,
+    void* value,
+    size_t max_value)
+{
+
+   return hsa_agent_get_info(agent, attribute, value);
 }
 
 extern "C" int
@@ -130,4 +180,30 @@ __do_c_get_kerenel_symbols(
    hsa_executable_iterate_agent_symbols(*exec, *agent, copy_kernels, &arg);
    assert(arg.cur <= symbols_len);
    return arg.cur;
+}
+
+extern "C" hipError_t
+__do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
+                      unsigned int gridDimY, unsigned int gridDimZ,
+                      unsigned int blockDimX, unsigned int blockDimY,
+                      unsigned int blockDimZ, unsigned int sharedMemBytes,
+                      hipStream_t stream, void** kernelParams, char *_extra,
+                      size_t extra_size)
+{
+   void* new_extra[5] = {
+      HIP_LAUNCH_PARAM_BUFFER_POINTER, _extra,
+      HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size,
+      HIP_LAUNCH_PARAM_END};
+
+   printf("XXX size: %ld\n", extra_size);
+   for (int i = 0; i < extra_size; i++)
+      printf("extra at %d: %hhu\n",  i, _extra[i]);
+   printf("XXX hipFunction %p\n", *f);
+
+   assert(kernelParams == nullptr);
+
+   return hipModuleLaunchKernel(*f, gridDimX,
+                                gridDimY, gridDimZ, blockDimX,
+                                blockDimY, blockDimZ, sharedMemBytes, stream,
+                                kernelParams, new_extra);
 }

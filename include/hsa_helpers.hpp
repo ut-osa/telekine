@@ -26,13 +26,6 @@ THE SOFTWARE.
 #include <cstdint>
 #include <functional>
 #include <string>
-#include "hip_cpp_bridge.h"
-
-#define hsa_executable_symbol_get_info(x, y, z) ({\
-   auto __tmp = z; \
-   auto ret = __do_c_hsa_executable_symbol_get_info(x, y, (char *)z, sizeof(*__tmp)); \
-   ret;\
-})
 
 inline constexpr bool operator==(hsa_isa_t x, hsa_isa_t y) { return x.handle == y.handle; }
 
@@ -90,8 +83,8 @@ inline std::string name(hsa_executable_symbol_t x) {
     hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_NAME_LENGTH, &sz);
 
     std::string r(sz, '\0');
-   __do_c_hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_NAME,
-                                         &r.front(), sz);
+    hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_NAME, &r.front());
+
     return r;
 }
 
@@ -116,4 +109,3 @@ inline hsa_symbol_kind_t type(hsa_executable_symbol_t x) {
     return r;
 }
 }  // namespace hip_impl
-#undef hsa_executable_symbol_get_info

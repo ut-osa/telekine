@@ -87,6 +87,7 @@ int main() {
     hipMemcpy(gpuMatrix, Matrix, NUM * sizeof(float), hipMemcpyHostToDevice);
 
     // Lauching kernel from host
+    printf("arg 1 %p, arg 2 %p, arg 3 %d\n", gpuTransposeMatrix, gpuMatrix, WIDTH);
     hipLaunchKernel(matrixTranspose, dim3(WIDTH / THREADS_PER_BLOCK_X, WIDTH / THREADS_PER_BLOCK_Y),
                     dim3(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y), 0, 0, gpuTransposeMatrix,
                     gpuMatrix, WIDTH);
