@@ -1,14 +1,14 @@
 include ../../../include/make.mk
 
 CC=gcc
-override CFLAGS+= -g -fmax-errors=10      `pkg-config --cflags glib-2.0`     -pthread -lrt -ldl -D_GNU_SOURCE     -Wall -Wno-unused-but-set-variable     -Wno-unused-variable -Wno-unused-function     -Wno-discarded-qualifiers -Wno-deprecated-declarations     -Wl,-z,defs -D__HIP_PLATFORM_HCC__=1
+override CFLAGS+= -g -fmax-errors=10      `pkg-config --cflags glib-2.0`     -pthread -lrt -ldl -D_GNU_SOURCE     -Wall -Wno-unused-but-set-variable     -Wno-unused-variable -Wno-unused-function     -Wno-discarded-qualifiers -Wno-deprecated-declarations     -Wl,-z,defs -D__HIP_PLATFORM_HCC__=1 -Wno-enum-compare
 
 includes = -I/opt/rocm/hcc/bin/../include -I/opt/rocm/hcc/bin/../hcc/include \
 	        -I/opt/rocm/hcc/include -I/opt/rocm/hip/include/hip/hcc_detail/cuda \
-			  -I/opt/rocm/hsa/include -I/opt/rocm/hip/include
+			  -I/opt/rocm/hsa/include -I/opt/rocm/hip/include -I../
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
-WORKER_LIBS+=`pkg-config --libs glib-2.0` -L/opt/rocm/hip/lib -lhip_hcc
+WORKER_LIBS+=`pkg-config --libs glib-2.0` -L/opt/rocm/lib -lhip_hcc -lhsa-runtime64
 
 all: libguestlib.so worker
 

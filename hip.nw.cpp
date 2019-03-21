@@ -8,9 +8,10 @@ ava_export_qualifier();
 
 struct hipFuncAttributes;
 typedef struct hipFuncAttributes hipFuncAttributes;
-#include "/var/local/thunt/nightwatch-combined/nwcc/hip_helpers/hip_cpp_bridge.h"
+#include "hip_cpp_bridge.h"
 #include <hip/hip_runtime.h>
 #include <hip/hcc_detail/hip_runtime_api.h>
+#include <hsa/hsa.h>
 
 typedef struct {
     /* argument types */
@@ -96,6 +97,7 @@ ava_utility size_t hipLaunchKernel_extra_size(void **extra) {
     return size;
 }
 
+/*
 hipError_t
 hipModuleLaunchKernel(hipFunction_t f, unsigned int gridDimX,
                       unsigned int gridDimY, unsigned int gridDimZ,
@@ -122,6 +124,62 @@ hipModuleLaunchKernel(hipFunction_t f, unsigned int gridDimX,
         ava_element ava_buffer(1);
     }
 }
+*/
+
+hsa_status_t
+HSA_API hsa_system_major_extension_supported(
+      uint16_t extension,
+      uint16_t version_major,
+      uint16_t *version_minor,
+      bool *result)
+{
+   ava_argument(result) {
+      ava_out; ava_buffer(1);
+   }
+   ava_argument(version_minor) {
+      ava_in; ava_out; ava_buffer(1);
+   }
+}
+
+hsa_status_t
+HSA_API hsa_executable_create_alt(
+    hsa_profile_t profile,
+    hsa_default_float_rounding_mode_t default_float_rounding_mode,
+    const char *options,
+    hsa_executable_t *executable)
+{
+   ava_argument(options) {
+      ava_in; ava_buffer(strlen(options) + 1);
+   }
+   ava_argument(executable) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hsa_status_t
+HSA_API hsa_isa_from_name(
+    const char *name,
+    hsa_isa_t *isa)
+{
+   ava_argument(name) {
+      ava_in; ava_buffer(strlen(name) + 1);
+   }
+   ava_argument(isa) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+#include <stdint.h>
+
+hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
+    hsa_executable_symbol_t executable_symbol,
+    hsa_executable_symbol_info_t attribute, char *value, size_t max_value)
+{
+   ava_argument(value) {
+      ava_depends_on(max_value);
+      ava_out; ava_buffer(max_value);
+   }
+}
 
 int
 __do_c_load_executable(const char *file_buf, size_t file_len,
@@ -135,5 +193,50 @@ __do_c_load_executable(const char *file_buf, size_t file_len,
    }
    ava_argument(agent) {
       ava_in; ava_buffer(1);
+   }
+}
+
+size_t
+__do_c_get_agents(hsa_agent_t *agents, size_t max_agents)
+{
+   ava_argument(agents) {
+      ava_out; ava_buffer(max_agents);
+   }
+}
+
+size_t
+__do_c_get_isas(hsa_agent_t agents, hsa_isa_t *isas, size_t max_isas)
+{
+   ava_argument(isas) {
+      ava_out; ava_buffer(max_isas);
+   }
+}
+
+size_t
+__do_c_get_kerenel_symbols(
+      const hsa_executable_t *exec,
+      const hsa_agent_t *agent,
+      hsa_executable_symbol_t *symbols,
+      size_t max_symbols)
+{
+   ava_argument(exec) {
+      ava_in; ava_buffer(1);
+   }
+   ava_argument(agent) {
+      ava_in; ava_buffer(1);
+   }
+   ava_argument(symbols) {
+      ava_out; ava_buffer(max_symbols);
+   }
+}
+
+hsa_status_t
+HSA_API __do_c_query_host_address(
+    uint64_t kernel_object_,
+    char *kernel_header_)
+{
+   ava_argument(kernel_object_) ava_opaque;
+   ava_argument(kernel_header_) {
+      ava_out; ava_buffer(sizeof(amd_kernel_code_t));
    }
 }

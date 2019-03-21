@@ -84,19 +84,15 @@ int main() {
     hipMalloc((void**)&gpuTransposeMatrix, NUM * sizeof(float));
 
     // Memory transfer from host to device
-    //hipMemcpyHtoD(gpuMatrix, Matrix, NUM * sizeof(float));
     hipMemcpy(gpuMatrix, Matrix, NUM * sizeof(float), hipMemcpyHostToDevice);
 
     // Lauching kernel from host
-    /*
     hipLaunchKernel(matrixTranspose, dim3(WIDTH / THREADS_PER_BLOCK_X, WIDTH / THREADS_PER_BLOCK_Y),
                     dim3(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y), 0, 0, gpuTransposeMatrix,
                     gpuMatrix, WIDTH);
-                    */
 
     // Memory transfer from device to host
     hipMemcpy(TransposeMatrix, gpuTransposeMatrix, NUM * sizeof(float), hipMemcpyDeviceToHost);
-    //hipMemcpyDtoH(TransposeMatrix, gpuTransposeMatrix, NUM * sizeof(float));
 
     // CPU MatrixTranspose computation
     matrixTransposeCPUReference(cpuTransposeMatrix, Matrix, WIDTH);
