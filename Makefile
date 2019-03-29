@@ -48,9 +48,9 @@ code_object_bundle.o: code_object_bundle.cpp
 	$(CXX) -g $(CFLAGS) -fPIC $(guest_includes) -c $^
 
 guestshim.so: guestshim.o program_state.o code_object_bundle.o hip_nw/libguestlib.so
-	g++ -fPIC -shared $(includes) -o $@ $^ \
+	g++ -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
 	   -Wl,--no-allow-shlib-undefined \
-		-Wl,--no-undefined -L$(nw_path) -lguestlib
+		-Wl,--no-undefined -Wl,-rpath=$(PWD)/hip_nw -L$(PWD)/hip_nw -lguestlib
 
 hip_cpp_bridge.so: hip_cpp_bridge.o
 	g++ -std=c++11 -fPIC -shared $(includes) -o $@ $<

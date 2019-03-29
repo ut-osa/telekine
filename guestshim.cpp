@@ -15,6 +15,7 @@
 #include <hip/hip_hcc_internal.h>
 #include "./hc.hpp"
 #include "./trace_helper.h"
+#include <hip/hip_hcc.h>
 
 //#include <program_state.hpp>
 
@@ -23,6 +24,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <stdexcept>
+#include <unordered_map>
 
 #include <iostream>
 
@@ -33,6 +35,180 @@ using  std::printf;
 
 #define MAX_AGENTS 16
 
+static unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
+
+hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
+                                    uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
+                                    uint32_t localWorkSizeX, uint32_t localWorkSizeY,
+                                    uint32_t localWorkSizeZ, size_t sharedMemBytes,
+                                    hipStream_t hStream, void** kernelParams, void** extra,
+                                    hipEvent_t startEvent,
+                                    hipEvent_t stopEvent)
+{
+   size_t extra_size = *(size_t *)extra[3];
+   assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
+   assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
+   assert(extra[4] == HIP_LAUNCH_PARAM_END);
+
+   return __do_c_hipHccModuleLaunchKernel(f, globalWorkSizeX, globalWorkSizeY,
+                                       globalWorkSizeZ, localWorkSizeX,
+                                       localWorkSizeY, localWorkSizeZ,
+                                       sharedMemBytes, hStream, kernelParams,
+                                       (char *)(extra[1]), extra_size,
+                                       startEvent, stopEvent);
+}
+
+hipError_t
+hipStreamCreate(hipStream_t* stream)
+{
+   hsa_agent_t agent;
+
+   hipError_t ret = nw_hipStreamCreate(stream, &agent);
+   if (!ret)
+      stream_to_agent.emplace(*stream, agent);
+
+   return ret;
+}
+
+const char* ihipErrorString(hipError_t hip_error) {
+    switch (hip_error) {
+        case hipSuccess:
+            return "hipSuccess";
+        case hipErrorOutOfMemory:
+            return "hipErrorOutOfMemory";
+        case hipErrorNotInitialized:
+            return "hipErrorNotInitialized";
+        case hipErrorDeinitialized:
+            return "hipErrorDeinitialized";
+        case hipErrorProfilerDisabled:
+            return "hipErrorProfilerDisabled";
+        case hipErrorProfilerNotInitialized:
+            return "hipErrorProfilerNotInitialized";
+        case hipErrorProfilerAlreadyStarted:
+            return "hipErrorProfilerAlreadyStarted";
+        case hipErrorProfilerAlreadyStopped:
+            return "hipErrorProfilerAlreadyStopped";
+        case hipErrorInvalidImage:
+            return "hipErrorInvalidImage";
+        case hipErrorInvalidContext:
+            return "hipErrorInvalidContext";
+        case hipErrorContextAlreadyCurrent:
+            return "hipErrorContextAlreadyCurrent";
+        case hipErrorMapFailed:
+            return "hipErrorMapFailed";
+        case hipErrorUnmapFailed:
+            return "hipErrorUnmapFailed";
+        case hipErrorArrayIsMapped:
+            return "hipErrorArrayIsMapped";
+        case hipErrorAlreadyMapped:
+            return "hipErrorAlreadyMapped";
+        case hipErrorNoBinaryForGpu:
+            return "hipErrorNoBinaryForGpu";
+        case hipErrorAlreadyAcquired:
+            return "hipErrorAlreadyAcquired";
+        case hipErrorNotMapped:
+            return "hipErrorNotMapped";
+        case hipErrorNotMappedAsArray:
+            return "hipErrorNotMappedAsArray";
+        case hipErrorNotMappedAsPointer:
+            return "hipErrorNotMappedAsPointer";
+        case hipErrorECCNotCorrectable:
+            return "hipErrorECCNotCorrectable";
+        case hipErrorUnsupportedLimit:
+            return "hipErrorUnsupportedLimit";
+        case hipErrorContextAlreadyInUse:
+            return "hipErrorContextAlreadyInUse";
+        case hipErrorPeerAccessUnsupported:
+            return "hipErrorPeerAccessUnsupported";
+        case hipErrorInvalidKernelFile:
+            return "hipErrorInvalidKernelFile";
+        case hipErrorInvalidGraphicsContext:
+            return "hipErrorInvalidGraphicsContext";
+        case hipErrorInvalidSource:
+            return "hipErrorInvalidSource";
+        case hipErrorFileNotFound:
+            return "hipErrorFileNotFound";
+        case hipErrorSharedObjectSymbolNotFound:
+            return "hipErrorSharedObjectSymbolNotFound";
+        case hipErrorSharedObjectInitFailed:
+            return "hipErrorSharedObjectInitFailed";
+        case hipErrorOperatingSystem:
+            return "hipErrorOperatingSystem";
+        case hipErrorSetOnActiveProcess:
+            return "hipErrorSetOnActiveProcess";
+        case hipErrorInvalidHandle:
+            return "hipErrorInvalidHandle";
+        case hipErrorNotFound:
+            return "hipErrorNotFound";
+        case hipErrorIllegalAddress:
+            return "hipErrorIllegalAddress";
+
+        case hipErrorMissingConfiguration:
+            return "hipErrorMissingConfiguration";
+        case hipErrorMemoryAllocation:
+            return "hipErrorMemoryAllocation";
+        case hipErrorInitializationError:
+            return "hipErrorInitializationError";
+        case hipErrorLaunchFailure:
+            return "hipErrorLaunchFailure";
+        case hipErrorPriorLaunchFailure:
+            return "hipErrorPriorLaunchFailure";
+        case hipErrorLaunchTimeOut:
+            return "hipErrorLaunchTimeOut";
+        case hipErrorLaunchOutOfResources:
+            return "hipErrorLaunchOutOfResources";
+        case hipErrorInvalidDeviceFunction:
+            return "hipErrorInvalidDeviceFunction";
+        case hipErrorInvalidConfiguration:
+            return "hipErrorInvalidConfiguration";
+        case hipErrorInvalidDevice:
+            return "hipErrorInvalidDevice";
+        case hipErrorInvalidValue:
+            return "hipErrorInvalidValue";
+        case hipErrorInvalidDevicePointer:
+            return "hipErrorInvalidDevicePointer";
+        case hipErrorInvalidMemcpyDirection:
+            return "hipErrorInvalidMemcpyDirection";
+        case hipErrorUnknown:
+            return "hipErrorUnknown";
+        case hipErrorInvalidResourceHandle:
+            return "hipErrorInvalidResourceHandle";
+        case hipErrorNotReady:
+            return "hipErrorNotReady";
+        case hipErrorNoDevice:
+            return "hipErrorNoDevice";
+        case hipErrorPeerAccessAlreadyEnabled:
+            return "hipErrorPeerAccessAlreadyEnabled";
+
+        case hipErrorPeerAccessNotEnabled:
+            return "hipErrorPeerAccessNotEnabled";
+        case hipErrorRuntimeMemory:
+            return "hipErrorRuntimeMemory";
+        case hipErrorRuntimeOther:
+            return "hipErrorRuntimeOther";
+        case hipErrorHostMemoryAlreadyRegistered:
+            return "hipErrorHostMemoryAlreadyRegistered";
+        case hipErrorHostMemoryNotRegistered:
+            return "hipErrorHostMemoryNotRegistered";
+        case hipErrorTbd:
+            return "hipErrorTbd";
+        default:
+            return "hipErrorUnknown";
+    };
+};
+
+extern "C" const char*
+hipGetErrorString(hipError_t hip_error) {
+    return ihipErrorString(hip_error);
+}
+
+
+extern "C" hipError_t
+hipGetDeviceProperties(hipDeviceProp_t *prop, int deviceId)
+{
+   return __do_c_hipGetDeviceProperties((char *)prop, deviceId);
+}
+
 extern "C" hipError_t
 hipModuleLaunchKernel(hipFunction_t f, uint32_t gridDimX, uint32_t gridDimY,
                       uint32_t gridDimZ, uint32_t blockDimX, uint32_t blockDimY,
@@ -40,12 +216,10 @@ hipModuleLaunchKernel(hipFunction_t f, uint32_t gridDimX, uint32_t gridDimY,
                       void** kernelParams, void** extra)
 {
    size_t extra_size = *(size_t *)extra[3];
+   assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
+   assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
+   assert(extra[4] == HIP_LAUNCH_PARAM_END);
 
-   std::printf("XXX size: %ld\n", *(size_t *)extra[3]);
-   for (int i = 0; i < *(size_t *)extra[3]; i++)
-      std::printf("extra at %d: %hhu\n",  i, ((uint8_t *)extra[1])[i]);
-
-   std::printf("XXX hipFunction %p\n", f);
    return __do_c_hipModuleLaunchKernel(&f, gridDimX, gridDimY, gridDimZ,
                                        blockDimX, blockDimY, blockDimZ,
                                        sharedMemBytes, hStream, kernelParams,
@@ -54,7 +228,7 @@ hipModuleLaunchKernel(hipFunction_t f, uint32_t gridDimX, uint32_t gridDimY,
 
 
 extern "C" hsa_status_t HSA_API
-hsa_iterate_agents(
+nw_hsa_iterate_agents(
       hsa_status_t (*callback)(hsa_agent_t agent, void* data),
       void* data)
 {
@@ -68,7 +242,7 @@ hsa_iterate_agents(
 }
 
 extern "C" hsa_status_t HSA_API
-hsa_agent_get_info(
+nw_hsa_agent_get_info(
     hsa_agent_t agent,
     hsa_agent_info_t attribute,
     void* value)
@@ -158,7 +332,7 @@ namespace hip_impl
         string name(hsa_agent_t agent)
         {
             char n[64] = {};
-            hsa_agent_get_info(agent, HSA_AGENT_INFO_NAME, n);
+            nw_hsa_agent_get_info(agent, HSA_AGENT_INFO_NAME, n);
 
             return string{n};
         }
@@ -178,11 +352,15 @@ namespace hip_impl
             });
 
             if (stream) {
-               fprintf(stderr, "Not handling streams quite yet!\n");
-               std::abort();
-            } else {
-               return default_agent;
+               auto it = stream_to_agent.find(stream);
+               if (it == stream_to_agent.end()) {
+                  std::printf("%s:%d no agent recoreded\n", __FILE__, __LINE__);
+                  std::abort();
+               } else {
+                  return it->second;
+               }
             }
+            return default_agent;
 #if 0
             if (stream) {
                 return *static_cast<hsa_agent_t*>(

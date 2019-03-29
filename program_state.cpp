@@ -8,6 +8,7 @@
 #include "elfio/elfio.hpp"
 
 #include <link.h>
+#include <hsa_limited.h>
 
 #include <hsa/hsa.h>
 #include <hsa/hsa_ext_amd.h>
@@ -239,7 +240,7 @@ const vector<pair<uintptr_t, string>>& function_names_for_process() {
     return r;
 }
 
-#define MAX_SYMBOLS 128
+#define MAX_SYMBOLS 4096
 const unordered_map<string, vector<hsa_executable_symbol_t>>& kernels() {
     static unordered_map<string, vector<hsa_executable_symbol_t>> r;
     static once_flag f;
@@ -301,13 +302,16 @@ namespace hip_impl {
 Kernel_descriptor::Kernel_descriptor(std::uint64_t kernel_object, const std::string& name)
   : kernel_object_{kernel_object}, name_{name}
 {
+#if 0
   bool supported{false};
   std::uint16_t min_v{UINT16_MAX};
-  auto r = hsa_system_major_extension_supported(
+  auto r = nw_hsa_system_major_extension_supported(
       HSA_EXTENSION_AMD_LOADER, 1, &min_v, &supported);
 
   if (r != HSA_STATUS_SUCCESS || !supported) return;
+#endif
 
+  auto r = HSA_STATUS_SUCCESS;
   r = __do_c_query_host_address(kernel_object_, reinterpret_cast<char *>(&kernel_header_buffer));
 #if 0
   hsa_ven_amd_loader_1_01_pfn_t tbl{};
@@ -359,7 +363,7 @@ executables() {  // TODO: This leaks the hsa_executable_ts, it should use RAII.
                    for (auto&& blob : it->second) {
                        hsa_executable_t tmp = {};
 
-                       hsa_executable_create_alt(
+                       nw_hsa_executable_create_alt(
                            HSA_PROFILE_FULL,
                            HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT, nullptr,
                            &tmp);
@@ -468,6 +472,7 @@ hsa_executable_t load_executable(const string& file, hsa_executable_t executable
 
 // To force HIP to load the kernels and to setup the function
 // symbol map on program startup
+/*
 class startup_kernel_loader {
    private:
     startup_kernel_loader() { functions(); }
@@ -476,5 +481,6 @@ class startup_kernel_loader {
     static startup_kernel_loader skl;
 };
 startup_kernel_loader startup_kernel_loader::skl;
+*/
 
 }  // Namespace hip_impl.

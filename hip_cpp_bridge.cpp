@@ -12,6 +12,23 @@
 
 using std::string;
 
+extern "C" hipError_t
+nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent)
+{
+   hipError_t ret = hipStreamCreate(stream);
+   if (!ret) {
+      *agent = *static_cast<hsa_agent_t*>(
+            (*stream)->locked_getAv()->get_hsa_agent());
+   }
+   return ret;
+}
+
+extern "C" hipError_t
+__do_c_hipGetDeviceProperties(char* prop, int deviceId)
+{
+   return hipGetDeviceProperties((hipDeviceProp_t *)prop, deviceId);
+}
+
 hip_impl::Kernel_descriptor::Kernel_descriptor(std::uint64_t kernel_object,
                                               const std::string& name)
         : kernel_object_{kernel_object}, name_{name}
@@ -72,7 +89,6 @@ __do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
 {
    auto descriptor = new hip_impl::Kernel_descriptor(hip_impl::kernel_object(*symbol), std::string(name));
    *f = reinterpret_cast<hipFunction_t>(descriptor);
-   printf("XXX hipFunction %p\n", f);
    return hipSuccess;
 }
 
@@ -183,6 +199,27 @@ __do_c_get_kerenel_symbols(
 }
 
 extern "C" hipError_t
+__do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
+                      uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
+                      uint32_t localWorkSizeX, uint32_t localWorkSizeY,
+                      uint32_t localWorkSizeZ, size_t sharedMemBytes,
+                      hipStream_t stream, void** kernelParams, char* _extra,
+                      size_t extra_size, hipEvent_t start, hipEvent_t stop)
+{
+   void* new_extra[5] = {
+      HIP_LAUNCH_PARAM_BUFFER_POINTER, _extra,
+      HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size,
+      HIP_LAUNCH_PARAM_END};
+
+   assert(kernelParams == nullptr);
+
+   return hipHccModuleLaunchKernel(f, globalWorkSizeX,
+                                globalWorkSizeY, globalWorkSizeZ, localWorkSizeX,
+                                localWorkSizeY, localWorkSizeZ, sharedMemBytes, stream,
+                                kernelParams, new_extra, start, stop);
+}
+
+extern "C" hipError_t
 __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
                       unsigned int gridDimY, unsigned int gridDimZ,
                       unsigned int blockDimX, unsigned int blockDimY,
@@ -195,15 +232,60 @@ __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
       HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size,
       HIP_LAUNCH_PARAM_END};
 
-   printf("XXX size: %ld\n", extra_size);
-   for (int i = 0; i < extra_size; i++)
-      printf("extra at %d: %hhu\n",  i, _extra[i]);
-   printf("XXX hipFunction %p\n", *f);
-
    assert(kernelParams == nullptr);
 
    return hipModuleLaunchKernel(*f, gridDimX,
                                 gridDimY, gridDimZ, blockDimX,
                                 blockDimY, blockDimZ, sharedMemBytes, stream,
                                 kernelParams, new_extra);
+}
+
+extern "C"
+hsa_status_t HSA_API nw_hsa_executable_create_alt(
+    hsa_profile_t profile,
+    hsa_default_float_rounding_mode_t default_float_rounding_mode,
+    const char *options,
+    hsa_executable_t *executable)
+{
+   return hsa_executable_create_alt(profile, default_float_rounding_mode,
+                                    options, executable);
+}
+
+extern "C"
+hsa_status_t HSA_API nw_hsa_executable_symbol_get_info(
+    hsa_executable_symbol_t executable_symbol,
+    hsa_executable_symbol_info_t attribute,
+    void *value)
+{
+   return hsa_executable_symbol_get_info(executable_symbol, attribute, value);
+}
+
+extern "C"
+hsa_status_t HSA_API nw_hsa_system_major_extension_supported(
+    uint16_t extension,
+    uint16_t version_major,
+    uint16_t *version_minor,
+    bool* result)
+{
+   return hsa_system_major_extension_supported(extension, version_major,
+                                               version_minor, result);
+}
+
+extern "C"
+hsa_status_t HSA_API nw_hsa_system_get_major_extension_table(
+    uint16_t extension,
+    uint16_t version_major,
+    size_t table_length,
+    void *table)
+{
+   return hsa_system_get_major_extension_table(extension, version_major,
+                                               table_length, table);
+}
+
+extern "C"
+hsa_status_t HSA_API nw_hsa_isa_from_name(
+    const char *name,
+    hsa_isa_t *isa)
+{
+   return hsa_isa_from_name(name, isa);
 }

@@ -11,7 +11,7 @@ typedef struct hipFuncAttributes hipFuncAttributes;
 #include "hip_cpp_bridge.h"
 #include <hip/hip_runtime.h>
 #include <hip/hcc_detail/hip_runtime_api.h>
-#include <hsa/hsa.h>
+#include <hsa_limited.h>
 
 typedef struct {
     /* argument types */
@@ -57,6 +57,21 @@ hipMemcpyDtoH(void* dst, hipDeviceptr_t src, size_t sizeBytes)
 }
 
 hipError_t
+hipGetDeviceCount(int* count)
+{
+   ava_argument(count) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hipError_t
+hipSetDevice(int deviceId)
+{
+   ava_argument(deviceId) {
+   }
+}
+
+hipError_t
 hipMemcpyHtoD(hipDeviceptr_t dst, void* src, size_t sizeBytes)
 {
    ava_argument(src) {
@@ -90,11 +105,137 @@ hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
    }
 }
 
+hipError_t
+hipMemGetInfo(size_t* __free, size_t* total)
+{
+   ava_argument(__free) {
+      ava_out; ava_buffer(1);
+   }
+   ava_argument(total) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hipError_t
+nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent)
+{
+   ava_argument(stream) {
+      ava_out; ava_buffer(1);
+      ava_element {
+         ava_handle;
+      }
+   }
+   ava_argument(agent) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hipError_t
+hipGetDevice(int* deviceId)
+{
+   ava_argument(deviceId) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hipError_t
+hipInit(unsigned int flags)
+{
+   ava_argument(flags) {
+   }
+}
+
+hipError_t
+hipCtxGetCurrent(hipCtx_t* ctx)
+{
+   ava_argument(ctx) {
+      ava_out; ava_buffer(1);
+      ava_element {
+         ava_handle;
+      }
+   }
+}
+
+hipError_t hipMemcpy2DAsync(void* dst, size_t dpitch, const void* src,
+                            size_t spitch, size_t width, size_t height,
+                            hipMemcpyKind kind, hipStream_t stream)
+{
+   ava_argument(dst) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyDeviceToHost) {
+         ava_out;
+         ava_buffer(width * height);
+      } else {
+         ava_opaque;
+      }
+   }
+   ava_argument(src) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyHostToDevice) {
+         ava_in;
+         ava_buffer(width * height);
+      } else {
+         ava_opaque;
+      }
+   }
+   ava_argument(stream) {
+      ava_handle;
+   }
+}
+
+hipError_t hipStreamSynchronize(hipStream_t stream)
+{
+   ava_argument(stream) {
+      ava_handle;
+   }
+}
+
+hipError_t
+__do_c_hipGetDeviceProperties(char* prop, int deviceId)
+{
+   ava_argument(prop) {
+      ava_out; ava_buffer(sizeof(hipDeviceProp_t));
+   }
+   ava_argument(deviceId) {
+   }
+}
+
 ava_utility size_t hipLaunchKernel_extra_size(void **extra) {
     size_t size = 1;
     while (extra[size - 1] != HIP_LAUNCH_PARAM_END)
         size++;
     return size;
+}
+
+hipError_t
+__do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
+                      uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
+                      uint32_t localWorkSizeX, uint32_t localWorkSizeY,
+                      uint32_t localWorkSizeZ, size_t sharedMemBytes,
+                      hipStream_t stream, void** kernelParams, char* extra,
+                      size_t extra_size, hipEvent_t start, hipEvent_t stop)
+{
+   ava_argument(f) {
+         ava_handle;
+   }
+    ava_argument(kernelParams) {
+        ava_in; ava_buffer(1);
+        ava_element {
+           ava_opaque;
+        }
+    }
+    ava_argument(extra) {
+        ava_in; ava_buffer(extra_size);
+    }
+    ava_argument (stream) {
+       ava_handle;
+    }
+    ava_argument (start) {
+       ava_handle;
+    }
+    ava_argument (stop) {
+       ava_handle;
+    }
 }
 
 hipError_t
@@ -120,10 +261,13 @@ __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
     ava_argument(extra) {
         ava_in; ava_buffer(extra_size);
     }
+    ava_argument (stream) {
+       ava_handle;
+    }
 }
 
 hsa_status_t
-HSA_API hsa_system_major_extension_supported(
+HSA_API nw_hsa_system_major_extension_supported(
       uint16_t extension,
       uint16_t version_major,
       uint16_t *version_minor,
@@ -138,7 +282,7 @@ HSA_API hsa_system_major_extension_supported(
 }
 
 hsa_status_t
-HSA_API hsa_executable_create_alt(
+HSA_API nw_hsa_executable_create_alt(
     hsa_profile_t profile,
     hsa_default_float_rounding_mode_t default_float_rounding_mode,
     const char *options,
@@ -153,7 +297,7 @@ HSA_API hsa_executable_create_alt(
 }
 
 hsa_status_t
-HSA_API hsa_isa_from_name(
+HSA_API nw_hsa_isa_from_name(
     const char *name,
     hsa_isa_t *isa)
 {
@@ -161,6 +305,18 @@ HSA_API hsa_isa_from_name(
       ava_in; ava_buffer(strlen(name) + 1);
    }
    ava_argument(isa) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hipError_t hipPeekAtLastError(void)
+{
+}
+
+hipError_t
+hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId)
+{
+   ava_argument(pi) {
       ava_out; ava_buffer(1);
    }
 }
@@ -174,6 +330,92 @@ hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
    ava_argument(value) {
       ava_depends_on(max_value);
       ava_out; ava_buffer(max_value);
+   }
+}
+
+hipError_t hipCtxSetCurrent(hipCtx_t ctx)
+{
+   ava_argument(ctx) ava_handle;
+}
+
+hipError_t hipEventCreate(hipEvent_t* event)
+{
+   ava_argument(event) {
+      ava_out; ava_buffer(1);
+      ava_element {
+         ava_handle; ava_allocates;
+      }
+   }
+}
+
+hipError_t hipEventRecord(hipEvent_t event, hipStream_t stream)
+{
+   ava_argument(event) ava_handle;
+   ava_argument(stream) ava_handle;
+}
+
+hipError_t hipEventSynchronize(hipEvent_t event)
+{
+   ava_argument(event) ava_handle;
+}
+
+hipError_t hipEventDestroy(hipEvent_t event)
+{
+   ava_argument(event) {
+      ava_handle; ava_deallocates;
+   }
+}
+
+hipError_t hipEventElapsedTime(float* ms, hipEvent_t start, hipEvent_t stop)
+{
+   ava_argument(ms) {
+      ava_out; ava_buffer(1);
+   }
+   ava_argument(start) ava_handle;
+   ava_argument(stop) ava_handle;
+}
+
+hipError_t hipModuleLoad(hipModule_t* module, const char* fname)
+{
+   ava_argument(module) {
+      ava_out; ava_buffer(1);
+      ava_element {
+         ava_handle; ava_allocates;
+      }
+   }
+   ava_argument(fname) {
+      ava_in; ava_buffer(strlen(fname) + 1);
+   }
+}
+
+hipError_t hipModuleUnload(hipModule_t module)
+{
+   ava_argument(module) {
+      ava_handle; ava_deallocates;
+   }
+}
+
+hipError_t hipStreamDestroy(hipStream_t stream)
+{
+   ava_argument(stream) {
+      ava_handle; ava_deallocates;
+   }
+}
+
+hipError_t hipModuleGetFunction(hipFunction_t* function, hipModule_t module,
+                                const char* kname)
+{
+   ava_argument(function) {
+      ava_out; ava_buffer(1);
+      ava_element {
+         ava_handle; ava_allocates;
+      }
+   }
+   ava_argument(module) {
+      ava_handle;
+   }
+   ava_argument(kname) {
+      ava_in; ava_buffer(strlen(kname) + 1);
    }
 }
 
@@ -267,7 +509,9 @@ __do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
    }
 }
 
-hsa_status_t
-HSA_API hsa_init()
+hipError_t hipCtxGetDevice(hipDevice_t* device)
 {
+   ava_argument(device) {
+      ava_out; ava_buffer(1);
+   }
 }

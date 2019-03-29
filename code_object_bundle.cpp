@@ -1,5 +1,6 @@
 #include "../include/hip/hcc_detail/code_object_bundle.hpp"
 
+#include <hsa_limited.h>
 #include <hsa/hsa.h>
 
 #include <algorithm>
@@ -35,7 +36,7 @@ std::string isa_name(std::string triple)
 
     static hsa_isa_t tmp{};
     static const bool is_old_rocr{
-        hsa_isa_from_name(triple.c_str(), &tmp) != HSA_STATUS_SUCCESS};
+        nw_hsa_isa_from_name(triple.c_str(), &tmp) != HSA_STATUS_SUCCESS};
 
     if (is_old_rocr) {
         auto tmp{triple.substr(triple.rfind('x') + 1)};
@@ -57,7 +58,7 @@ hsa_isa_t hip_impl::triple_to_hsa_isa(const std::string& triple) {
 
     hsa_isa_t r{};
 
-    if(HSA_STATUS_SUCCESS != hsa_isa_from_name(isa.c_str(), &r)) {
+    if(HSA_STATUS_SUCCESS != nw_hsa_isa_from_name(isa.c_str(), &r)) {
         r.handle = 0;
     }
 

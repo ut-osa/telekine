@@ -13,6 +13,9 @@ extern "C" {
 struct hipFuncAttributes;
 typedef struct hipFuncAttributes hipFuncAttributes;
 
+hipError_t
+__do_c_hipGetDeviceProperties(char* prop, int deviceId);
+
 hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
     hsa_executable_symbol_t executable_symbol,
     hsa_executable_symbol_info_t attribute, char *value, size_t max_value);
@@ -48,10 +51,16 @@ size_t __do_c_get_kerenel_symbols(
       hsa_executable_symbol_t *symbols,
       size_t symbols_len);
 
-struct extra_disc {
-   size_t buffer_size;
-   uint8_t buffer[];
-};
+hipError_t
+nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent);
+
+hipError_t
+__do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
+                      uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
+                      uint32_t localWorkSizeX, uint32_t localWorkSizeY,
+                      uint32_t localWorkSizeZ, size_t sharedMemBytes,
+                      hipStream_t stream, void** kernelParams, char* extra,
+                      size_t extra_size, hipEvent_t start, hipEvent_t stop);
 
 hipError_t
 __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
