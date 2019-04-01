@@ -67,8 +67,6 @@ hipGetDeviceCount(int* count)
 hipError_t
 hipSetDevice(int deviceId)
 {
-   ava_argument(deviceId) {
-   }
 }
 
 hipError_t

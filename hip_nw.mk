@@ -18,8 +18,8 @@ WORKER_LIBS+=`pkg-config --libs glib-2.0` -L/opt/rocm/lib -lhip_hcc -lhsa-runtim
 all: libguestlib.so worker
 
 GENERAL_SOURCES=$(addprefix ../../../common/,cmd_channel.c murmur3.c cmd_handler.c endpoint_lib.c socket.c)
-WORKER_SPECIFIC_SOURCES=hip_nw_worker.c $(addprefix ../../../worker/,worker.c) $(addprefix ../../../common/,cmd_channel_shm_worker.c) $(addprefix ../../../common/,cmd_channel_min_worker.c)
-GUESTLIB_SPECIFIC_SOURCES=hip_nw_guestlib.c $(addprefix ../../../guestlib/src/,init.c) $(addprefix ../../../common/,cmd_channel_shm.c) $(addprefix ../../../common/,cmd_channel_min.c)
+WORKER_SPECIFIC_SOURCES=hip_nw_worker.c $(addprefix ../../../worker/,worker.c) $(addprefix ../../../common/,cmd_channel_shm_worker.c cmd_channel_min_worker.c cmd_channel_socket_worker.c)
+GUESTLIB_SPECIFIC_SOURCES=hip_nw_guestlib.c $(addprefix ../../../guestlib/src/,init.c) $(addprefix ../../../common/,cmd_channel_shm.c cmd_channel_min.c cmd_channel_socket.c)
 
 worker: $(GENERAL_SOURCES) $(WORKER_SPECIFIC_SOURCES)
 	$(CC) -I../../../worker/include $(includes) $(CFLAGS) $^ $(WORKER_LIBS) -o $@ ../hip_cpp_bridge.so
