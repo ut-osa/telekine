@@ -65,7 +65,7 @@ hipGetDeviceCount(int* count)
 }
 
 hipError_t
-hipSetDevice(int deviceId)
+nw_hipSetDevice(int deviceId)
 {
 }
 
@@ -129,7 +129,7 @@ nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent)
 }
 
 hipError_t
-hipGetDevice(int* deviceId)
+nw_hipGetDevice(int* deviceId)
 {
    ava_argument(deviceId) {
       ava_out; ava_buffer(1);
@@ -331,7 +331,7 @@ hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
    }
 }
 
-hipError_t hipCtxSetCurrent(hipCtx_t ctx)
+hipError_t nw_hipCtxSetCurrent(hipCtx_t ctx)
 {
    ava_argument(ctx) ava_opaque;
 }

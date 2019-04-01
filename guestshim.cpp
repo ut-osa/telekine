@@ -34,6 +34,8 @@ using namespace hc;
 #define MAX_AGENTS 16
 
 static unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
+int current_device = -1;
+hipCtx_t current_ctx = nullptr;
 
 hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                     uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
@@ -54,6 +56,48 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                        sharedMemBytes, hStream, kernelParams,
                                        (char *)(extra[1]), extra_size,
                                        startEvent, stopEvent);
+}
+
+hipError_t hipCtxSetCurrent(hipCtx_t ctx)
+{
+   hipError_t ret = hipSuccess;
+   if (ctx != current_ctx) {
+      ret = nw_hipCtxSetCurrent(ctx);
+      if (!ret)
+         current_ctx = ctx;
+   }
+   return ret;
+}
+
+hipError_t
+hipGetDevice(int* deviceId)
+{
+   hipError_t ret = hipSuccess;
+
+   if (current_device == -1) {
+      static std::once_flag f;
+      std::call_once(f, [&ret] () {
+         int id;
+         ret = nw_hipGetDevice(&id);
+         if (!ret)
+            current_device = id;
+     });
+   }
+   *deviceId = current_device;
+   return ret;
+}
+
+hipError_t
+hipSetDevice(int deviceId)
+{
+   hipError_t ret = hipSuccess;
+
+   if (current_device != deviceId) {
+      ret = nw_hipSetDevice(deviceId);
+      if (!ret)
+         current_device = deviceId;
+   }
+   return ret;
 }
 
 hipError_t

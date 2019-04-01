@@ -1888,7 +1888,7 @@ hipError_t hipCtxPushCurrent(hipCtx_t ctx) DEPRECATED(DEPRECATED_MSG);
  * @see hipCtxCreate, hipCtxDestroy, hipCtxGetFlags, hipCtxPopCurrent, hipCtxGetCurrent,
  * hipCtxPushCurrent, hipCtxSetCacheConfig, hipCtxSynchronize , hipCtxGetDevice
  */
-hipError_t hipCtxSetCurrent(hipCtx_t ctx) DEPRECATED(DEPRECATED_MSG);
+hipError_t hipCtxSetCurrent(hipCtx_t ctx);
 
 /**
  * @brief Get the handle of the current/ default context

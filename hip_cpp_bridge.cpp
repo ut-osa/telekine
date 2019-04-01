@@ -13,6 +13,24 @@
 using std::string;
 
 extern "C" hipError_t
+nw_hipCtxSetCurrent(hipCtx_t ctx)
+{
+   return hipCtxSetCurrent(ctx);
+}
+
+extern "C" hipError_t
+nw_hipGetDevice(int *deviceId)
+{
+   return hipGetDevice(deviceId);
+}
+
+extern "C" hipError_t
+nw_hipSetDevice(int deviceId)
+{
+   return hipSetDevice(deviceId);
+}
+
+extern "C" hipError_t
 nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent)
 {
    hipError_t ret = hipStreamCreate(stream);

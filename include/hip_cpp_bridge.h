@@ -52,6 +52,15 @@ size_t __do_c_get_kerenel_symbols(
       size_t symbols_len);
 
 hipError_t
+nw_hipCtxSetCurrent(hipCtx_t ctx);
+
+hipError_t
+nw_hipGetDevice(int* deviceId);
+
+hipError_t
+nw_hipSetDevice(int deviceId);
+
+hipError_t
 nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent);
 
 hipError_t
