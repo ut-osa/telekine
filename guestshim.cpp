@@ -31,8 +31,6 @@
 using namespace std;
 using namespace hc;
 
-using  std::printf;
-
 #define MAX_AGENTS 16
 
 static unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
@@ -64,9 +62,23 @@ hipStreamCreate(hipStream_t* stream)
    hsa_agent_t agent;
 
    hipError_t ret = nw_hipStreamCreate(stream, &agent);
-   if (!ret)
+   if (!ret) {
       stream_to_agent.emplace(*stream, agent);
+      cout << "stream to agent added!\n";
+   }
 
+   return ret;
+}
+
+hipError_t
+hipStreamDestroy(hipStream_t stream)
+{
+   hipError_t ret = nw_hipStreamDestroy(stream);
+   if (!ret) {
+      auto it = stream_to_agent.find(stream);
+      if (it != stream_to_agent.end())
+         stream_to_agent.erase(it);
+   }
    return ret;
 }
 

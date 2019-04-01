@@ -24,6 +24,12 @@ nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent)
 }
 
 extern "C" hipError_t
+nw_hipStreamDestroy(hipStream_t stream)
+{
+   return hipStreamDestroy(stream);
+}
+
+extern "C" hipError_t
 __do_c_hipGetDeviceProperties(char* prop, int deviceId)
 {
    return hipGetDeviceProperties((hipDeviceProp_t *)prop, deviceId);

@@ -120,7 +120,7 @@ nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent)
    ava_argument(stream) {
       ava_out; ava_buffer(1);
       ava_element {
-         ava_handle;
+         ava_opaque;
       }
    }
    ava_argument(agent) {
@@ -149,7 +149,7 @@ hipCtxGetCurrent(hipCtx_t* ctx)
    ava_argument(ctx) {
       ava_out; ava_buffer(1);
       ava_element {
-         ava_handle;
+         ava_opaque;
       }
    }
 }
@@ -177,14 +177,14 @@ hipError_t hipMemcpy2DAsync(void* dst, size_t dpitch, const void* src,
       }
    }
    ava_argument(stream) {
-      ava_handle;
+      ava_opaque;
    }
 }
 
 hipError_t hipStreamSynchronize(hipStream_t stream)
 {
    ava_argument(stream) {
-      ava_handle;
+      ava_opaque;
    }
 }
 
@@ -214,7 +214,7 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                       size_t extra_size, hipEvent_t start, hipEvent_t stop)
 {
    ava_argument(f) {
-         ava_handle;
+         ava_opaque;
    }
     ava_argument(kernelParams) {
         ava_in; ava_buffer(1);
@@ -226,13 +226,13 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
         ava_in; ava_buffer(extra_size);
     }
     ava_argument (stream) {
-       ava_handle;
+       ava_opaque;
     }
     ava_argument (start) {
-       ava_handle;
+       ava_opaque;
     }
     ava_argument (stop) {
-       ava_handle;
+       ava_opaque;
     }
 }
 
@@ -247,7 +247,7 @@ __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
    ava_argument(f) {
       ava_in; ava_buffer(1);
       ava_element {
-         ava_handle;
+         ava_opaque;
       }
    }
     ava_argument(kernelParams) {
@@ -260,7 +260,7 @@ __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
         ava_in; ava_buffer(extra_size);
     }
     ava_argument (stream) {
-       ava_handle;
+       ava_opaque;
     }
 }
 
@@ -333,7 +333,7 @@ hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
 
 hipError_t hipCtxSetCurrent(hipCtx_t ctx)
 {
-   ava_argument(ctx) ava_handle;
+   ava_argument(ctx) ava_opaque;
 }
 
 hipError_t hipEventCreate(hipEvent_t* event)
@@ -341,26 +341,26 @@ hipError_t hipEventCreate(hipEvent_t* event)
    ava_argument(event) {
       ava_out; ava_buffer(1);
       ava_element {
-         ava_handle; ava_allocates;
+         ava_opaque;
       }
    }
 }
 
 hipError_t hipEventRecord(hipEvent_t event, hipStream_t stream)
 {
-   ava_argument(event) ava_handle;
-   ava_argument(stream) ava_handle;
+   ava_argument(event) ava_opaque;
+   ava_argument(stream) ava_opaque;
 }
 
 hipError_t hipEventSynchronize(hipEvent_t event)
 {
-   ava_argument(event) ava_handle;
+   ava_argument(event) ava_opaque;
 }
 
 hipError_t hipEventDestroy(hipEvent_t event)
 {
    ava_argument(event) {
-      ava_handle; ava_deallocates;
+      ava_opaque;
    }
 }
 
@@ -369,8 +369,8 @@ hipError_t hipEventElapsedTime(float* ms, hipEvent_t start, hipEvent_t stop)
    ava_argument(ms) {
       ava_out; ava_buffer(1);
    }
-   ava_argument(start) ava_handle;
-   ava_argument(stop) ava_handle;
+   ava_argument(start) ava_opaque;
+   ava_argument(stop) ava_opaque;
 }
 
 hipError_t hipModuleLoad(hipModule_t* module, const char* fname)
@@ -378,7 +378,7 @@ hipError_t hipModuleLoad(hipModule_t* module, const char* fname)
    ava_argument(module) {
       ava_out; ava_buffer(1);
       ava_element {
-         ava_handle; ava_allocates;
+         ava_opaque;
       }
    }
    ava_argument(fname) {
@@ -389,14 +389,14 @@ hipError_t hipModuleLoad(hipModule_t* module, const char* fname)
 hipError_t hipModuleUnload(hipModule_t module)
 {
    ava_argument(module) {
-      ava_handle; ava_deallocates;
+      ava_opaque;
    }
 }
 
-hipError_t hipStreamDestroy(hipStream_t stream)
+hipError_t nw_hipStreamDestroy(hipStream_t stream)
 {
    ava_argument(stream) {
-      ava_handle; ava_deallocates;
+      ava_opaque;
    }
 }
 
@@ -406,11 +406,11 @@ hipError_t hipModuleGetFunction(hipFunction_t* function, hipModule_t module,
    ava_argument(function) {
       ava_out; ava_buffer(1);
       ava_element {
-         ava_handle; ava_allocates;
+         ava_opaque;
       }
    }
    ava_argument(module) {
-      ava_handle;
+      ava_opaque;
    }
    ava_argument(kname) {
       ava_in; ava_buffer(strlen(kname) + 1);
@@ -502,7 +502,7 @@ __do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
    ava_argument(f) {
       ava_out; ava_buffer(1);
       ava_element {
-         ava_handle;
+         ava_opaque;
       }
    }
 }

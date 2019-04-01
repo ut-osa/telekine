@@ -55,6 +55,9 @@ hipError_t
 nw_hipStreamCreate(hipStream_t* stream, hsa_agent_t *agent);
 
 hipError_t
+nw_hipStreamDestroy(hipStream_t stream);
+
+hipError_t
 __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                       uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
                       uint32_t localWorkSizeX, uint32_t localWorkSizeY,
