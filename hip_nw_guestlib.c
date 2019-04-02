@@ -2750,18 +2750,25 @@ hipMemcpy2DAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    GPtrArray *__ava_alloc_list_hipMemcpy2DAsync = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
         /* Size: const void * src */
         if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if ((src) != (NULL) && (width * height) > (0)) {
+            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
+                && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
                 __total_buffer_size +=
                     command_channel_buffer_size(__chan,
                     ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
             }
         } else {
             if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-               assert(0 && "can't get here\n");
+                if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
+                    && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
+                    __total_buffer_size +=
+                        command_channel_buffer_size(__chan,
+                        ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
+                }
             }
     }}
     struct hip_hip_memcpy2_d_async_call *__cmd =
@@ -2777,14 +2784,22 @@ hipMemcpy2DAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_
 
         /* Input: void * dst */
         if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if ((dst) != (NULL) && (width * height) > (0)) {
+            if (kind == hipMemcpyDeviceToHost
+                && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                && ((kind == hipMemcpyDeviceToHost) ? (width * height) : (0)) > (0)) {
                 __cmd->dst = HAS_OUT_BUFFER_SENTINEL;
             } else {
                 __cmd->dst = NULL;
             }
         } else {
             if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                assert(0 && "can't get here\n");
+                if (kind == hipMemcpyDeviceToHost
+                    && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                    && ((kind == hipMemcpyDeviceToHost) ? (width * height) : (0)) > (0)) {
+                    __cmd->dst = HAS_OUT_BUFFER_SENTINEL;
+                } else {
+                    __cmd->dst = NULL;
+                }
             } else {
                 __cmd->dst = dst;
             }
@@ -2793,15 +2808,46 @@ hipMemcpy2DAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_
         __cmd->dpitch = dpitch;
         /* Input: const void * src */
         if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if (src != (NULL) && (width * height) > (0)) {
-                __cmd->src = (void *)command_channel_attach_buffer(__chan,
-                                          (struct command_base *)__cmd, src,
-                                          (width * height));
+            if (kind == hipMemcpyHostToDevice
+                && ((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
+                && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
+                __cmd->src =
+                    (void *)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, src,
+                    ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
             } else {
                 __cmd->src = NULL;
             }
         } else {
-           __cmd->src = src;
+            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (kind == hipMemcpyHostToDevice
+                    && ((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
+                    && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
+                    void *__tmp_src_0;
+                    __tmp_src_0 =
+                        (void *)calloc(1,
+                        ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
+                    g_ptr_array_add(__ava_alloc_list_hipMemcpy2DAsync, __tmp_src_0);
+                    const size_t __src_size_0 = ((kind == hipMemcpyHostToDevice) ? (width * height) : (0));
+                    for (size_t __src_index_0 = 0; __src_index_0 < __src_size_0; __src_index_0++) {
+                        const size_t ava_index = __src_index_0;
+
+                        char *__src_a_0;
+                        __src_a_0 = (src) + __src_index_0;
+
+                        char *__src_b_0;
+                        __src_b_0 = (__tmp_src_0) + __src_index_0;
+
+                        *__src_b_0 = *__src_a_0;
+                    }
+                    __cmd->src =
+                        (void *)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, __tmp_src_0,
+                        ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
+                } else {
+                    __cmd->src = NULL;
+                }
+            } else {
+                __cmd->src = src;
+            }
         }
         /* Input: size_t spitch */
         __cmd->spitch = spitch;
@@ -2839,6 +2885,8 @@ hipMemcpy2DAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_
     ava_add_call(__call_id, __call_record);
 
     command_channel_send_command(__chan, (struct command_base *)__cmd);
+
+    g_ptr_array_unref(__ava_alloc_list_hipMemcpy2DAsync);       /* Deallocate all memory in the alloc list */
 
     handle_commands_until(HIP_API, __call_record->__call_complete);
     hipError_t ret;
