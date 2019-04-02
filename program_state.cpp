@@ -2,7 +2,7 @@
 #include "hip_cpp_bridge.h"
 
 #include "hip_hcc_internal.h"
-#include "hsa_helpers.hpp"
+//#include "hsa_helpers.hpp"
 #include "trace_helper.h"
 
 #include "elfio/elfio.hpp"
@@ -29,6 +29,49 @@
 using namespace ELFIO;
 using namespace hip_impl;
 using namespace std;
+
+#define hsa_executable_symbol_get_info(x, y, z) ({\
+   auto __tmp = z; \
+   auto ret = __do_c_hsa_executable_symbol_get_info(x, y, (char *)z, sizeof(*__tmp)); \
+   ret;\
+})
+
+inline constexpr bool operator==(hsa_isa_t x, hsa_isa_t y) { return x.handle == y.handle; }
+
+namespace std {
+template <>
+struct hash<hsa_isa_t> {
+    size_t operator()(hsa_isa_t x) const { return hash<decltype(x.handle)>{}(x.handle); }
+};
+}  // namespace std
+
+namespace hip_impl {
+
+inline hsa_symbol_kind_t type(hsa_executable_symbol_t x) {
+    hsa_symbol_kind_t r = {};
+    hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_TYPE, &r);
+
+    return r;
+}
+
+inline std::string name(hsa_executable_symbol_t x) {
+    std::uint32_t sz = 0u;
+    hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_NAME_LENGTH, &sz);
+
+    std::string r(sz, '\0');
+   __do_c_hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_NAME,
+                                         &r.front(), sz);
+    return r;
+}
+
+inline hsa_agent_t agent(hsa_executable_symbol_t x) {
+    hsa_agent_t r = {};
+    hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_AGENT, &r);
+
+    return r;
+}
+
+}  // namespace hip_impl
 
 namespace {
 struct Symbol {

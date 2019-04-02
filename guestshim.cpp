@@ -6,18 +6,14 @@
 
 #include "hip_cpp_bridge.h"
 
-
-
 #include <libhsakmt/hsakmttypes.h>
-#include "hip/hip_runtime_api.h"
+#include <hip/hip_runtime_api.h>
 
 // Internal header, do not percolate upwards.
-#include <hip/hip_hcc_internal.h>
-#include "./hc.hpp"
-#include "./trace_helper.h"
+#include <hip_hcc_internal.h>
+#include <hc.hpp>
+#include <trace_helper.h>
 #include <hip/hip_hcc.h>
-
-//#include <program_state.hpp>
 
 #include <cassert>
 #include <cstddef>

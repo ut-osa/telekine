@@ -3,7 +3,6 @@
 
 
 #include "hip_hcc_internal.h"
-#include "hsa_helpers.hpp"
 #include "trace_helper.h"
 
 #include <string>
@@ -11,6 +10,15 @@
 #include <stdlib.h>
 
 using std::string;
+
+namespace hip_impl {
+inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {
+    std::uint64_t r = 0u;
+    hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_OBJECT, &r);
+
+    return r;
+}
+}
 
 extern "C" hipError_t
 nw_hipCtxSetCurrent(hipCtx_t ctx)
