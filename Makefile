@@ -3,7 +3,10 @@ export HIP_PATH
 
 HIPCC_VERBOSE = 1
 export HIPCC_VERBOSE
-HIPCC = ./hipcc
+HIP_PLATFORM = hcc
+export HIP_PLATFORM
+HIPCC = ./hipcc --amdgpu-target=gfx900
+
 
 TARGET = hcc
 
@@ -27,7 +30,8 @@ HIP_SOs = libhc_am.so libhip_hcc.so libhsa-runtime64.so.1 libhsakmt.so.1
 
 clangargs = -D__HIP_PLATFORM_HCC__=1
 
-CXXFLAGS = -g $(CFLAGS) -fPIC $(includes) -Wno-deprecated-declarations
+CXXFLAGS = -g $(CFLAGS) -fPIC $(includes) -Wno-deprecated-declarations \
+			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
 all: $(EXECUTABLE) worker libguestlib.so guestshim.so
