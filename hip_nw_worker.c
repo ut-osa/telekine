@@ -219,10 +219,115 @@ __wrapper_hipFree(void *ptr)
 }
 
 static hipError_t
+__wrapper_hipMemcpyHtoD(hipDeviceptr_t dst, size_t sizeBytes, void *src)
+{
+    hipError_t ret;
+    ret = hipMemcpyHtoD(dst, src, sizeBytes);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
 __wrapper_hipMemcpyDtoH(hipDeviceptr_t src, size_t sizeBytes, void *dst)
 {
     hipError_t ret;
     ret = hipMemcpyDtoH(dst, src, sizeBytes);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
+__wrapper_hipMemcpyDtoD(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes)
+{
+    hipError_t ret;
+    ret = hipMemcpyDtoD(dst, src, sizeBytes);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
+__wrapper_hipMemcpy(size_t sizeBytes, hipMemcpyKind kind, const void *src, void *dst)
+{
+    hipError_t ret;
+    ret = hipMemcpy(dst, src, sizeBytes, kind);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
+__wrapper_hipMemcpyHtoDAsync(hipDeviceptr_t dst, size_t sizeBytes, hipStream_t stream, void *src)
+{
+    hipError_t ret;
+    ret = hipMemcpyHtoDAsync(dst, src, sizeBytes, stream);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
+__wrapper_hipMemcpyDtoHAsync(hipDeviceptr_t src, size_t sizeBytes, hipStream_t stream, void *dst)
+{
+    hipError_t ret;
+    ret = hipMemcpyDtoHAsync(dst, src, sizeBytes, stream);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
+__wrapper_hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes, hipStream_t stream)
+{
+    hipError_t ret;
+    ret = hipMemcpyDtoDAsync(dst, src, sizeBytes, stream);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
+__wrapper_hipMemcpyAsync(size_t sizeBytes, hipMemcpyKind kind, const void *src, hipStream_t stream, void *dst)
+{
+    hipError_t ret;
+    ret = hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
 
     /* Report resources */
 
@@ -253,36 +358,6 @@ __wrapper_nw_hipSetDevice(int deviceId)
 {
     hipError_t ret;
     ret = nw_hipSetDevice(deviceId);
-
-    /* Report resources */
-
-#ifdef AVA_API_FUNCTION_CALL_RESOURCE
-    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
-#endif
-
-    return ret;
-}
-
-static hipError_t
-__wrapper_hipMemcpyHtoD(hipDeviceptr_t dst, size_t sizeBytes, void *src)
-{
-    hipError_t ret;
-    ret = hipMemcpyHtoD(dst, src, sizeBytes);
-
-    /* Report resources */
-
-#ifdef AVA_API_FUNCTION_CALL_RESOURCE
-    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
-#endif
-
-    return ret;
-}
-
-static hipError_t
-__wrapper_hipMemcpy(size_t sizeBytes, hipMemcpyKind kind, void *dst, const void *src)
-{
-    hipError_t ret;
-    ret = hipMemcpy(dst, src, sizeBytes, kind);
 
     /* Report resources */
 
@@ -369,8 +444,8 @@ __wrapper_hipCtxGetCurrent(hipCtx_t * ctx)
 }
 
 static hipError_t
-__wrapper_hipMemcpy2DAsync(size_t dpitch, size_t spitch, size_t width, size_t height, hipMemcpyKind kind, void *dst,
-    hipStream_t stream, const void *src)
+__wrapper_hipMemcpy2DAsync(size_t dpitch, size_t spitch, size_t width, size_t height, hipMemcpyKind kind,
+    const void *src, void *dst, hipStream_t stream)
 {
     hipError_t ret;
     ret = hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
@@ -417,7 +492,7 @@ __wrapper___do_c_hipGetDeviceProperties(char *prop, int deviceId)
 static hipError_t
 __wrapper___do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint32_t globalWorkSizeY,
     uint32_t globalWorkSizeZ, uint32_t localWorkSizeX, uint32_t localWorkSizeY, uint32_t localWorkSizeZ,
-    size_t sharedMemBytes, hipStream_t stream, void **kernelParams, size_t extra_size, hipEvent_t start, char *extra,
+    size_t sharedMemBytes, hipStream_t stream, void **kernelParams, size_t extra_size, char *extra, hipEvent_t start,
     hipEvent_t stop)
 {
     hipError_t ret;
@@ -470,7 +545,7 @@ __wrapper_nw_hsa_system_major_extension_supported(uint16_t extension, uint16_t v
 }
 
 static hsa_status_t
-__wrapper_nw_hsa_executable_create_alt(const char *options, hsa_profile_t profile,
+__wrapper_nw_hsa_executable_create_alt(hsa_profile_t profile, const char *options,
     hsa_default_float_rounding_mode_t default_float_rounding_mode, hsa_executable_t * executable)
 {
     hsa_status_t ret;
@@ -637,7 +712,7 @@ __wrapper_hipEventElapsedTime(float *ms, hipEvent_t start, hipEvent_t stop)
 }
 
 static hipError_t
-__wrapper_hipModuleLoad(hipModule_t * module, const char *fname)
+__wrapper_hipModuleLoad(const char *fname, hipModule_t * module)
 {
     hipError_t ret;
     ret = hipModuleLoad(module, fname);
@@ -682,7 +757,7 @@ __wrapper_nw_hipStreamDestroy(hipStream_t stream)
 }
 
 static hipError_t
-__wrapper_hipModuleGetFunction(const char *kname, hipFunction_t * function, hipModule_t module)
+__wrapper_hipModuleGetFunction(hipFunction_t * function, const char *kname, hipModule_t module)
 {
     hipError_t ret;
     ret = hipModuleGetFunction(function, module, kname);
@@ -742,7 +817,7 @@ __wrapper___do_c_hsa_agent_get_info(hsa_agent_t agent, hsa_agent_info_t attribut
 }
 
 static int
-__wrapper___do_c_load_executable(size_t file_len, hsa_executable_t * executable, const char *file_buf,
+__wrapper___do_c_load_executable(size_t file_len, const char *file_buf, hsa_executable_t * executable,
     hsa_agent_t * agent)
 {
     int ret;
@@ -819,7 +894,7 @@ __wrapper___do_c_query_host_address(uint64_t kernel_object_, char *kernel_header
 }
 
 static hipError_t
-__wrapper___do_c_get_kernel_descriptor(const hsa_executable_symbol_t * symbol, const char *name, hipFunction_t * f)
+__wrapper___do_c_get_kernel_descriptor(const char *name, const hsa_executable_symbol_t * symbol, hipFunction_t * f)
 {
     hipError_t ret;
     ret = __do_c_get_kernel_descriptor(symbol, name, f);
@@ -1015,6 +1090,76 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
+    case CALL_HIP_HIP_MEMCPY_HTO_D:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipMemcpyHtoD = g_ptr_array_new_full(0, free);
+        struct hip_hip_memcpy_hto_d_call *__call = (struct hip_hip_memcpy_hto_d_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_hto_d_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: hipDeviceptr_t dst */
+        hipDeviceptr_t dst;
+        dst = __call->dst;
+        dst = __call->dst;
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Input: void * src */
+        void *src;
+        src =
+            ((__call->src) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->src))) : (__call->src);
+        if (__call->src != NULL)
+            src =
+                ((__call->src) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                        __call->src))) : (__call->src);
+        else
+            src = NULL;
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipMemcpyHtoD(dst, sizeBytes, src);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+        }
+        struct hip_hip_memcpy_hto_d_ret *__ret =
+            (struct hip_hip_memcpy_hto_d_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_memcpy_hto_d_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MEMCPY_HTO_D;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipMemcpyHtoD);      /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
     case CALL_HIP_HIP_MEMCPY_DTO_H:{
         ava_is_in = 1;
         ava_is_out = 0;
@@ -1095,6 +1240,670 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_hipMemcpyDtoH);      /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP_HIP_MEMCPY_DTO_D:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipMemcpyDtoD = g_ptr_array_new_full(0, free);
+        struct hip_hip_memcpy_dto_d_call *__call = (struct hip_hip_memcpy_dto_d_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_dto_d_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: hipDeviceptr_t dst */
+        hipDeviceptr_t dst;
+        dst = __call->dst;
+        dst = __call->dst;
+
+        /* Input: hipDeviceptr_t src */
+        hipDeviceptr_t src;
+        src = __call->src;
+        src = __call->src;
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipMemcpyDtoD(dst, src, sizeBytes);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+        }
+        struct hip_hip_memcpy_dto_d_ret *__ret =
+            (struct hip_hip_memcpy_dto_d_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_memcpy_dto_d_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MEMCPY_DTO_D;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipMemcpyDtoD);      /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP_HIP_MEMCPY:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipMemcpy = g_ptr_array_new_full(0, free);
+        struct hip_hip_memcpy_call *__call = (struct hip_hip_memcpy_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Input: hipMemcpyKind kind */
+        hipMemcpyKind kind;
+        kind = __call->kind;
+        kind = __call->kind;
+
+        /* Input: const void * src */
+        void *src;
+        src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->src))) : (__call->src);
+        if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && kind == hipMemcpyHostToDevice) {
+            if (__call->src != NULL)
+                src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+                    && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                            __call->src))) : (__call->src);
+            else
+                src = NULL;
+        } else {
+            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (__call->src != NULL) {
+                    const size_t __size = ((size_t) (kind == hipMemcpyHostToDevice) ? (sizeBytes) : (0));
+                    src = (void *)calloc(__size, sizeof(const void));
+                    g_ptr_array_add(__ava_alloc_list_hipMemcpy, src);
+                    if (kind == hipMemcpyHostToDevice) {
+                        void *__tmp_src_0;
+                        __tmp_src_0 = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+                            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                                    __call->src))) : (__call->src);
+                        const size_t __src_size_0 = (__size);
+                        for (size_t __src_index_0 = 0; __src_index_0 < __src_size_0; __src_index_0++) {
+                            const size_t ava_index = __src_index_0;
+
+                            char *__src_a_0;
+                            __src_a_0 = (src) + __src_index_0;
+
+                            char *__src_b_0;
+                            __src_b_0 = (__tmp_src_0) + __src_index_0;
+
+                            *__src_a_0 = *__src_b_0;
+                            *__src_a_0 = *__src_b_0;
+                    }}
+                } else {
+                    src = NULL;
+                }
+            } else {
+                src = __call->src;
+            }
+        }
+
+        /* Input: void * dst */
+        void *dst;
+        dst = (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && (__call->dst) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->dst))) : (__call->dst);
+        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+            if (__call->dst != NULL) {
+                const size_t __size = ((size_t) (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0));
+                dst = (void *)calloc(__size, sizeof(void));
+                g_ptr_array_add(__ava_alloc_list_hipMemcpy, dst);
+            } else {
+                dst = NULL;
+            }
+        } else {
+            dst = __call->dst;
+        }
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipMemcpy(sizeBytes, kind, src, dst);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+            /* Size: void * dst */
+            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                    __total_buffer_size +=
+                        command_channel_buffer_size(__chan,
+                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                }
+            } else {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                    if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                        && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                        __total_buffer_size +=
+                            command_channel_buffer_size(__chan,
+                            ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                    }
+                }
+        }}
+        struct hip_hip_memcpy_ret *__ret =
+            (struct hip_hip_memcpy_ret *)command_channel_new_command(__chan, sizeof(struct hip_hip_memcpy_ret),
+            __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MEMCPY;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+        /* Output: void * dst */
+        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+            if (kind == hipMemcpyDeviceToHost
+                && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                __ret->dst =
+                    (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, dst,
+                    ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+            } else {
+                __ret->dst = NULL;
+            }
+        } else {
+            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (kind == hipMemcpyDeviceToHost
+                    && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                    const size_t __size = (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0);
+                    void *__tmp_dst_0;
+                    __tmp_dst_0 = (void *)calloc(__size, sizeof(void));
+                    g_ptr_array_add(__ava_alloc_list_hipMemcpy, __tmp_dst_0);
+                    const size_t __dst_size_0 = (__size);
+                    for (size_t __dst_index_0 = 0; __dst_index_0 < __dst_size_0; __dst_index_0++) {
+                        const size_t ava_index = __dst_index_0;
+
+                        char *__dst_a_0;
+                        __dst_a_0 = (__tmp_dst_0) + __dst_index_0;
+
+                        char *__dst_b_0;
+                        __dst_b_0 = (dst) + __dst_index_0;
+
+                        *__dst_a_0 = *__dst_b_0;
+                    }
+                    __ret->dst =
+                        (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, __tmp_dst_0,
+                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                } else {
+                    __ret->dst = NULL;
+                }
+            } else {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_OPAQUE)) {
+                    __ret->dst = dst;
+                }
+            }
+        }
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipMemcpy);  /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP_HIP_MEMCPY_HTO_D_ASYNC:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipMemcpyHtoDAsync = g_ptr_array_new_full(0, free);
+        struct hip_hip_memcpy_hto_d_async_call *__call = (struct hip_hip_memcpy_hto_d_async_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_hto_d_async_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: hipDeviceptr_t dst */
+        hipDeviceptr_t dst;
+        dst = __call->dst;
+        dst = __call->dst;
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
+        /* Input: void * src */
+        void *src;
+        src =
+            ((__call->src) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->src))) : (__call->src);
+        if (__call->src != NULL)
+            src =
+                ((__call->src) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                        __call->src))) : (__call->src);
+        else
+            src = NULL;
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipMemcpyHtoDAsync(dst, sizeBytes, stream, src);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+        }
+        struct hip_hip_memcpy_hto_d_async_ret *__ret =
+            (struct hip_hip_memcpy_hto_d_async_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_memcpy_hto_d_async_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MEMCPY_HTO_D_ASYNC;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipMemcpyHtoDAsync); /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP_HIP_MEMCPY_DTO_H_ASYNC:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipMemcpyDtoHAsync = g_ptr_array_new_full(0, free);
+        struct hip_hip_memcpy_dto_h_async_call *__call = (struct hip_hip_memcpy_dto_h_async_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_dto_h_async_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: hipDeviceptr_t src */
+        hipDeviceptr_t src;
+        src = __call->src;
+        src = __call->src;
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
+        /* Input: void * dst */
+        void *dst;
+        dst =
+            ((__call->dst) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->dst))) : (__call->dst);
+        if (__call->dst != NULL) {
+            const size_t __size = ((size_t) sizeBytes);
+            dst = (void *)calloc(__size, sizeof(void));
+            g_ptr_array_add(__ava_alloc_list_hipMemcpyDtoHAsync, dst);
+        } else {
+            dst = NULL;
+        }
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipMemcpyDtoHAsync(src, sizeBytes, stream, dst);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+            /* Size: void * dst */
+            if ((dst) != (NULL) && (sizeBytes) > (0)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (sizeBytes) * sizeof(void));
+            }
+        }
+        struct hip_hip_memcpy_dto_h_async_ret *__ret =
+            (struct hip_hip_memcpy_dto_h_async_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_memcpy_dto_h_async_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MEMCPY_DTO_H_ASYNC;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+        /* Output: void * dst */
+        if ((dst) != (NULL) && (sizeBytes) > (0)) {
+            __ret->dst =
+                (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, dst,
+                (sizeBytes) * sizeof(void));
+        } else {
+            __ret->dst = NULL;
+        }
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipMemcpyDtoHAsync); /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP_HIP_MEMCPY_DTO_D_ASYNC:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipMemcpyDtoDAsync = g_ptr_array_new_full(0, free);
+        struct hip_hip_memcpy_dto_d_async_call *__call = (struct hip_hip_memcpy_dto_d_async_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_dto_d_async_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: hipDeviceptr_t dst */
+        hipDeviceptr_t dst;
+        dst = __call->dst;
+        dst = __call->dst;
+
+        /* Input: hipDeviceptr_t src */
+        hipDeviceptr_t src;
+        src = __call->src;
+        src = __call->src;
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipMemcpyDtoDAsync(dst, src, sizeBytes, stream);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+        }
+        struct hip_hip_memcpy_dto_d_async_ret *__ret =
+            (struct hip_hip_memcpy_dto_d_async_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_memcpy_dto_d_async_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MEMCPY_DTO_D_ASYNC;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipMemcpyDtoDAsync); /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP_HIP_MEMCPY_ASYNC:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipMemcpyAsync = g_ptr_array_new_full(0, free);
+        struct hip_hip_memcpy_async_call *__call = (struct hip_hip_memcpy_async_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_async_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Input: hipMemcpyKind kind */
+        hipMemcpyKind kind;
+        kind = __call->kind;
+        kind = __call->kind;
+
+        /* Input: const void * src */
+        void *src;
+        src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->src))) : (__call->src);
+        if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && kind == hipMemcpyHostToDevice) {
+            if (__call->src != NULL)
+                src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+                    && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                            __call->src))) : (__call->src);
+            else
+                src = NULL;
+        } else {
+            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (__call->src != NULL) {
+                    const size_t __size = ((size_t) (kind == hipMemcpyHostToDevice) ? (sizeBytes) : (0));
+                    src = (void *)calloc(__size, sizeof(const void));
+                    g_ptr_array_add(__ava_alloc_list_hipMemcpyAsync, src);
+                    if (kind == hipMemcpyHostToDevice) {
+                        void *__tmp_src_0;
+                        __tmp_src_0 = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+                            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                                    __call->src))) : (__call->src);
+                        const size_t __src_size_0 = (__size);
+                        for (size_t __src_index_0 = 0; __src_index_0 < __src_size_0; __src_index_0++) {
+                            const size_t ava_index = __src_index_0;
+
+                            char *__src_a_0;
+                            __src_a_0 = (src) + __src_index_0;
+
+                            char *__src_b_0;
+                            __src_b_0 = (__tmp_src_0) + __src_index_0;
+
+                            *__src_a_0 = *__src_b_0;
+                            *__src_a_0 = *__src_b_0;
+                    }}
+                } else {
+                    src = NULL;
+                }
+            } else {
+                src = __call->src;
+            }
+        }
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
+        /* Input: void * dst */
+        void *dst;
+        dst = (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && (__call->dst) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->dst))) : (__call->dst);
+        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+            if (__call->dst != NULL) {
+                const size_t __size = ((size_t) (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0));
+                dst = (void *)calloc(__size, sizeof(void));
+                g_ptr_array_add(__ava_alloc_list_hipMemcpyAsync, dst);
+            } else {
+                dst = NULL;
+            }
+        } else {
+            dst = __call->dst;
+        }
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipMemcpyAsync(sizeBytes, kind, src, stream, dst);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+            /* Size: void * dst */
+            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                    __total_buffer_size +=
+                        command_channel_buffer_size(__chan,
+                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                }
+            } else {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                    if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                        && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                        __total_buffer_size +=
+                            command_channel_buffer_size(__chan,
+                            ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                    }
+                }
+        }}
+        struct hip_hip_memcpy_async_ret *__ret =
+            (struct hip_hip_memcpy_async_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_memcpy_async_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MEMCPY_ASYNC;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+        /* Output: void * dst */
+        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+            if (kind == hipMemcpyDeviceToHost
+                && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                __ret->dst =
+                    (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, dst,
+                    ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+            } else {
+                __ret->dst = NULL;
+            }
+        } else {
+            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (kind == hipMemcpyDeviceToHost
+                    && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                    const size_t __size = (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0);
+                    void *__tmp_dst_0;
+                    __tmp_dst_0 = (void *)calloc(__size, sizeof(void));
+                    g_ptr_array_add(__ava_alloc_list_hipMemcpyAsync, __tmp_dst_0);
+                    const size_t __dst_size_0 = (__size);
+                    for (size_t __dst_index_0 = 0; __dst_index_0 < __dst_size_0; __dst_index_0++) {
+                        const size_t ava_index = __dst_index_0;
+
+                        char *__dst_a_0;
+                        __dst_a_0 = (__tmp_dst_0) + __dst_index_0;
+
+                        char *__dst_b_0;
+                        __dst_b_0 = (dst) + __dst_index_0;
+
+                        *__dst_a_0 = *__dst_b_0;
+                    }
+                    __ret->dst =
+                        (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, __tmp_dst_0,
+                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                } else {
+                    __ret->dst = NULL;
+                }
+            } else {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_OPAQUE)) {
+                    __ret->dst = dst;
+                }
+            }
+        }
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipMemcpyAsync);     /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
@@ -1221,258 +2030,6 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_nw_hipSetDevice);    /* Deallocate all memory in the alloc list */
-        command_channel_free_command(__chan, (struct command_base *)__call);
-        command_channel_free_command(__chan, (struct command_base *)__ret);
-        break;
-    }
-    case CALL_HIP_HIP_MEMCPY_HTO_D:{
-        ava_is_in = 1;
-        ava_is_out = 0;
-        GPtrArray *__ava_alloc_list_hipMemcpyHtoD = g_ptr_array_new_full(0, free);
-        struct hip_hip_memcpy_hto_d_call *__call = (struct hip_hip_memcpy_hto_d_call *)__cmd;
-        assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_hto_d_call));
-#ifdef AVA_RECORD_REPLAY
-
-#endif
-
-        /* Unpack and translate arguments */
-
-        /* Input: hipDeviceptr_t dst */
-        hipDeviceptr_t dst;
-        dst = __call->dst;
-        dst = __call->dst;
-
-        /* Input: size_t sizeBytes */
-        size_t sizeBytes;
-        sizeBytes = __call->sizeBytes;
-        sizeBytes = __call->sizeBytes;
-
-        /* Input: void * src */
-        void *src;
-        src =
-            ((__call->src) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
-                    __call->src))) : (__call->src);
-        if (__call->src != NULL)
-            src =
-                ((__call->src) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
-                        __call->src))) : (__call->src);
-        else
-            src = NULL;
-
-        /* Perform Call */
-        hipError_t ret;
-        ret = __wrapper_hipMemcpyHtoD(dst, sizeBytes, src);
-
-        ava_is_in = 0;
-        ava_is_out = 1;
-        size_t __total_buffer_size = 0; {
-        }
-        struct hip_hip_memcpy_hto_d_ret *__ret =
-            (struct hip_hip_memcpy_hto_d_ret *)command_channel_new_command(__chan,
-            sizeof(struct hip_hip_memcpy_hto_d_ret), __total_buffer_size);
-        __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_HIP_MEMCPY_HTO_D;
-        __ret->__call_id = __call->__call_id;
-
-        /* Output: hipError_t ret */
-        __ret->ret = ret;
-
-#ifdef AVA_RECORD_REPLAY
-
-#endif
-
-        /* Send reply message */
-        command_channel_send_command(__chan, (struct command_base *)__ret);
-
-#ifdef AVA_RECORD_REPLAY
-        /* Record call in object metadata */
-
-#endif
-
-        g_ptr_array_unref(__ava_alloc_list_hipMemcpyHtoD);      /* Deallocate all memory in the alloc list */
-        command_channel_free_command(__chan, (struct command_base *)__call);
-        command_channel_free_command(__chan, (struct command_base *)__ret);
-        break;
-    }
-    case CALL_HIP_HIP_MEMCPY:{
-        ava_is_in = 1;
-        ava_is_out = 0;
-        GPtrArray *__ava_alloc_list_hipMemcpy = g_ptr_array_new_full(0, free);
-        struct hip_hip_memcpy_call *__call = (struct hip_hip_memcpy_call *)__cmd;
-        assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_call));
-#ifdef AVA_RECORD_REPLAY
-
-#endif
-
-        /* Unpack and translate arguments */
-
-        /* Input: size_t sizeBytes */
-        size_t sizeBytes;
-        sizeBytes = __call->sizeBytes;
-        sizeBytes = __call->sizeBytes;
-
-        /* Input: hipMemcpyKind kind */
-        hipMemcpyKind kind;
-        kind = __call->kind;
-        kind = __call->kind;
-
-        /* Input: void * dst */
-        void *dst;
-        dst = (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-            && (__call->dst) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
-                    __call->dst))) : (__call->dst);
-        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if (__call->dst != NULL) {
-                const size_t __size = ((size_t) (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0));
-                dst = (void *)calloc(__size, sizeof(void));
-                g_ptr_array_add(__ava_alloc_list_hipMemcpy, dst);
-            } else {
-                dst = NULL;
-            }
-        } else {
-            dst = __call->dst;
-        }
-
-        /* Input: const void * src */
-        void *src;
-        src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
-                    __call->src))) : (__call->src);
-        if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-            && kind == hipMemcpyHostToDevice) {
-            if (__call->src != NULL)
-                src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-                    && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
-                            __call->src))) : (__call->src);
-            else
-                src = NULL;
-        } else {
-            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                if (__call->src != NULL) {
-                    const size_t __size = ((size_t) (kind == hipMemcpyHostToDevice) ? (sizeBytes) : (0));
-                    src = (void *)calloc(__size, sizeof(const void));
-                    g_ptr_array_add(__ava_alloc_list_hipMemcpy, src);
-                    if (kind == hipMemcpyHostToDevice) {
-                        void *__tmp_src_0;
-                        __tmp_src_0 = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-                            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
-                                    __call->src))) : (__call->src);
-                        const size_t __src_size_0 = (__size);
-                        for (size_t __src_index_0 = 0; __src_index_0 < __src_size_0; __src_index_0++) {
-                            const size_t ava_index = __src_index_0;
-
-                            char *__src_a_0;
-                            __src_a_0 = (src) + __src_index_0;
-
-                            char *__src_b_0;
-                            __src_b_0 = (__tmp_src_0) + __src_index_0;
-
-                            *__src_a_0 = *__src_b_0;
-                            *__src_a_0 = *__src_b_0;
-                    }}
-                } else {
-                    src = NULL;
-                }
-            } else {
-                src = __call->src;
-            }
-        }
-
-        /* Perform Call */
-        hipError_t ret;
-        ret = __wrapper_hipMemcpy(sizeBytes, kind, dst, src);
-
-        ava_is_in = 0;
-        ava_is_out = 1;
-        size_t __total_buffer_size = 0; {
-            /* Size: void * dst */
-            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
-                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
-                    __total_buffer_size +=
-                        command_channel_buffer_size(__chan,
-                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
-                }
-            } else {
-                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                    if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
-                        && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
-                        __total_buffer_size +=
-                            command_channel_buffer_size(__chan,
-                            ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
-                    }
-                }
-        }}
-        struct hip_hip_memcpy_ret *__ret =
-            (struct hip_hip_memcpy_ret *)command_channel_new_command(__chan, sizeof(struct hip_hip_memcpy_ret),
-            __total_buffer_size);
-        __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_HIP_MEMCPY;
-        __ret->__call_id = __call->__call_id;
-
-        /* Output: hipError_t ret */
-        __ret->ret = ret;
-
-        /* Output: void * dst */
-        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if (kind == hipMemcpyDeviceToHost
-                && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
-                && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
-                __ret->dst =
-                    (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, dst,
-                    ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
-            } else {
-                __ret->dst = NULL;
-            }
-        } else {
-            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                if (kind == hipMemcpyDeviceToHost
-                    && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
-                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
-                    const size_t __size = (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0);
-                    void *__tmp_dst_0;
-                    __tmp_dst_0 = (void *)calloc(__size, sizeof(void));
-                    g_ptr_array_add(__ava_alloc_list_hipMemcpy, __tmp_dst_0);
-                    const size_t __dst_size_0 = (__size);
-                    for (size_t __dst_index_0 = 0; __dst_index_0 < __dst_size_0; __dst_index_0++) {
-                        const size_t ava_index = __dst_index_0;
-
-                        char *__dst_a_0;
-                        __dst_a_0 = (__tmp_dst_0) + __dst_index_0;
-
-                        char *__dst_b_0;
-                        __dst_b_0 = (dst) + __dst_index_0;
-
-                        *__dst_a_0 = *__dst_b_0;
-                    }
-                    __ret->dst =
-                        (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, __tmp_dst_0,
-                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
-                } else {
-                    __ret->dst = NULL;
-                }
-            } else {
-                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_OPAQUE)) {
-                    __ret->dst = dst;
-                }
-            }
-        }
-
-#ifdef AVA_RECORD_REPLAY
-
-#endif
-
-        /* Send reply message */
-        command_channel_send_command(__chan, (struct command_base *)__ret);
-
-#ifdef AVA_RECORD_REPLAY
-        /* Record call in object metadata */
-
-#endif
-
-        g_ptr_array_unref(__ava_alloc_list_hipMemcpy);  /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
@@ -1956,11 +2513,6 @@ __handle_command_hip(struct command_base *__cmd)
             dst = __call->dst;
         }
 
-        /* Input: hipStream_t stream */
-        hipStream_t stream;
-        stream = __call->stream;
-        stream = __call->stream;
-
         /* Input: const void * src */
         void *src;
         src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
@@ -2006,9 +2558,14 @@ __handle_command_hip(struct command_base *__cmd)
             }
         }
 
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_hipMemcpy2DAsync(dpitch, spitch, width, height, kind, dst, stream, src);
+        ret = __wrapper_hipMemcpy2DAsync(dpitch, spitch, width, height, kind, src, dst, stream);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -2312,11 +2869,6 @@ __handle_command_hip(struct command_base *__cmd)
         extra_size = __call->extra_size;
         extra_size = __call->extra_size;
 
-        /* Input: hipEvent_t start */
-        hipEvent_t start;
-        start = __call->start;
-        start = __call->start;
-
         /* Input: char * extra */
         char *extra;
         extra =
@@ -2329,6 +2881,11 @@ __handle_command_hip(struct command_base *__cmd)
         else
             extra = NULL;
 
+        /* Input: hipEvent_t start */
+        hipEvent_t start;
+        start = __call->start;
+        start = __call->start;
+
         /* Input: hipEvent_t stop */
         hipEvent_t stop;
         stop = __call->stop;
@@ -2338,8 +2895,8 @@ __handle_command_hip(struct command_base *__cmd)
         hipError_t ret;
         ret =
             __wrapper___do_c_hipHccModuleLaunchKernel(f, globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ,
-            localWorkSizeX, localWorkSizeY, localWorkSizeZ, sharedMemBytes, stream, kernelParams, extra_size, start,
-            extra, stop);
+            localWorkSizeX, localWorkSizeY, localWorkSizeZ, sharedMemBytes, stream, kernelParams, extra_size, extra,
+            start, stop);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -2626,6 +3183,11 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Unpack and translate arguments */
 
+        /* Input: hsa_profile_t profile */
+        hsa_profile_t profile;
+        profile = __call->profile;
+        profile = __call->profile;
+
         /* Input: const char * options */
         char *options;
         options =
@@ -2637,11 +3199,6 @@ __handle_command_hip(struct command_base *__cmd)
                         __call->options))) : (__call->options);
         else
             options = NULL;
-
-        /* Input: hsa_profile_t profile */
-        hsa_profile_t profile;
-        profile = __call->profile;
-        profile = __call->profile;
 
         /* Input: hsa_default_float_rounding_mode_t default_float_rounding_mode */
         hsa_default_float_rounding_mode_t default_float_rounding_mode;
@@ -2663,7 +3220,7 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         hsa_status_t ret;
-        ret = __wrapper_nw_hsa_executable_create_alt(options, profile, default_float_rounding_mode, executable);
+        ret = __wrapper_nw_hsa_executable_create_alt(profile, options, default_float_rounding_mode, executable);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -3450,6 +4007,18 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Unpack and translate arguments */
 
+        /* Input: const char * fname */
+        char *fname;
+        fname =
+            ((__call->fname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                    __call->fname))) : (__call->fname);
+        if (__call->fname != NULL)
+            fname =
+                ((__call->fname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                        __call->fname))) : (__call->fname);
+        else
+            fname = NULL;
+
         /* Input: hipModule_t * module */
         hipModule_t *module;
         module =
@@ -3463,21 +4032,9 @@ __handle_command_hip(struct command_base *__cmd)
             module = NULL;
         }
 
-        /* Input: const char * fname */
-        char *fname;
-        fname =
-            ((__call->fname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                    __call->fname))) : (__call->fname);
-        if (__call->fname != NULL)
-            fname =
-                ((__call->fname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                        __call->fname))) : (__call->fname);
-        else
-            fname = NULL;
-
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_hipModuleLoad(module, fname);
+        ret = __wrapper_hipModuleLoad(fname, module);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -3642,18 +4199,6 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Unpack and translate arguments */
 
-        /* Input: const char * kname */
-        char *kname;
-        kname =
-            ((__call->kname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                    __call->kname))) : (__call->kname);
-        if (__call->kname != NULL)
-            kname =
-                ((__call->kname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                        __call->kname))) : (__call->kname);
-        else
-            kname = NULL;
-
         /* Input: hipFunction_t * function */
         hipFunction_t *function;
         function =
@@ -3667,6 +4212,18 @@ __handle_command_hip(struct command_base *__cmd)
             function = NULL;
         }
 
+        /* Input: const char * kname */
+        char *kname;
+        kname =
+            ((__call->kname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                    __call->kname))) : (__call->kname);
+        if (__call->kname != NULL)
+            kname =
+                ((__call->kname) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                        __call->kname))) : (__call->kname);
+        else
+            kname = NULL;
+
         /* Input: hipModule_t module */
         hipModule_t module;
         module = __call->module;
@@ -3674,7 +4231,7 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_hipModuleGetFunction(kname, function, module);
+        ret = __wrapper_hipModuleGetFunction(function, kname, module);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -3716,8 +4273,6 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_hipModuleGetFunction);       /* Deallocate all memory in the alloc list */
-        command_channel_free_command(__chan, (struct command_base *)__call);
-        command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
     case CALL_HIP_HIP_GET_LAST_ERROR:{
@@ -3764,8 +4319,6 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_hipGetLastError);    /* Deallocate all memory in the alloc list */
-        command_channel_free_command(__chan, (struct command_base *)__call);
-        command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
     case CALL_HIP_HIP_MEMSET:{
@@ -3827,8 +4380,6 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_hipMemset);  /* Deallocate all memory in the alloc list */
-        command_channel_free_command(__chan, (struct command_base *)__call);
-        command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
     case CALL_HIP___DO_C_HSA_AGENT_GET_INFO:{
@@ -3922,8 +4473,6 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list___do_c_hsa_agent_get_info);  /* Deallocate all memory in the alloc list */
-        command_channel_free_command(__chan, (struct command_base *)__call);
-        command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
     case CALL_HIP___DO_C_LOAD_EXECUTABLE:{
@@ -3943,6 +4492,18 @@ __handle_command_hip(struct command_base *__cmd)
         size_t file_len;
         file_len = __call->file_len;
         file_len = __call->file_len;
+
+        /* Input: const char * file_buf */
+        char *file_buf;
+        file_buf =
+            ((__call->file_buf) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                    __call->file_buf))) : (__call->file_buf);
+        if (__call->file_buf != NULL)
+            file_buf =
+                ((__call->file_buf) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                        __call->file_buf))) : (__call->file_buf);
+        else
+            file_buf = NULL;
 
         /* Input: hsa_executable_t * executable */
         hsa_executable_t *executable;
@@ -3979,18 +4540,6 @@ __handle_command_hip(struct command_base *__cmd)
         } else {
             executable = NULL;
         }
-
-        /* Input: const char * file_buf */
-        char *file_buf;
-        file_buf =
-            ((__call->file_buf) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                    __call->file_buf))) : (__call->file_buf);
-        if (__call->file_buf != NULL)
-            file_buf =
-                ((__call->file_buf) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                        __call->file_buf))) : (__call->file_buf);
-        else
-            file_buf = NULL;
 
         /* Input: hsa_agent_t * agent */
         hsa_agent_t *agent;
@@ -4030,7 +4579,7 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         int ret;
-        ret = __wrapper___do_c_load_executable(file_len, executable, file_buf, agent);
+        ret = __wrapper___do_c_load_executable(file_len, file_buf, executable, agent);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -4577,6 +5126,18 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Unpack and translate arguments */
 
+        /* Input: const char * name */
+        char *name;
+        name =
+            ((__call->name) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                    __call->name))) : (__call->name);
+        if (__call->name != NULL)
+            name =
+                ((__call->name) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
+                        __call->name))) : (__call->name);
+        else
+            name = NULL;
+
         /* Input: const hsa_executable_symbol_t * symbol */
         hsa_executable_symbol_t *symbol;
         symbol =
@@ -4613,18 +5174,6 @@ __handle_command_hip(struct command_base *__cmd)
             symbol = NULL;
         }
 
-        /* Input: const char * name */
-        char *name;
-        name =
-            ((__call->name) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                    __call->name))) : (__call->name);
-        if (__call->name != NULL)
-            name =
-                ((__call->name) != (NULL)) ? (((const char *)command_channel_get_buffer(__chan, __cmd,
-                        __call->name))) : (__call->name);
-        else
-            name = NULL;
-
         /* Input: hipFunction_t * f */
         hipFunction_t *f;
         f = ((__call->f) != (NULL)) ? (((hipFunction_t *) command_channel_get_buffer(__chan, __cmd,
@@ -4639,7 +5188,7 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper___do_c_get_kernel_descriptor(symbol, name, f);
+        ret = __wrapper___do_c_get_kernel_descriptor(name, symbol, f);
 
         ava_is_in = 0;
         ava_is_out = 1;

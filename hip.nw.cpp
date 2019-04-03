@@ -29,29 +29,6 @@ hipFree(void* ptr)
 }
 
 hipError_t
-hipMemcpyDtoH(void* dst, hipDeviceptr_t src, size_t sizeBytes)
-{
-   ava_argument(src) ava_opaque;
-   ava_argument(dst) {
-         ava_out;
-         ava_buffer(sizeBytes);
-   }
-}
-
-hipError_t
-hipGetDeviceCount(int* count)
-{
-   ava_argument(count) {
-      ava_out; ava_buffer(1);
-   }
-}
-
-hipError_t
-nw_hipSetDevice(int deviceId)
-{
-}
-
-hipError_t
 hipMemcpyHtoD(hipDeviceptr_t dst, void* src, size_t sizeBytes)
 {
    ava_argument(src) {
@@ -62,9 +39,25 @@ hipMemcpyHtoD(hipDeviceptr_t dst, void* src, size_t sizeBytes)
 }
 
 hipError_t
+hipMemcpyDtoH(void* dst, hipDeviceptr_t src, size_t sizeBytes)
+{
+   ava_argument(src) ava_opaque;
+   ava_argument(dst) {
+         ava_out;
+         ava_buffer(sizeBytes);
+   }
+}
+
+hipError_t
+hipMemcpyDtoD(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes)
+{
+   ava_argument(src) ava_opaque;
+   ava_argument(dst) ava_opaque;
+}
+
+hipError_t
 hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
 {
-
    ava_argument(dst) {
       ava_depends_on(kind);
       if (kind == hipMemcpyDeviceToHost) {
@@ -83,6 +76,75 @@ hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
          ava_opaque;
       }
    }
+}
+
+
+hipError_t
+hipMemcpyHtoDAsync(hipDeviceptr_t dst, void* src, size_t sizeBytes, hipStream_t stream)
+{
+   ava_argument(src) {
+         ava_in;
+         ava_buffer(sizeBytes);
+   }
+   ava_argument(dst) ava_opaque;
+   ava_argument(stream) ava_opaque;
+}
+
+hipError_t
+hipMemcpyDtoHAsync(void* dst, hipDeviceptr_t src, size_t sizeBytes, hipStream_t stream)
+{
+   ava_argument(src) ava_opaque;
+   ava_argument(dst) {
+         ava_out;
+         ava_buffer(sizeBytes);
+   }
+   ava_argument(stream) ava_opaque;
+}
+
+hipError_t
+hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes, hipStream_t stream)
+{
+   ava_argument(src) ava_opaque;
+   ava_argument(dst) ava_opaque;
+   ava_argument(stream) ava_opaque;
+}
+
+hipError_t
+hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
+               hipStream_t stream)
+{
+   ava_argument(dst) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyDeviceToHost) {
+         ava_out;
+         ava_buffer(sizeBytes);
+      } else {
+         ava_opaque;
+      }
+   }
+   ava_argument(src) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyHostToDevice) {
+         ava_in;
+         ava_buffer(sizeBytes);
+      } else {
+         ava_opaque;
+      }
+   }
+   ava_argument(stream) ava_opaque;
+}
+
+hipError_t
+hipGetDeviceCount(int* count)
+{
+   ava_argument(count) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hipError_t
+nw_hipSetDevice(int deviceId)
+{
 }
 
 hipError_t

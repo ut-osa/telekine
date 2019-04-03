@@ -16,10 +16,13 @@
 #define HIP_API 3
 
 enum hip_functions {
-    CALL_HIP_HIP_MALLOC, RET_HIP_HIP_MALLOC, CALL_HIP_HIP_FREE, RET_HIP_HIP_FREE, CALL_HIP_HIP_MEMCPY_DTO_H,
-        RET_HIP_HIP_MEMCPY_DTO_H, CALL_HIP_HIP_GET_DEVICE_COUNT, RET_HIP_HIP_GET_DEVICE_COUNT,
-        CALL_HIP_NW_HIP_SET_DEVICE, RET_HIP_NW_HIP_SET_DEVICE, CALL_HIP_HIP_MEMCPY_HTO_D, RET_HIP_HIP_MEMCPY_HTO_D,
-        CALL_HIP_HIP_MEMCPY, RET_HIP_HIP_MEMCPY, CALL_HIP_HIP_MEM_GET_INFO, RET_HIP_HIP_MEM_GET_INFO,
+    CALL_HIP_HIP_MALLOC, RET_HIP_HIP_MALLOC, CALL_HIP_HIP_FREE, RET_HIP_HIP_FREE, CALL_HIP_HIP_MEMCPY_HTO_D,
+        RET_HIP_HIP_MEMCPY_HTO_D, CALL_HIP_HIP_MEMCPY_DTO_H, RET_HIP_HIP_MEMCPY_DTO_H, CALL_HIP_HIP_MEMCPY_DTO_D,
+        RET_HIP_HIP_MEMCPY_DTO_D, CALL_HIP_HIP_MEMCPY, RET_HIP_HIP_MEMCPY, CALL_HIP_HIP_MEMCPY_HTO_D_ASYNC,
+        RET_HIP_HIP_MEMCPY_HTO_D_ASYNC, CALL_HIP_HIP_MEMCPY_DTO_H_ASYNC, RET_HIP_HIP_MEMCPY_DTO_H_ASYNC,
+        CALL_HIP_HIP_MEMCPY_DTO_D_ASYNC, RET_HIP_HIP_MEMCPY_DTO_D_ASYNC, CALL_HIP_HIP_MEMCPY_ASYNC,
+        RET_HIP_HIP_MEMCPY_ASYNC, CALL_HIP_HIP_GET_DEVICE_COUNT, RET_HIP_HIP_GET_DEVICE_COUNT,
+        CALL_HIP_NW_HIP_SET_DEVICE, RET_HIP_NW_HIP_SET_DEVICE, CALL_HIP_HIP_MEM_GET_INFO, RET_HIP_HIP_MEM_GET_INFO,
         CALL_HIP_NW_HIP_STREAM_CREATE, RET_HIP_NW_HIP_STREAM_CREATE, CALL_HIP_NW_HIP_GET_DEVICE,
         RET_HIP_NW_HIP_GET_DEVICE, CALL_HIP_HIP_INIT, RET_HIP_HIP_INIT, CALL_HIP_HIP_CTX_GET_CURRENT,
         RET_HIP_HIP_CTX_GET_CURRENT, CALL_HIP_HIP_MEMCPY2_D_ASYNC, RET_HIP_HIP_MEMCPY2_D_ASYNC,
@@ -117,6 +120,30 @@ struct hip_hip_free_call_record {
     volatile char __call_complete;
 };
 
+struct hip_hip_memcpy_hto_d_call {
+    struct command_base base;
+    intptr_t __call_id;
+    hipDeviceptr_t dst;
+    size_t sizeBytes;
+    void *src;
+};
+
+struct hip_hip_memcpy_hto_d_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip_hip_memcpy_hto_d_call_record {
+    hipDeviceptr_t dst;
+    size_t sizeBytes;
+    void *src;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
 struct hip_hip_memcpy_dto_h_call {
     struct command_base base;
     intptr_t __call_id;
@@ -135,6 +162,162 @@ struct hip_hip_memcpy_dto_h_ret {
 struct hip_hip_memcpy_dto_h_call_record {
     hipDeviceptr_t src;
     size_t sizeBytes;
+    void *dst;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_memcpy_dto_d_call {
+    struct command_base base;
+    intptr_t __call_id;
+    hipDeviceptr_t dst;
+    hipDeviceptr_t src;
+    size_t sizeBytes;
+};
+
+struct hip_hip_memcpy_dto_d_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip_hip_memcpy_dto_d_call_record {
+    hipDeviceptr_t dst;
+    hipDeviceptr_t src;
+    size_t sizeBytes;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_memcpy_call {
+    struct command_base base;
+    intptr_t __call_id;
+    size_t sizeBytes;
+    hipMemcpyKind kind;
+    void *src;
+    void *dst;
+};
+
+struct hip_hip_memcpy_ret {
+    struct command_base base;
+    intptr_t __call_id;
+    void *dst;
+    hipError_t ret;
+};
+
+struct hip_hip_memcpy_call_record {
+    size_t sizeBytes;
+    hipMemcpyKind kind;
+    void *src;
+    void *dst;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_memcpy_hto_d_async_call {
+    struct command_base base;
+    intptr_t __call_id;
+    hipDeviceptr_t dst;
+    size_t sizeBytes;
+    hipStream_t stream;
+    void *src;
+};
+
+struct hip_hip_memcpy_hto_d_async_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip_hip_memcpy_hto_d_async_call_record {
+    hipDeviceptr_t dst;
+    size_t sizeBytes;
+    hipStream_t stream;
+    void *src;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_memcpy_dto_h_async_call {
+    struct command_base base;
+    intptr_t __call_id;
+    hipDeviceptr_t src;
+    size_t sizeBytes;
+    hipStream_t stream;
+    void *dst;
+};
+
+struct hip_hip_memcpy_dto_h_async_ret {
+    struct command_base base;
+    intptr_t __call_id;
+    void *dst;
+    hipError_t ret;
+};
+
+struct hip_hip_memcpy_dto_h_async_call_record {
+    hipDeviceptr_t src;
+    size_t sizeBytes;
+    hipStream_t stream;
+    void *dst;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_memcpy_dto_d_async_call {
+    struct command_base base;
+    intptr_t __call_id;
+    hipDeviceptr_t dst;
+    hipDeviceptr_t src;
+    size_t sizeBytes;
+    hipStream_t stream;
+};
+
+struct hip_hip_memcpy_dto_d_async_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip_hip_memcpy_dto_d_async_call_record {
+    hipDeviceptr_t dst;
+    hipDeviceptr_t src;
+    size_t sizeBytes;
+    hipStream_t stream;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_memcpy_async_call {
+    struct command_base base;
+    intptr_t __call_id;
+    size_t sizeBytes;
+    hipMemcpyKind kind;
+    void *src;
+    hipStream_t stream;
+    void *dst;
+};
+
+struct hip_hip_memcpy_async_ret {
+    struct command_base base;
+    intptr_t __call_id;
+    void *dst;
+    hipError_t ret;
+};
+
+struct hip_hip_memcpy_async_call_record {
+    size_t sizeBytes;
+    hipMemcpyKind kind;
+    void *src;
+    hipStream_t stream;
     void *dst;
     hipError_t ret;
     char __handler_deallocate;
@@ -176,56 +359,6 @@ struct hip_nw_hip_set_device_ret {
 
 struct hip_nw_hip_set_device_call_record {
     int deviceId;
-    hipError_t ret;
-    char __handler_deallocate;
-    volatile char __call_complete;
-};
-
-struct hip_hip_memcpy_hto_d_call {
-    struct command_base base;
-    intptr_t __call_id;
-    hipDeviceptr_t dst;
-    size_t sizeBytes;
-    void *src;
-};
-
-struct hip_hip_memcpy_hto_d_ret {
-    struct command_base base;
-    intptr_t __call_id;
-
-    hipError_t ret;
-};
-
-struct hip_hip_memcpy_hto_d_call_record {
-    hipDeviceptr_t dst;
-    size_t sizeBytes;
-    void *src;
-    hipError_t ret;
-    char __handler_deallocate;
-    volatile char __call_complete;
-};
-
-struct hip_hip_memcpy_call {
-    struct command_base base;
-    intptr_t __call_id;
-    size_t sizeBytes;
-    hipMemcpyKind kind;
-    void *dst;
-    void *src;
-};
-
-struct hip_hip_memcpy_ret {
-    struct command_base base;
-    intptr_t __call_id;
-    void *dst;
-    hipError_t ret;
-};
-
-struct hip_hip_memcpy_call_record {
-    size_t sizeBytes;
-    hipMemcpyKind kind;
-    void *dst;
-    void *src;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -427,8 +560,8 @@ struct hip___do_c_hip_hcc_module_launch_kernel_call {
     hipStream_t stream;
     void **kernelParams;
     size_t extra_size;
-    hipEvent_t start;
     char *extra;
+    hipEvent_t start;
     hipEvent_t stop;
 };
 
@@ -451,8 +584,8 @@ struct hip___do_c_hip_hcc_module_launch_kernel_call_record {
     hipStream_t stream;
     void **kernelParams;
     size_t extra_size;
-    hipEvent_t start;
     char *extra;
+    hipEvent_t start;
     hipEvent_t stop;
     hipError_t ret;
     char __handler_deallocate;
@@ -774,8 +907,8 @@ struct hip_hip_event_elapsed_time_call_record {
 struct hip_hip_module_load_call {
     struct command_base base;
     intptr_t __call_id;
-    hipModule_t *module;
     char *fname;
+    hipModule_t *module;
 };
 
 struct hip_hip_module_load_ret {
@@ -786,8 +919,8 @@ struct hip_hip_module_load_ret {
 };
 
 struct hip_hip_module_load_call_record {
-    hipModule_t *module;
     char *fname;
+    hipModule_t *module;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -836,8 +969,8 @@ struct hip_nw_hip_stream_destroy_call_record {
 struct hip_hip_module_get_function_call {
     struct command_base base;
     intptr_t __call_id;
-    char *kname;
     hipFunction_t *function;
+    char *kname;
     hipModule_t module;
 };
 
@@ -849,8 +982,8 @@ struct hip_hip_module_get_function_ret {
 };
 
 struct hip_hip_module_get_function_call_record {
-    char *kname;
     hipFunction_t *function;
+    char *kname;
     hipModule_t module;
     hipError_t ret;
     char __handler_deallocate;
@@ -1049,8 +1182,8 @@ struct hip___do_c_query_host_address_call_record {
 struct hip___do_c_get_kernel_descriptor_call {
     struct command_base base;
     intptr_t __call_id;
-    hsa_executable_symbol_t *symbol;
     char *name;
+    hsa_executable_symbol_t *symbol;
     hipFunction_t *f;
 };
 
@@ -1062,8 +1195,8 @@ struct hip___do_c_get_kernel_descriptor_ret {
 };
 
 struct hip___do_c_get_kernel_descriptor_call_record {
-    hsa_executable_symbol_t *symbol;
     char *name;
+    hsa_executable_symbol_t *symbol;
     hipFunction_t *f;
     hipError_t ret;
     char __handler_deallocate;
