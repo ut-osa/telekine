@@ -34,7 +34,7 @@ CXXFLAGS = -g $(CFLAGS) -fPIC $(includes) -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) worker libguestlib.so guestshim.so
+all: $(EXECUTABLE) worker libguestlib.so guestshim.so crypto_guestshim.so
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
@@ -70,6 +70,14 @@ guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so
 	g++ -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
 	   -Wl,--no-allow-shlib-undefined \
 		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib
+
+crypto_guestshim.so: HIP-encryptedMemcpy/hip_wrapper.o HIP-encryptedMemcpy/crypto/aes_gcm.o \
+							guestshim.o program_state.o code_object_bundle.o libguestlib.so
+	$(HIPCC) -fPIC -shared $(includes) -o $@ HIP-encryptedMemcpy/hip_wrapper.o \
+		HIP-encryptedMemcpy/crypto/aes_gcm.o \
+		guestshim.o program_state.o code_object_bundle.o \
+	   -Wl,--no-allow-shlib-undefined \
+		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lsodium -ldl
 
 clean:
 	rm -rf hip_nw *.o *.so

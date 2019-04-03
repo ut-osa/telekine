@@ -1,0 +1,3 @@
+[submodule "HIP-encryptedMemcpy"]
+	path = HIP-encryptedMemcpy
+	url = plant.csres.utexas.edu:/filer/osa/git-sec/sec-gpu/HIP-encryptedMemcpy
