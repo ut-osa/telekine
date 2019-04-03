@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
@@ -196,14 +197,35 @@ struct command_channel* command_channel_min_new()
     command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
 
     /* connect manager to get worker port */
-    struct sockaddr_in serv_addr;
-    int manager_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int manager_fd;
 
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons( 4000 );
-    inet_pton(AF_INET, "128.83.143.74", &serv_addr.sin_addr);
-    connect(manager_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+    const char *ip_str = getenv("AVA_IP");
+    if (!ip_str)
+       ip_str = "127.0.0.1";
+
+    struct addrinfo hints = {
+       .ai_family = AF_INET,
+       .ai_socktype = SOCK_STREAM,
+    };
+    struct addrinfo *result, *rp;
+    if (getaddrinfo(ip_str, "4000", &hints, &result)) {
+       perror(ip_str);
+       exit(1);
+    }
+
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+       manager_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+       if (manager_fd == -1)
+          continue;
+       if (connect(manager_fd, rp->ai_addr, rp->ai_addrlen) != -1)
+          break;
+       close(manager_fd);
+    }
+    if (rp == NULL) {
+       fprintf(stderr, "%s:%d couldn't connect!\n", __FILE__, __LINE__);
+       exit(1);
+    }
+    freeaddrinfo(result);
 
     struct command_base* msg = command_channel_min_new_command((struct command_channel *)chan, sizeof(struct command_base), 0);
     msg->command_type = MSG_NEW_APPLICATION;
@@ -220,8 +242,6 @@ struct command_channel* command_channel_min_new()
 
     /* connect worker */
     DEBUG_PRINT("assigned worker at %lu\n", worker_port);
-    chan->sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    serv_addr.sin_port = htons(worker_port);
 
     usleep(500000);
     /* on mirage `connect` is always non-blocking and the server must
@@ -236,8 +256,25 @@ struct command_channel* command_channel_min_new()
         }
     }
     */
+    char port_buf[128];
+    sprintf(port_buf, "%lu", worker_port);
+    if (getaddrinfo(ip_str, port_buf, &hints, &result)) {
+       perror(ip_str);
+       exit(1);
+    }
 
-    int ret = connect(chan->sock_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+       chan->sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+       if (chan->sock_fd == -1)
+          continue;
+       if (connect(chan->sock_fd, rp->ai_addr, rp->ai_addrlen) != -1)
+          break;
+       close(chan->sock_fd);
+    }
+    if (rp == NULL) {
+       fprintf(stderr, "%s:%d couldn't connect!\n", __FILE__, __LINE__);
+       exit(1);
+    }
 
     chan->pfd.fd = chan->sock_fd;
     chan->pfd.events = POLLIN | POLLRDHUP;
