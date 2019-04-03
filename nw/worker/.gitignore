@@ -1,0 +1,8 @@
+*.out
+*.obj
+*.swp
+*.pyc
+*.cubin
+worker
+manager
+manager_tcp

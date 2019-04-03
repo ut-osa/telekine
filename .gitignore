@@ -3,3 +3,4 @@ hip_nw
 *.o
 *.so
 *.guesses
+worker

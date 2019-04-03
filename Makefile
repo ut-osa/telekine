@@ -7,15 +7,21 @@ HIPCC = ./hipcc
 
 TARGET = hcc
 
+GEN_CFLAGS += -g -fmax-errors=10 `pkg-config --cflags glib-2.0` -pthread \
+	-lrt -ldl -D_GNU_SOURCE -Wall -Wno-unused-but-set-variable \
+	-Wno-unused-variable -Wno-unused-function -Wno-discarded-qualifiers \
+	-Wno-deprecated-declarations -Wno-deprecated-declarations -Wl,-z,defs \
+	-D__HIP_PLATFORM_HCC__=1 -Wno-enum-compare
+
 SOURCES = MatrixTranspose.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 EXECUTABLE = ./MatrixTranspose
 
-
-includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include -I/opt/rocm/hcc/bin/../hcc/include \
-	        -I/opt/rocm/hcc/include -I/opt/rocm/hip/include/hip/hcc_detail/cuda \
-			  -I/opt/rocm/hsa/include -I/opt/rocm/hip/include
+includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include \
+			  -I/opt/rocm/hcc/bin/../hcc/include -I/opt/rocm/hcc/include \
+			  -I/opt/rocm/hip/include/hip/hcc_detail/cuda -I/opt/rocm/hsa/include \
+			  -I/opt/rocm/hip/include
 
 HIP_SOs = libhc_am.so libhip_hcc.so libhsa-runtime64.so.1 libhsakmt.so.1
 
@@ -24,35 +30,43 @@ clangargs = -D__HIP_PLATFORM_HCC__=1
 CXXFLAGS = -g $(CFLAGS) -fPIC $(includes) -Wno-deprecated-declarations
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) hip_nw/worker guestshim.so hip_cpp_bridge.so
+all: $(EXECUTABLE) worker libguestlib.so guestshim.so
+.PHONY: all
 
-$(EXECUTABLE): $(OBJECTS) guestshim.so hip_nw/libguestlib.so
+GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
+WORKER_LIBS+=`pkg-config --libs glib-2.0` -L/opt/rocm/lib -lhip_hcc -lhsa-runtime64
+
+GENERAL_SOURCES = $(addprefix nw/common/,cmd_channel.c murmur3.c cmd_handler.c \
+													endpoint_lib.c socket.c)
+WORKER_SOURCES = hip_nw_worker.c \
+					  $(addprefix nw/worker/,worker.c) \
+					  $(addprefix nw/common/,cmd_channel_shm_worker.c \
+					                         cmd_channel_min_worker.c \
+													 cmd_channel_socket_worker.c)
+GUESTLIB_SOURCES = hip_nw_guestlib.c $(addprefix nw/guestlib/src/,init.c) \
+						 $(addprefix nw/common/,cmd_channel_shm.c cmd_channel_min.c \
+													   cmd_channel_socket.c)
+
+worker: $(GENERAL_SOURCES) $(WORKER_SOURCES) hip_cpp_bridge.o
+	$(CC) -I../../worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -o $@
+
+libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
+	$(CC) -I../../guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -o $@
+
+
+$(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so
 	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
-	patchelf $(addprefix --remove-needed ,$(HIP_SOs)) $@
 
 
-hip_nw/worker hip_nw/libguestlib.so: hip_nw/Makefile hip_cpp_bridge.so $(wildcard hip_nw/*.c) $(wildcard hip_nw/*.h)
-	$(MAKE) -C hip_nw
-
-hip_nw/Makefile: hip.nw.cpp hip_nw.mk
+regen: hip.nw.cpp hip_nw.mk
 	../nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
-	cp hip_nw.mk ./hip_nw/Makefile
+.PHONY: regen
 
-guestshim.o: guestshim.cpp
-	$(CXX) $(CXXFLAGS) -c $^
-program_state.o: program_state.cpp
-	$(CXX) $(CXXFLAGS) -c $^
-code_object_bundle.o: code_object_bundle.cpp
-	$(CXX) $(CXXFLAGS) -c $^
-
-guestshim.so: guestshim.o program_state.o code_object_bundle.o hip_nw/libguestlib.so
+guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so
 	g++ -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
 	   -Wl,--no-allow-shlib-undefined \
-		-Wl,--no-undefined -Wl,-rpath=$(PWD)/hip_nw -L$(PWD)/hip_nw -lguestlib
-
-hip_cpp_bridge.so: hip_cpp_bridge.o
-	g++ -std=c++11 -fPIC -shared $(includes) -o $@ $<
+		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib
 
 clean:
-	rm -rf hip_nw
-	rm *.o *.so
+	rm -rf hip_nw *.o *.so
+.PHONY: clean

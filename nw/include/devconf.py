@@ -1,0 +1,91 @@
+#define VGPU_DRIVER_MAJOR 1
+#define VGPU_DRIVER_MINOR 0
+
+# Global variables
+def init_vgpu():
+    global vgpu_fd
+    vgpu_fd = open("/dev/scea-vgpu0", 'rw')
+    print("[hook] vgpu_fd is opened")
+
+def get_vgpu_fd():
+    return vgpu_fd
+
+# Memory
+MAX_VM_NUM          = 4
+VGPU_FIFO_SIZE      = 0x8000000  # 128 MB
+VGPU_DSTORE_SIZE    = 0x20000000 # 512 MB
+INVOKER_FIFO_SIZE   = (VGPU_FIFO_SIZE * MAX_VM_NUM)
+INVOKER_DSTORE_SIZE = (VGPU_DSTORE_SIZE * MAX_VM_NUM)
+
+TENSORFLOW_PY_API = 6
+
+TF_PY_PARAM_PAYLOAD_NUM = 12
+
+# IOCTL
+IOCTL_TF_PY_CMD      = 0x54
+IOCTL_TF_PY_CALLBACK = 0x55
+IOCTL_KVM_NOTIFY_EXEC_SPAWN    = 0x107
+IOCTL_KVM_NOTIFY_TASK_FINISHED = 0x104
+
+# API
+TF_PY_NW_OBJECT                 = 15
+TF_PY_NW_METHOD                 = 16
+TF_PY_NW_CALLBACK               = 17
+TF_PY_NW_CALLBACK_INIT          = 18
+TF_PY_NW_CALLBACK_DONE          = 40
+TF_PY_NW_CALLBACK_TEST          = 19
+
+TF_PY_SESSION_INIT              = 1
+TF_PY_SESSION_ENTER             = 6
+TF_PY_SESSION_EXIT              = 7
+TF_PY_SESSION_DEL               = 4
+TF_PY_SESSION_RUN               = 5
+TF_PY_TPU_CLUSTER_RESOLVER_INIT = 2
+TF_PY_TPU_CLUSTER_RESOLVER_MASTER = 3
+
+TF_PY_TPU_INITIALIZE_SYSTEM     = 8
+TF_PY_TPU_SHUTDOWN_SYSTEM       = 9
+TF_PY_TPU_REWRITE               = 11
+TF_PY_TPU_RUN_CONFIG            = 13
+TF_PY_TPU_TPU_ESTIMATOR         = 14
+
+TF_PY_GLOBAL_VARIABLES_INITIALIZER = 10
+TF_PY_ONES                         = 12
+TF_PY_RANDOM_UNIFORM               = 20
+TF_PY_TRANSPOSE                    = 21
+TF_PY_CAST                         = 22
+TF_PY_RESHAPE                      = 23
+TF_PY_EXPAND_DIMS                  = 24
+TF_PY_CONCAT                       = 25
+TF_PY_EQUAL                        = 26
+TF_PY_SLICE                        = 30
+TF_PY_SHAPE                        = 32
+TF_PY_FIXED_LEN_FEATURE            = 36
+TF_PY_VAR_LEN_FEATURE              = 37
+TF_PY_PARSE_SINGLE_EXAMPLE         = 38
+
+TF_PY_CONTROL_FLOW_OPS_SWITCH      = 27
+TF_PY_CONTROL_FLOW_OPS_MERGE       = 28
+
+TF_PY_IMAGE_RESIZE_IMAGES          = 29
+TF_PY_IMAGE_SAMPLE_DISTORTED_BOUNDING_BOX = 31
+TF_PY_IMAGE_DRAW_BOUNDING_BOXES    = 33
+TF_PY_IMAGE_DECODE_JPEG            = 34
+TF_PY_IMAGE_CONVERT_IMAGE_DTYPE    = 35
+
+TF_PY_DATA_DATASET_LIST_FILES      = 39
+
+# States
+STATUS_TASK_UNDEFINED = 0
+STATUS_TASK_DONE      = 1
+STATUS_TASK_RUNNING   = 2
+STATUS_TASK_ASYNC     = 3
+STATUS_TASK_CALLBACK  = 4
+STATUS_TASK_ERROR     = 5
+STATUS_TASK_CONTINUE  = 9
+
+STATUS_CALLBACK_POLL   = 6
+STATUS_CALLBACK_FILLED = 7
+STATUS_CALLBACK_DONE   = 8
+STATUS_CALLBACK_TIMEOUT = 10
+STATUS_CALLBACK_ERROR   = 11
