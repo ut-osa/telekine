@@ -26,15 +26,13 @@ includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include \
 			  -I/opt/rocm/hip/include/hip/hcc_detail/cuda -I/opt/rocm/hsa/include \
 			  -I/opt/rocm/hip/include
 
-HIP_SOs = libhc_am.so libhip_hcc.so libhsa-runtime64.so.1 libhsakmt.so.1
-
 clangargs = -D__HIP_PLATFORM_HCC__=1
 
-CXXFLAGS = -g $(CFLAGS) -fPIC $(includes) -Wno-deprecated-declarations \
+CXXFLAGS = -g $(CFLAGS) -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) worker libguestlib.so guestshim.so crypto_guestshim.so
+all: $(EXECUTABLE) worker libguestlib.so guestshim.so crypto_guestshim.so crypto_impl.so
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
@@ -71,13 +69,15 @@ guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so
 	   -Wl,--no-allow-shlib-undefined \
 		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib
 
-crypto_guestshim.so: HIP-encryptedMemcpy/hip_wrapper.o HIP-encryptedMemcpy/crypto/aes_gcm.o \
+crypto_impl.so: HIP-encryptedMemcpy/crypto/aes_gcm.o
+	$(HIPCC) -shared $^ -o $@ -lsodium -ldl
+
+crypto_guestshim.so: HIP-encryptedMemcpy/hip_wrapper.o\
 							guestshim.o program_state.o code_object_bundle.o libguestlib.so
-	$(HIPCC) -fPIC -shared $(includes) -o $@ HIP-encryptedMemcpy/hip_wrapper.o \
-		HIP-encryptedMemcpy/crypto/aes_gcm.o \
-		guestshim.o program_state.o code_object_bundle.o \
-	   -Wl,--no-allow-shlib-undefined \
-		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lsodium -ldl
+	g++ -fPIC -shared $(includes) -o $@ HIP-encryptedMemcpy/hip_wrapper.o \
+	   guestshim.o program_state.o code_object_bundle.o \
+		-Wl,-rpath=$(PWD) -L$(PWD) -lguestlib
+
 
 clean:
 	rm -rf hip_nw *.o *.so
