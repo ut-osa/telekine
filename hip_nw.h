@@ -37,7 +37,8 @@ enum hip_functions {
         RET_HIP_HIP_EVENT_DESTROY, CALL_HIP_HIP_EVENT_ELAPSED_TIME, RET_HIP_HIP_EVENT_ELAPSED_TIME,
         CALL_HIP_HIP_MODULE_LOAD, RET_HIP_HIP_MODULE_LOAD, CALL_HIP_HIP_MODULE_UNLOAD, RET_HIP_HIP_MODULE_UNLOAD,
         CALL_HIP_NW_HIP_STREAM_DESTROY, RET_HIP_NW_HIP_STREAM_DESTROY, CALL_HIP_HIP_MODULE_GET_FUNCTION,
-        RET_HIP_HIP_MODULE_GET_FUNCTION, CALL_HIP___DO_C_HSA_AGENT_GET_INFO, RET_HIP___DO_C_HSA_AGENT_GET_INFO,
+        RET_HIP_HIP_MODULE_GET_FUNCTION, CALL_HIP_HIP_GET_LAST_ERROR, RET_HIP_HIP_GET_LAST_ERROR, CALL_HIP_HIP_MEMSET,
+        RET_HIP_HIP_MEMSET, CALL_HIP___DO_C_HSA_AGENT_GET_INFO, RET_HIP___DO_C_HSA_AGENT_GET_INFO,
         CALL_HIP___DO_C_LOAD_EXECUTABLE, RET_HIP___DO_C_LOAD_EXECUTABLE, CALL_HIP___DO_C_GET_AGENTS,
         RET_HIP___DO_C_GET_AGENTS, CALL_HIP___DO_C_GET_ISAS, RET_HIP___DO_C_GET_ISAS,
         CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS, CALL_HIP___DO_C_QUERY_HOST_ADDRESS,
@@ -67,7 +68,7 @@ ava_new_offset_pair(size_t a, size_t b)
 }
 
 struct hip_metadata {
-    Metadata application;
+    int application;
     ava_extract_function extract;
     ava_replace_function replace;
     GPtrArray * /* ava_offset_pair_t* */ recorded_calls;
@@ -209,8 +210,8 @@ struct hip_hip_memcpy_call {
     intptr_t __call_id;
     size_t sizeBytes;
     hipMemcpyKind kind;
-    void *src;
     void *dst;
+    void *src;
 };
 
 struct hip_hip_memcpy_ret {
@@ -223,8 +224,8 @@ struct hip_hip_memcpy_ret {
 struct hip_hip_memcpy_call_record {
     size_t sizeBytes;
     hipMemcpyKind kind;
-    void *src;
     void *dst;
+    void *src;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -344,9 +345,9 @@ struct hip_hip_memcpy2_d_async_call {
     size_t width;
     size_t height;
     hipMemcpyKind kind;
+    void *src;
     void *dst;
     hipStream_t stream;
-    void *src;
 };
 
 struct hip_hip_memcpy2_d_async_ret {
@@ -362,9 +363,9 @@ struct hip_hip_memcpy2_d_async_call_record {
     size_t width;
     size_t height;
     hipMemcpyKind kind;
+    void *src;
     void *dst;
     hipStream_t stream;
-    void *src;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -773,8 +774,8 @@ struct hip_hip_event_elapsed_time_call_record {
 struct hip_hip_module_load_call {
     struct command_base base;
     intptr_t __call_id;
-    char *fname;
     hipModule_t *module;
+    char *fname;
 };
 
 struct hip_hip_module_load_ret {
@@ -785,8 +786,8 @@ struct hip_hip_module_load_ret {
 };
 
 struct hip_hip_module_load_call_record {
-    char *fname;
     hipModule_t *module;
+    char *fname;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -835,8 +836,8 @@ struct hip_nw_hip_stream_destroy_call_record {
 struct hip_hip_module_get_function_call {
     struct command_base base;
     intptr_t __call_id;
-    hipFunction_t *function;
     char *kname;
+    hipFunction_t *function;
     hipModule_t module;
 };
 
@@ -848,9 +849,52 @@ struct hip_hip_module_get_function_ret {
 };
 
 struct hip_hip_module_get_function_call_record {
-    hipFunction_t *function;
     char *kname;
+    hipFunction_t *function;
     hipModule_t module;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_get_last_error_call {
+    struct command_base base;
+    intptr_t __call_id;
+
+};
+
+struct hip_hip_get_last_error_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip_hip_get_last_error_call_record {
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_memset_call {
+    struct command_base base;
+    intptr_t __call_id;
+    void *dst;
+    int value;
+    size_t sizeBytes;
+};
+
+struct hip_hip_memset_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip_hip_memset_call_record {
+    void *dst;
+    int value;
+    size_t sizeBytes;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -886,8 +930,8 @@ struct hip___do_c_load_executable_call {
     struct command_base base;
     intptr_t __call_id;
     size_t file_len;
-    hsa_executable_t *executable;
     char *file_buf;
+    hsa_executable_t *executable;
     hsa_agent_t *agent;
 };
 
@@ -900,8 +944,8 @@ struct hip___do_c_load_executable_ret {
 
 struct hip___do_c_load_executable_call_record {
     size_t file_len;
-    hsa_executable_t *executable;
     char *file_buf;
+    hsa_executable_t *executable;
     hsa_agent_t *agent;
     int ret;
     char __handler_deallocate;
@@ -1005,8 +1049,8 @@ struct hip___do_c_query_host_address_call_record {
 struct hip___do_c_get_kernel_descriptor_call {
     struct command_base base;
     intptr_t __call_id;
-    char *name;
     hsa_executable_symbol_t *symbol;
+    char *name;
     hipFunction_t *f;
 };
 
@@ -1018,8 +1062,8 @@ struct hip___do_c_get_kernel_descriptor_ret {
 };
 
 struct hip___do_c_get_kernel_descriptor_call_record {
-    char *name;
     hsa_executable_symbol_t *symbol;
+    char *name;
     hipFunction_t *f;
     hipError_t ret;
     char __handler_deallocate;

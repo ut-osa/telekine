@@ -13,24 +13,6 @@ typedef struct hipFuncAttributes hipFuncAttributes;
 #include <hip/hcc_detail/hip_runtime_api.h>
 #include <hsa_limited.h>
 
-typedef struct {
-    /* argument types */
-    int func_argc;
-    char func_arg_is_handle[64];
-} Metadata;
-
-ava_register_metadata(Metadata);
-
-#if 0
-hipError_t
-hipGetDeviceProperties(hipDeviceProp_t* prop, int deviceId)
-{
-    ava_argument(prop) {
-        ava_out; ava_buffer(1);
-    }
-}
-#endif
-
 hipError_t
 hipMalloc(void **dptr,
           size_t size)
@@ -415,6 +397,15 @@ hipError_t hipModuleGetFunction(hipFunction_t* function, hipModule_t module,
    ava_argument(kname) {
       ava_in; ava_buffer(strlen(kname) + 1);
    }
+}
+
+hipError_t hipGetLastError(void)
+{
+}
+
+hipError_t hipMemset(void *dst, int value, size_t sizeBytes)
+{
+   ava_argument(dst) ava_opaque;
 }
 
 hsa_status_t HSA_API __do_c_hsa_agent_get_info(

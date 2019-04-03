@@ -62,7 +62,7 @@ $(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so
 	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
 
 
-regen: hip.nw.cpp hip_nw.mk
+regen: hip.nw.cpp
 	../nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
 .PHONY: regen
 

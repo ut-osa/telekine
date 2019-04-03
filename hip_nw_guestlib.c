@@ -1629,6 +1629,67 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
+    case RET_HIP_HIP_GET_LAST_ERROR:{
+        ava_is_in = 0;
+        ava_is_out = 1;
+        struct hip_hip_get_last_error_ret *__ret = (struct hip_hip_get_last_error_ret *)__cmd;
+        assert(__ret->base.api_id == HIP_API);
+        assert(__ret->base.command_size == sizeof(struct hip_hip_get_last_error_ret));
+        struct hip_hip_get_last_error_call_record *__local =
+            (struct hip_hip_get_last_error_call_record *)ava_remove_call(__ret->__call_id);
+
+        {
+
+            hipError_t ret;
+            ret = __ret->ret;
+
+            /* Output: hipError_t ret */
+            __local->ret = __ret->ret;
+
+        }
+
+        if (__local->__handler_deallocate) {
+            free(__local);
+        }
+        __local->__call_complete = 1;
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case RET_HIP_HIP_MEMSET:{
+        ava_is_in = 0;
+        ava_is_out = 1;
+        struct hip_hip_memset_ret *__ret = (struct hip_hip_memset_ret *)__cmd;
+        assert(__ret->base.api_id == HIP_API);
+        assert(__ret->base.command_size == sizeof(struct hip_hip_memset_ret));
+        struct hip_hip_memset_call_record *__local =
+            (struct hip_hip_memset_call_record *)ava_remove_call(__ret->__call_id);
+
+        {
+
+            void *dst;
+            dst = __local->dst;
+
+            int value;
+            value = __local->value;
+
+            size_t sizeBytes;
+            sizeBytes = __local->sizeBytes;
+
+            hipError_t ret;
+            ret = __ret->ret;
+
+            /* Output: hipError_t ret */
+            __local->ret = __ret->ret;
+
+        }
+
+        if (__local->__handler_deallocate) {
+            free(__local);
+        }
+        __local->__call_complete = 1;
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
     case RET_HIP___DO_C_HSA_AGENT_GET_INFO:{
         ava_is_in = 0;
         ava_is_out = 1;
@@ -4134,6 +4195,99 @@ hipModuleGetFunction(hipFunction_t * function, hipModule_t module, const char *k
     hipError_t ret;
     ret = __call_record->ret;
     free(__call_record);
+    return ret;
+}
+
+EXPORTED hipError_t
+hipGetLastError()
+{
+    const int ava_is_in = 1,
+        ava_is_out = 0;
+    GPtrArray *__ava_alloc_list_hipGetLastError = g_ptr_array_new_full(0, free);
+
+    size_t __total_buffer_size = 0; {
+    }
+    struct hip_hip_get_last_error_call *__cmd =
+        (struct hip_hip_get_last_error_call *)command_channel_new_command(__chan,
+        sizeof(struct hip_hip_get_last_error_call), __total_buffer_size);
+    __cmd->base.api_id = HIP_API;
+    __cmd->base.command_id = CALL_HIP_HIP_GET_LAST_ERROR;
+
+    intptr_t __call_id = ava_get_call_id();
+    __cmd->__call_id = __call_id;
+
+    {
+
+    }
+
+    struct hip_hip_get_last_error_call_record *__call_record =
+        (struct hip_hip_get_last_error_call_record *)calloc(1, sizeof(struct hip_hip_get_last_error_call_record));
+
+    __call_record->__call_complete = 0;
+    __call_record->__handler_deallocate = 0;
+    ava_add_call(__call_id, __call_record);
+
+    command_channel_send_command(__chan, (struct command_base *)__cmd);
+
+    g_ptr_array_unref(__ava_alloc_list_hipGetLastError);        /* Deallocate all memory in the alloc list */
+
+    handle_commands_until(HIP_API, __call_record->__call_complete);
+    hipError_t ret;
+    ret = __call_record->ret;
+    free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
+    return ret;
+}
+
+EXPORTED hipError_t
+hipMemset(void *dst, int value, size_t sizeBytes)
+{
+    const int ava_is_in = 1,
+        ava_is_out = 0;
+    GPtrArray *__ava_alloc_list_hipMemset = g_ptr_array_new_full(0, free);
+
+    size_t __total_buffer_size = 0; {
+    }
+    struct hip_hip_memset_call *__cmd =
+        (struct hip_hip_memset_call *)command_channel_new_command(__chan, sizeof(struct hip_hip_memset_call),
+        __total_buffer_size);
+    __cmd->base.api_id = HIP_API;
+    __cmd->base.command_id = CALL_HIP_HIP_MEMSET;
+
+    intptr_t __call_id = ava_get_call_id();
+    __cmd->__call_id = __call_id;
+
+    {
+
+        /* Input: void * dst */
+        __cmd->dst = dst;
+        /* Input: int value */
+        __cmd->value = value;
+        /* Input: size_t sizeBytes */
+        __cmd->sizeBytes = sizeBytes;
+    }
+
+    struct hip_hip_memset_call_record *__call_record =
+        (struct hip_hip_memset_call_record *)calloc(1, sizeof(struct hip_hip_memset_call_record));
+
+    __call_record->dst = dst;
+
+    __call_record->value = value;
+
+    __call_record->sizeBytes = sizeBytes;
+
+    __call_record->__call_complete = 0;
+    __call_record->__handler_deallocate = 0;
+    ava_add_call(__call_id, __call_record);
+
+    command_channel_send_command(__chan, (struct command_base *)__cmd);
+
+    g_ptr_array_unref(__ava_alloc_list_hipMemset);      /* Deallocate all memory in the alloc list */
+
+    handle_commands_until(HIP_API, __call_record->__call_complete);
+    hipError_t ret;
+    ret = __call_record->ret;
+    free(__call_record);
     command_channel_free_command(__chan, (struct command_base *)__cmd);
     return ret;
 }
@@ -4862,12 +5016,6 @@ hipChooseDevice(int *device, const hipDeviceProp_t * prop)
     abort_with_reason("Unsupported API function: hipChooseDevice");
 }
 
-EXPORTED hipError_t
-hipGetLastError()
-{
-    abort_with_reason("Unsupported API function: hipGetLastError");
-}
-
 EXPORTED const char *
 hipGetErrorName(hipError_t hip_error)
 {
@@ -5055,12 +5203,6 @@ EXPORTED hipError_t
 hipMemcpyAsync(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream)
 {
     abort_with_reason("Unsupported API function: hipMemcpyAsync");
-}
-
-EXPORTED hipError_t
-hipMemset(void *dst, int value, size_t sizeBytes)
-{
-    abort_with_reason("Unsupported API function: hipMemset");
 }
 
 EXPORTED hipError_t
