@@ -48,10 +48,10 @@ GUESTLIB_SOURCES = hip_nw_guestlib.c $(addprefix nw/guestlib/src/,init.c) \
 													   cmd_channel_socket.c)
 
 worker: $(GENERAL_SOURCES) $(WORKER_SOURCES) hip_cpp_bridge.o
-	$(CC) -I../../worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -o $@
+	$(CC) -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -o $@
 
 libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
-	$(CC) -I../../guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -o $@
+	$(CC) -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -o $@
 
 
 $(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so
