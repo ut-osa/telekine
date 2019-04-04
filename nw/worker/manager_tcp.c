@@ -11,6 +11,7 @@
 
 #include <sys/ipc.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 #include "common/cmd_channel_impl.h"
 #include "common/guest_mem.h"
@@ -28,6 +29,32 @@ void sig_handler(int signo)
     exit(0);
 }
 
+#define MAX_PATH 4096
+int cannonize(char cannon[MAX_PATH], const char *bin)
+{
+    char next_cannon[MAX_PATH];
+    struct stat stat_info = {0};
+
+    if (stat(bin, &stat_info) == 0) {
+       mode_t m = stat_info.st_mode;
+       if (S_ISLNK(m) && (readlink(bin, cannon, MAX_PATH) == 0)) {
+          int ret = cannonize(next_cannon, cannon);
+          if (ret == 0)
+             strncpy(cannon, next_cannon, MAX_PATH);
+          return ret;
+       } else if (S_ISREG(m)) {
+          if (access(bin, X_OK) == 0) {
+             strncpy(cannon, bin, MAX_PATH);
+             return 0;
+          }
+       } else {
+          errno = EINVAL;
+       }
+    }
+    return 1;
+}
+
+
 int main(int argc, char *argv[])
 {
     /* setup signal handler */
@@ -43,8 +70,22 @@ int main(int argc, char *argv[])
     struct command_base msg, response;
     struct param_block_info *pb_info;
     uintptr_t *worker_port;
+    const char *worker_bin;
+    char worker_bin_buf[4096];
 
     worker_id = 1;
+
+    if (argc > 1)
+       worker_bin = argv[1];
+    else
+       worker_bin = "./worker";
+
+    if (cannonize(worker_bin_buf, worker_bin)) {
+       perror(worker_bin);
+       return 1;
+    }
+
+    worker_bin = worker_bin_buf;
 
     if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket");
@@ -108,11 +149,11 @@ int main(int argc, char *argv[])
     char *argv_list[] = {"worker.out",
                          str_vm_id, str_rt_type, str_port,
                          str_pb_offset, str_pb_size, NULL};
-    printf("[manager] worker vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx\n",
-           msg.vm_id, msg.api_id, str_port,
+    printf("[manager] %s vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx\n",
+           worker_bin, msg.vm_id, msg.api_id, str_port,
            pb_info->param_local_offset,
            pb_info->param_block_size);
-    if (execv("./worker", argv_list) < 0) {
+    if (execv(worker_bin, argv_list) < 0) {
         perror("execv worker");
     }
 
