@@ -10,6 +10,13 @@
 #include <stdlib.h>
 
 using std::string;
+struct ihipModuleSymbol_t{
+   uint64_t _object;             // The kernel object.
+   uint32_t _groupSegmentSize;
+   uint32_t _privateSegmentSize;
+   string   _name;       // TODO - review for performance cost.  Name is just used for debug.
+};
+
 
 namespace hip_impl {
 inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {

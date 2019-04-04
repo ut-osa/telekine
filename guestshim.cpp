@@ -30,7 +30,9 @@ using namespace hc;
 #define MAX_AGENTS 16
 
 static unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
-int current_device = -1;
+pthread_mutex_t stream_agent_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int current_device = 0;
 hipCtx_t current_ctx = nullptr;
 
 hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
@@ -70,15 +72,14 @@ hipGetDevice(int* deviceId)
 {
    hipError_t ret = hipSuccess;
 
-   if (current_device == -1) {
-      static std::once_flag f;
-      std::call_once(f, [&ret] () {
-         int id;
-         ret = nw_hipGetDevice(&id);
-         if (!ret)
-            current_device = id;
-     });
-   }
+   static std::once_flag f;
+   std::call_once(f, [&ret] () {
+      int id;
+      ret = nw_hipGetDevice(&id);
+      if (!ret)
+         current_device = id;
+   });
+
    *deviceId = current_device;
    return ret;
 }
@@ -103,7 +104,9 @@ hipStreamCreate(hipStream_t* stream)
 
    hipError_t ret = nw_hipStreamCreate(stream, &agent);
    if (!ret) {
+      pthread_mutex_lock(&stream_agent_lock);
       stream_to_agent.emplace(*stream, agent);
+      pthread_mutex_unlock(&stream_agent_lock);
       cout << "stream to agent added!\n";
    }
 
@@ -115,9 +118,11 @@ hipStreamDestroy(hipStream_t stream)
 {
    hipError_t ret = nw_hipStreamDestroy(stream);
    if (!ret) {
+      pthread_mutex_lock(&stream_agent_lock);
       auto it = stream_to_agent.find(stream);
       if (it != stream_to_agent.end())
          stream_to_agent.erase(it);
+      pthread_mutex_unlock(&stream_agent_lock);
    }
    return ret;
 }
@@ -392,27 +397,28 @@ namespace hip_impl
         inline
         hsa_agent_t target_agent(hipStream_t stream)
         {
-            static hsa_agent_t default_agent;
+            static hsa_agent_t agents[MAX_AGENTS];
             static once_flag f;
 
             call_once(f, []() {
-               hsa_agent_t agents[MAX_AGENTS];
                size_t n_agents = __do_c_get_agents(agents, MAX_AGENTS);
 
                assert(n_agents > 0);
-               default_agent = agents[0];
             });
 
             if (stream) {
+               hsa_agent_t agent;
+               pthread_mutex_lock(&stream_agent_lock);
                auto it = stream_to_agent.find(stream);
                if (it == stream_to_agent.end()) {
                   std::printf("%s:%d no agent recoreded\n", __FILE__, __LINE__);
                   std::abort();
-               } else {
-                  return it->second;
                }
+               agent = it->second;
+               pthread_mutex_unlock(&stream_agent_lock);
+               return agent;
             }
-            return default_agent;
+            return agents[current_device];
 #if 0
             if (stream) {
                 return *static_cast<hsa_agent_t*>(
