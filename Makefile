@@ -67,7 +67,7 @@ regen: hip.nw.cpp
 
 manager:
 	$(MAKE) -C nw/worker
-	ln -s ./nw/worker/manager_tcp $@
+	ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
 guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so
