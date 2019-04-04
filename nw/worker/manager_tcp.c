@@ -65,27 +65,37 @@ int main(int argc, char *argv[])
     /* initialize TCP socket */
     struct sockaddr_in address;
     int addrlen = sizeof(address);
-    int opt = 1;
+    int sock_opt = 1;
+    int opt;
     int client_fd;
-    int i;
     int use_log_files = 0;
     pid_t child;
     struct command_base msg, response;
     struct param_block_info *pb_info;
     uintptr_t *worker_port;
-    const char *worker_bin;
+    char *worker_bin;
     char worker_bin_buf[4096];
 
     worker_id = 1;
 
     worker_bin = "./worker";
-    for (i = 1; i < argc; i++) {
-       if (strcmp(argv[i], "-l") == 0)
-          use_log_files = 1;
-       else
-          worker_bin = argv[i];
+    while ((opt = getopt(argc, argv, "lh")) != -1) {
+       switch (opt) {
+          case 'l':
+             use_log_files = 1;
+             break;
+          default:
+             printf("USAGE: %s [-l] [-h] [worker_bin]\n"
+                    "    -l: redirect server output(s) into log files\n"
+                    "    -h: display this message\n"
+                    "    worker_bin: override the default './worker' binary\n",
+                    argv[0]);
+             return 1;
+       }
     }
-
+    if (optind < argc) {
+       worker_bin = argv[optind];
+    }
     if (cannonize(worker_bin_buf, worker_bin)) {
        perror(worker_bin);
        return 1;
@@ -97,7 +107,7 @@ int main(int argc, char *argv[])
         perror("socket");
     }
     // Forcefully attaching socket to the port 4000
-    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &sock_opt, sizeof(sock_opt))) {
         perror("setsockopt");
     }
     address.sin_family = AF_INET;
@@ -184,7 +194,7 @@ int main(int argc, char *argv[])
     sprintf(str_pb_offset, "%lu", pb_info->param_local_offset);
     sprintf(str_pb_size, "%lu", pb_info->param_block_size);
     sprintf(str_rdy_pipe, "%d", ready_pipe[1]);
-    char *argv_list[] = {"worker.out",
+    char * argv_list[] = {worker_bin,
                          str_vm_id, str_rt_type, str_port,
                          str_pb_offset, str_pb_size, str_rdy_pipe, NULL};
     printf("[manager] %s vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx, rdy_pipe=%d\n",
