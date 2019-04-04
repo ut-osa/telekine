@@ -8,6 +8,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <sys/ipc.h>
 #include <sys/mman.h>
@@ -66,6 +67,8 @@ int main(int argc, char *argv[])
     int addrlen = sizeof(address);
     int opt = 1;
     int client_fd;
+    int i;
+    int use_log_files = 0;
     pid_t child;
     struct command_base msg, response;
     struct param_block_info *pb_info;
@@ -75,10 +78,13 @@ int main(int argc, char *argv[])
 
     worker_id = 1;
 
-    if (argc > 1)
-       worker_bin = argv[1];
-    else
-       worker_bin = "./worker";
+    worker_bin = "./worker";
+    for (i = 1; i < argc; i++) {
+       if (strcmp(argv[i], "-l") == 0)
+          use_log_files = 1;
+       else
+          worker_bin = argv[i];
+    }
 
     if (cannonize(worker_bin_buf, worker_bin)) {
        perror(worker_bin);
@@ -133,6 +139,28 @@ int main(int argc, char *argv[])
 
         worker_id++;
     } while (1);
+
+    if (use_log_files) {
+       char stdout_fname[64], stderr_fname[64];
+       int new_stdout, new_stderr;
+       snprintf(stdout_fname, 64, "ava_%d_stdout.log", worker_id);
+       snprintf(stderr_fname, 64, "ava_%d_stderr.log", worker_id);
+       printf("worker output in %s/%s\n", stdout_fname, stderr_fname);
+
+       new_stdout = open(stdout_fname, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+       if (new_stdout < 0) {
+          perror(stdout_fname);
+          return 1;
+       }
+       new_stderr = open(stderr_fname, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+       if (new_stderr < 0) {
+          perror(stderr_fname);
+          return 1;
+       }
+       dup2(new_stdout, 1);
+       dup2(new_stderr, 2);
+    }
+
 
     /* spawn worker */
     char str_vm_id[10];
