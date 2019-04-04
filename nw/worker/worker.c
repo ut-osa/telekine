@@ -51,8 +51,8 @@ int main(int argc, char *argv[])
 {
     int err;
 
-    if (argc != 6) {
-        printf("Usage: %s <vm_id> <api_id> <listen_port> <pb_offset> <pb_size>\n", argv[0]);
+    if (argc != 7) {
+        printf("Usage: %s <vm_id> <api_id> <listen_port> <pb_offset> <pb_size> <rdy_pipe>\n", argv[0]);
         return 0;
     }
 
@@ -69,7 +69,8 @@ int main(int argc, char *argv[])
 
     if (!getenv("AVA_CHANNEL") || !strcmp(getenv("AVA_CHANNEL"), "LOCAL")) {
         chan = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
+                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]),
+                atoi(argv[6]));
     }
     else if (!strcmp(getenv("AVA_CHANNEL"), "SHM")) {
         chan = command_channel_shm_worker_new(

@@ -110,6 +110,7 @@ int main(int argc, char *argv[])
     if (listen(listen_fd, 10) < 0) {
         perror("listen");
     }
+    int ready_pipe[2];
 
     /* polling new applications */
     do {
@@ -123,19 +124,26 @@ int main(int argc, char *argv[])
             continue;
         }
 
+        /* spawn a worker and wait for it to be ready */
+        uint64_t val;
+        pipe(ready_pipe);
+        child = fork();
+        if (child == 0) {
+            close(ready_pipe[0]);
+            close(listen_fd);
+            break;
+        }
+        /* wait for the worker to listen... */
+        close(ready_pipe[1]);
+        read(ready_pipe[0], &val, sizeof(val));
+        close(ready_pipe[0]);
+
         /* return worker port to guestlib */
         response.api_id = INTERNAL_API;
         worker_port = (uintptr_t *)response.reserved_area;
         *worker_port = worker_id + WORKER_PORT_BASE;
         send_socket(client_fd, &response, sizeof(struct command_base));
         close(client_fd);
-
-        /* spawn a worker */
-        child = fork();
-        if (child == 0) {
-            close(listen_fd);
-            break;
-        }
 
         worker_id++;
     } while (1);
@@ -168,19 +176,21 @@ int main(int argc, char *argv[])
     char str_port[10];
     char str_pb_offset[10];
     char str_pb_size[10];
+    char str_rdy_pipe[10];
     pb_info = (struct param_block_info *)msg.reserved_area;
     sprintf(str_vm_id, "%d", msg.vm_id);
     sprintf(str_rt_type, "%d", msg.api_id);
     sprintf(str_port, "%d", worker_id + WORKER_PORT_BASE);
     sprintf(str_pb_offset, "%lu", pb_info->param_local_offset);
     sprintf(str_pb_size, "%lu", pb_info->param_block_size);
+    sprintf(str_rdy_pipe, "%d", ready_pipe[1]);
     char *argv_list[] = {"worker.out",
                          str_vm_id, str_rt_type, str_port,
-                         str_pb_offset, str_pb_size, NULL};
-    printf("[manager] %s vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx\n",
+                         str_pb_offset, str_pb_size, str_rdy_pipe, NULL};
+    printf("[manager] %s vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx, rdy_pipe=%d\n",
            worker_bin, msg.vm_id, msg.api_id, str_port,
            pb_info->param_local_offset,
-           pb_info->param_block_size);
+           pb_info->param_block_size,  ready_pipe[1]);
     if (execv(worker_bin, argv_list) < 0) {
         perror("execv worker");
     }

@@ -243,19 +243,6 @@ struct command_channel* command_channel_min_new()
     /* connect worker */
     DEBUG_PRINT("assigned worker at %lu\n", worker_port);
 
-    usleep(500000);
-    /* on mirage `connect` is always non-blocking and the server must
-     * start before the guest.
-     *
-    int sock_flags = fcntl(chan->sock_fd, F_GETFL);
-    if (sock_flags & O_NONBLOCK) {
-        DEBUG_PRINT("socket was non-blocking\n");
-        if (fcntl(chan->sock_fd, F_SETFL, sock_flags & (~O_NONBLOCK)) < 0) {
-            perror("fcntl blocking");
-            exit(0);
-        }
-    }
-    */
     char port_buf[128];
     sprintf(port_buf, "%lu", worker_port);
     if (getaddrinfo(ip_str, port_buf, &hints, &result)) {

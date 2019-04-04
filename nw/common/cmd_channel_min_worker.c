@@ -227,7 +227,7 @@ void command_channel_min_free_command(struct command_channel* c, struct command_
 }
 
 struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, int listen_port,
-        uintptr_t dummy2, size_t dummy3)
+        uintptr_t dummy2, size_t dummy3, int pipefd)
 {
     struct command_channel_min *chan = (struct command_channel_min *)malloc(sizeof(struct command_channel_min));
     command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
@@ -257,11 +257,17 @@ struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, 
     if (bind(chan->listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("bind failed");
     }
+
     if (listen(chan->listen_fd, 10) < 0) {
         perror("listen");
     }
 
     printf("[worker#%d] waiting for guestlib connection\n", listen_port);
+
+    uint64_t rdy = 1;
+    write(pipefd, &rdy, sizeof(rdy));
+    close(pipefd);
+
     chan->guestlib_fd = accept(chan->listen_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen);
 
     chan->pfd.fd = chan->guestlib_fd;
