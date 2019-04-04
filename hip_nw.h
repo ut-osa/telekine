@@ -33,20 +33,20 @@ enum hip_functions {
         RET_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED, CALL_HIP_NW_HSA_EXECUTABLE_CREATE_ALT,
         RET_HIP_NW_HSA_EXECUTABLE_CREATE_ALT, CALL_HIP_NW_HSA_ISA_FROM_NAME, RET_HIP_NW_HSA_ISA_FROM_NAME,
         CALL_HIP_HIP_PEEK_AT_LAST_ERROR, RET_HIP_HIP_PEEK_AT_LAST_ERROR, CALL_HIP_HIP_DEVICE_GET_ATTRIBUTE,
-        RET_HIP_HIP_DEVICE_GET_ATTRIBUTE, CALL_HIP___DO_C_HSA_EXECUTABLE_SYMBOL_GET_INFO,
-        RET_HIP___DO_C_HSA_EXECUTABLE_SYMBOL_GET_INFO, CALL_HIP_NW_HIP_CTX_SET_CURRENT, RET_HIP_NW_HIP_CTX_SET_CURRENT,
-        CALL_HIP_HIP_EVENT_CREATE, RET_HIP_HIP_EVENT_CREATE, CALL_HIP_HIP_EVENT_RECORD, RET_HIP_HIP_EVENT_RECORD,
-        CALL_HIP_HIP_EVENT_SYNCHRONIZE, RET_HIP_HIP_EVENT_SYNCHRONIZE, CALL_HIP_HIP_EVENT_DESTROY,
-        RET_HIP_HIP_EVENT_DESTROY, CALL_HIP_HIP_EVENT_ELAPSED_TIME, RET_HIP_HIP_EVENT_ELAPSED_TIME,
-        CALL_HIP_HIP_MODULE_LOAD, RET_HIP_HIP_MODULE_LOAD, CALL_HIP_HIP_MODULE_UNLOAD, RET_HIP_HIP_MODULE_UNLOAD,
-        CALL_HIP_NW_HIP_STREAM_DESTROY, RET_HIP_NW_HIP_STREAM_DESTROY, CALL_HIP_HIP_MODULE_GET_FUNCTION,
-        RET_HIP_HIP_MODULE_GET_FUNCTION, CALL_HIP_HIP_GET_LAST_ERROR, RET_HIP_HIP_GET_LAST_ERROR, CALL_HIP_HIP_MEMSET,
-        RET_HIP_HIP_MEMSET, CALL_HIP___DO_C_HSA_AGENT_GET_INFO, RET_HIP___DO_C_HSA_AGENT_GET_INFO,
-        CALL_HIP___DO_C_LOAD_EXECUTABLE, RET_HIP___DO_C_LOAD_EXECUTABLE, CALL_HIP___DO_C_GET_AGENTS,
-        RET_HIP___DO_C_GET_AGENTS, CALL_HIP___DO_C_GET_ISAS, RET_HIP___DO_C_GET_ISAS,
-        CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS, CALL_HIP___DO_C_QUERY_HOST_ADDRESS,
-        RET_HIP___DO_C_QUERY_HOST_ADDRESS, CALL_HIP___DO_C_GET_KERNEL_DESCRIPTOR, RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR,
-        CALL_HIP_HIP_CTX_GET_DEVICE, RET_HIP_HIP_CTX_GET_DEVICE
+        RET_HIP_HIP_DEVICE_GET_ATTRIBUTE, CALL_HIP_HIP_MODULE_LOAD_DATA, RET_HIP_HIP_MODULE_LOAD_DATA,
+        CALL_HIP___DO_C_HSA_EXECUTABLE_SYMBOL_GET_INFO, RET_HIP___DO_C_HSA_EXECUTABLE_SYMBOL_GET_INFO,
+        CALL_HIP_NW_HIP_CTX_SET_CURRENT, RET_HIP_NW_HIP_CTX_SET_CURRENT, CALL_HIP_HIP_EVENT_CREATE,
+        RET_HIP_HIP_EVENT_CREATE, CALL_HIP_HIP_EVENT_RECORD, RET_HIP_HIP_EVENT_RECORD, CALL_HIP_HIP_EVENT_SYNCHRONIZE,
+        RET_HIP_HIP_EVENT_SYNCHRONIZE, CALL_HIP_HIP_EVENT_DESTROY, RET_HIP_HIP_EVENT_DESTROY,
+        CALL_HIP_HIP_EVENT_ELAPSED_TIME, RET_HIP_HIP_EVENT_ELAPSED_TIME, CALL_HIP_HIP_MODULE_LOAD,
+        RET_HIP_HIP_MODULE_LOAD, CALL_HIP_HIP_MODULE_UNLOAD, RET_HIP_HIP_MODULE_UNLOAD, CALL_HIP_NW_HIP_STREAM_DESTROY,
+        RET_HIP_NW_HIP_STREAM_DESTROY, CALL_HIP_HIP_MODULE_GET_FUNCTION, RET_HIP_HIP_MODULE_GET_FUNCTION,
+        CALL_HIP_HIP_GET_LAST_ERROR, RET_HIP_HIP_GET_LAST_ERROR, CALL_HIP_HIP_MEMSET, RET_HIP_HIP_MEMSET,
+        CALL_HIP___DO_C_HSA_AGENT_GET_INFO, RET_HIP___DO_C_HSA_AGENT_GET_INFO, CALL_HIP___DO_C_LOAD_EXECUTABLE,
+        RET_HIP___DO_C_LOAD_EXECUTABLE, CALL_HIP___DO_C_GET_AGENTS, RET_HIP___DO_C_GET_AGENTS, CALL_HIP___DO_C_GET_ISAS,
+        RET_HIP___DO_C_GET_ISAS, CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS,
+        CALL_HIP___DO_C_QUERY_HOST_ADDRESS, RET_HIP___DO_C_QUERY_HOST_ADDRESS, CALL_HIP___DO_C_GET_KERNEL_DESCRIPTOR,
+        RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR, CALL_HIP_HIP_CTX_GET_DEVICE, RET_HIP_HIP_CTX_GET_DEVICE
 };
 
 #include "hip_nw_utility_types.h"
@@ -249,8 +249,8 @@ struct hip_hip_memcpy_dto_h_async_call {
     intptr_t __call_id;
     hipDeviceptr_t src;
     size_t sizeBytes;
-    hipStream_t stream;
     void *dst;
+    hipStream_t stream;
 };
 
 struct hip_hip_memcpy_dto_h_async_ret {
@@ -263,8 +263,8 @@ struct hip_hip_memcpy_dto_h_async_ret {
 struct hip_hip_memcpy_dto_h_async_call_record {
     hipDeviceptr_t src;
     size_t sizeBytes;
-    hipStream_t stream;
     void *dst;
+    hipStream_t stream;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -301,8 +301,8 @@ struct hip_hip_memcpy_async_call {
     intptr_t __call_id;
     size_t sizeBytes;
     hipMemcpyKind kind;
-    void *src;
     hipStream_t stream;
+    void *src;
     void *dst;
 };
 
@@ -316,8 +316,8 @@ struct hip_hip_memcpy_async_ret {
 struct hip_hip_memcpy_async_call_record {
     size_t sizeBytes;
     hipMemcpyKind kind;
-    void *src;
     hipStream_t stream;
+    void *src;
     void *dst;
     hipError_t ret;
     char __handler_deallocate;
@@ -479,8 +479,8 @@ struct hip_hip_memcpy2_d_async_call {
     size_t height;
     hipMemcpyKind kind;
     void *src;
-    void *dst;
     hipStream_t stream;
+    void *dst;
 };
 
 struct hip_hip_memcpy2_d_async_ret {
@@ -497,8 +497,8 @@ struct hip_hip_memcpy2_d_async_call_record {
     size_t height;
     hipMemcpyKind kind;
     void *src;
-    void *dst;
     hipStream_t stream;
+    void *dst;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
@@ -560,8 +560,8 @@ struct hip___do_c_hip_hcc_module_launch_kernel_call {
     hipStream_t stream;
     void **kernelParams;
     size_t extra_size;
-    char *extra;
     hipEvent_t start;
+    char *extra;
     hipEvent_t stop;
 };
 
@@ -584,8 +584,8 @@ struct hip___do_c_hip_hcc_module_launch_kernel_call_record {
     hipStream_t stream;
     void **kernelParams;
     size_t extra_size;
-    char *extra;
     hipEvent_t start;
+    char *extra;
     hipEvent_t stop;
     hipError_t ret;
     char __handler_deallocate;
@@ -747,6 +747,28 @@ struct hip_hip_device_get_attribute_call_record {
     int *pi;
     hipDeviceAttribute_t attr;
     int deviceId;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_module_load_data_call {
+    struct command_base base;
+    intptr_t __call_id;
+    void *image;
+    hipModule_t *module;
+};
+
+struct hip_hip_module_load_data_ret {
+    struct command_base base;
+    intptr_t __call_id;
+    hipModule_t *module;
+    hipError_t ret;
+};
+
+struct hip_hip_module_load_data_call_record {
+    void *image;
+    hipModule_t *module;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;

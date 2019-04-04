@@ -605,6 +605,21 @@ __wrapper_hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attr, int deviceId
     return ret;
 }
 
+static hipError_t
+__wrapper_hipModuleLoadData(const void *image, hipModule_t * module)
+{
+    hipError_t ret;
+    ret = hipModuleLoadData(module, image);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
 static hsa_status_t
 __wrapper___do_c_hsa_executable_symbol_get_info(hsa_executable_symbol_t executable_symbol,
     hsa_executable_symbol_info_t attribute, size_t max_value, char *value)
@@ -3521,6 +3536,92 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_hipDeviceGetAttribute);      /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP_HIP_MODULE_LOAD_DATA:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipModuleLoadData = g_ptr_array_new_full(0, free);
+        struct hip_hip_module_load_data_call *__call = (struct hip_hip_module_load_data_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_module_load_data_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: const void * image */
+        void *image;
+        image =
+            ((__call->image) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->image))) : (__call->image);
+        if (__call->image != NULL)
+            image =
+                ((__call->image) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                        __call->image))) : (__call->image);
+        else
+            image = NULL;
+
+        /* Input: hipModule_t * module */
+        hipModule_t *module;
+        module =
+            ((__call->module) != (NULL)) ? (((hipModule_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->module))) : (__call->module);
+        if (__call->module != NULL) {
+            const size_t __size = ((size_t) 1);
+            module = (hipModule_t *) calloc(__size, sizeof(hipModule_t));
+            g_ptr_array_add(__ava_alloc_list_hipModuleLoadData, module);
+        } else {
+            module = NULL;
+        }
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipModuleLoadData(image, module);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+            /* Size: hipModule_t * module */
+            if ((module) != (NULL)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(hipModule_t));
+            }
+        }
+        struct hip_hip_module_load_data_ret *__ret =
+            (struct hip_hip_module_load_data_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_module_load_data_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_MODULE_LOAD_DATA;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+        /* Output: hipModule_t * module */
+        if ((module) != (NULL)) {
+            __ret->module =
+                (hipModule_t *) command_channel_attach_buffer(__chan, (struct command_base *)__ret, module,
+                (1) * sizeof(hipModule_t));
+        } else {
+            __ret->module = NULL;
+        }
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipModuleLoadData);  /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;

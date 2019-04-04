@@ -1488,6 +1488,45 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
+    case RET_HIP_HIP_MODULE_LOAD_DATA:{
+        ava_is_in = 0;
+        ava_is_out = 1;
+        struct hip_hip_module_load_data_ret *__ret = (struct hip_hip_module_load_data_ret *)__cmd;
+        assert(__ret->base.api_id == HIP_API);
+        assert(__ret->base.command_size == sizeof(struct hip_hip_module_load_data_ret));
+        struct hip_hip_module_load_data_call_record *__local =
+            (struct hip_hip_module_load_data_call_record *)ava_remove_call(__ret->__call_id);
+
+        {
+
+            void *image;
+            image = __local->image;
+
+            hipModule_t *module;
+            module = __local->module;
+
+            hipError_t ret;
+            ret = __ret->ret;
+
+            /* Output: hipModule_t * module */
+            if (__local->module != NULL && __ret->module != NULL) {
+                memcpy(__local->module,
+                    ((__ret->module) != (NULL)) ? (((hipModule_t *) command_channel_get_buffer(__chan, __cmd,
+                                __ret->module))) : (__ret->module), (1) * sizeof(hipModule_t));
+            }
+
+            /* Output: hipError_t ret */
+            __local->ret = __ret->ret;
+
+        }
+
+        if (__local->__handler_deallocate) {
+            free(__local);
+        }
+        __local->__call_complete = 1;
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
     case RET_HIP___DO_C_HSA_EXECUTABLE_SYMBOL_GET_INFO:{
         ava_is_in = 0;
         ava_is_out = 1;
@@ -4231,6 +4270,69 @@ hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attr, int deviceId)
     return ret;
 }
 
+EXPORTED hipError_t
+hipModuleLoadData(hipModule_t * module, const void *image)
+{
+    const int ava_is_in = 1,
+        ava_is_out = 0;
+    GPtrArray *__ava_alloc_list_hipModuleLoadData = g_ptr_array_new_full(0, free);
+
+    size_t __total_buffer_size = 0; {
+        /* Size: const void * image */
+        if ((image) != (NULL) && (calc_image_size(image)) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (calc_image_size(image)) * sizeof(const void));
+        }
+    }
+    struct hip_hip_module_load_data_call *__cmd =
+        (struct hip_hip_module_load_data_call *)command_channel_new_command(__chan,
+        sizeof(struct hip_hip_module_load_data_call), __total_buffer_size);
+    __cmd->base.api_id = HIP_API;
+    __cmd->base.command_id = CALL_HIP_HIP_MODULE_LOAD_DATA;
+
+    intptr_t __call_id = ava_get_call_id();
+    __cmd->__call_id = __call_id;
+
+    {
+
+        /* Input: hipModule_t * module */
+        if ((module) != (NULL)) {
+            __cmd->module = HAS_OUT_BUFFER_SENTINEL;
+        } else {
+            __cmd->module = NULL;
+        }
+        /* Input: const void * image */
+        if ((image) != (NULL) && (calc_image_size(image)) > (0)) {
+            __cmd->image =
+                (void *)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, image,
+                (calc_image_size(image)) * sizeof(const void));
+        } else {
+            __cmd->image = NULL;
+        }
+    }
+
+    struct hip_hip_module_load_data_call_record *__call_record =
+        (struct hip_hip_module_load_data_call_record *)calloc(1, sizeof(struct hip_hip_module_load_data_call_record));
+
+    __call_record->image = image;
+
+    __call_record->module = module;
+
+    __call_record->__call_complete = 0;
+    __call_record->__handler_deallocate = 0;
+    ava_add_call(__call_id, __call_record);
+
+    command_channel_send_command(__chan, (struct command_base *)__cmd);
+
+    g_ptr_array_unref(__ava_alloc_list_hipModuleLoadData);      /* Deallocate all memory in the alloc list */
+
+    handle_commands_until(HIP_API, __call_record->__call_complete);
+    hipError_t ret;
+    ret = __call_record->ret;
+    free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
+    return ret;
+}
+
 EXPORTED hsa_status_t
 __do_c_hsa_executable_symbol_get_info(hsa_executable_symbol_t executable_symbol, hsa_executable_symbol_info_t attribute,
     char *value, size_t max_value)
@@ -6134,12 +6236,6 @@ EXPORTED hipError_t
 hipModuleGetTexRef(textureReference ** texRef, hipModule_t hmod, const char *name)
 {
     abort_with_reason("Unsupported API function: hipModuleGetTexRef");
-}
-
-EXPORTED hipError_t
-hipModuleLoadData(hipModule_t * module, const void *image)
-{
-    abort_with_reason("Unsupported API function: hipModuleLoadData");
 }
 
 EXPORTED hipError_t
