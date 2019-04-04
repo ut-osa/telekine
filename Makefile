@@ -32,7 +32,8 @@ CXXFLAGS = -g $(CFLAGS) -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecate
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) worker libguestlib.so guestshim.so crypto_guestshim.so crypto_impl.so
+all: $(EXECUTABLE) worker libguestlib.so guestshim.so crypto_guestshim.so \
+	crypto_impl.so
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
@@ -64,6 +65,11 @@ regen: hip.nw.cpp
 	../nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
 .PHONY: regen
 
+manager:
+	$(MAKE) -C nw/worker
+	ln -s ./nw/worker/manager_tcp $@
+.PHONY: manager
+
 guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so
 	g++ -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
 	   -Wl,--no-allow-shlib-undefined \
@@ -80,5 +86,5 @@ crypto_guestshim.so: HIP-encryptedMemcpy/hip_wrapper.o\
 
 
 clean:
-	rm -rf hip_nw *.o *.so
+	rm -rf hip_nw *.o *.so manager_tcp
 .PHONY: clean

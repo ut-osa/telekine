@@ -4,3 +4,7 @@ hip_nw
 *.so
 *.guesses
 worker
+manager_tcp
+*.swp
+*.swn
+*.swo
