@@ -1,8 +1,9 @@
 #!/bin/bash
 
+dir=$(dirname $0)
 
-guest_lib=$PWD/libguestlib.so
-shim=$PWD/guestshim.so
+guest_lib=$dir/libguestlib.so
+shim=$dir/guestshim.so
 
-echo LD_PRELOAD="$shim:$guest_lib" AVA_LOCAL=1 "$@"
+echo HCC_LAZYINIT=1 LD_PRELOAD="$shim:$guest_lib" AVA_LOCAL=1 "$@"
 HCC_LAZYINIT=1 LD_PRELOAD="$shim:$guest_lib" AVA_LOCAL=1 exec "$@"
