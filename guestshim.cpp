@@ -272,15 +272,11 @@ hipModuleLaunchKernel(hipFunction_t f, uint32_t gridDimX, uint32_t gridDimY,
                       uint32_t blockDimZ, uint32_t sharedMemBytes, hipStream_t hStream,
                       void** kernelParams, void** extra)
 {
-   size_t extra_size = *(size_t *)extra[3];
-   assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
-   assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
-   assert(extra[4] == HIP_LAUNCH_PARAM_END);
-
-   return __do_c_hipModuleLaunchKernel(&f, gridDimX, gridDimY, gridDimZ,
-                                       blockDimX, blockDimY, blockDimZ,
-                                       sharedMemBytes, hStream, kernelParams,
-                                       (char *)(extra[1]), extra_size);
+   return hipHccModuleLaunchKernel(f,
+               blockDimX * gridDimX, blockDimY * gridDimY, blockDimZ * gridDimZ,
+               blockDimX, blockDimY, blockDimZ,
+               sharedMemBytes, hStream, kernelParams, extra,
+               nullptr, nullptr);
 }
 
 

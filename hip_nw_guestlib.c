@@ -1191,76 +1191,14 @@ __handle_command_hip(struct command_base *__cmd)
             size_t extra_size;
             extra_size = __local->extra_size;
 
-            char *extra;
-            extra = __local->extra;
-
             hipEvent_t start;
             start = __local->start;
 
-            hipEvent_t stop;
-            stop = __local->stop;
-
-            hipError_t ret;
-            ret = __ret->ret;
-
-            /* Output: hipError_t ret */
-            __local->ret = __ret->ret;
-
-        }
-
-        if (__local->__handler_deallocate) {
-            free(__local);
-        }
-        __local->__call_complete = 1;
-        command_channel_free_command(__chan, (struct command_base *)__ret);
-        break;
-    }
-    case RET_HIP___DO_C_HIP_MODULE_LAUNCH_KERNEL:{
-        ava_is_in = 0;
-        ava_is_out = 1;
-        struct hip___do_c_hip_module_launch_kernel_ret *__ret = (struct hip___do_c_hip_module_launch_kernel_ret *)__cmd;
-        assert(__ret->base.api_id == HIP_API);
-        assert(__ret->base.command_size == sizeof(struct hip___do_c_hip_module_launch_kernel_ret));
-        struct hip___do_c_hip_module_launch_kernel_call_record *__local =
-            (struct hip___do_c_hip_module_launch_kernel_call_record *)ava_remove_call(__ret->__call_id);
-
-        {
-
-            hipFunction_t *f;
-            f = __local->f;
-
-            unsigned int gridDimX;
-            gridDimX = __local->gridDimX;
-
-            unsigned int gridDimY;
-            gridDimY = __local->gridDimY;
-
-            unsigned int gridDimZ;
-            gridDimZ = __local->gridDimZ;
-
-            unsigned int blockDimX;
-            blockDimX = __local->blockDimX;
-
-            unsigned int blockDimY;
-            blockDimY = __local->blockDimY;
-
-            unsigned int blockDimZ;
-            blockDimZ = __local->blockDimZ;
-
-            unsigned int sharedMemBytes;
-            sharedMemBytes = __local->sharedMemBytes;
-
-            hipStream_t stream;
-            stream = __local->stream;
-
-            void **kernelParams;
-            kernelParams = __local->kernelParams;
-
-            size_t extra_size;
-            extra_size = __local->extra_size;
-
             char *extra;
             extra = __local->extra;
+
+            hipEvent_t stop;
+            stop = __local->stop;
 
             hipError_t ret;
             ret = __ret->ret;
@@ -3923,132 +3861,6 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
     hipError_t ret;
     ret = __call_record->ret;
     free(__call_record);
-    command_channel_free_command(__chan, (struct command_base *)__cmd);
-    return ret;
-}
-
-EXPORTED hipError_t
-__do_c_hipModuleLaunchKernel(hipFunction_t * f, unsigned int gridDimX, unsigned int gridDimY, unsigned int gridDimZ,
-    unsigned int blockDimX, unsigned int blockDimY, unsigned int blockDimZ, unsigned int sharedMemBytes,
-    hipStream_t stream, void **kernelParams, char *extra, size_t extra_size)
-{
-    const int ava_is_in = 1,
-        ava_is_out = 0;
-    pthread_once(&guestlib_init, init_hip_guestlib);
-    GPtrArray *__ava_alloc_list___do_c_hipModuleLaunchKernel = g_ptr_array_new_full(0, free);
-
-    size_t __total_buffer_size = 0; {
-        /* Size: hipFunction_t * f */
-        if ((f) != (NULL)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(hipFunction_t));
-        }
-
-        /* Size: void ** kernelParams */
-        if ((kernelParams) != (NULL)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(void *));
-        }
-
-        /* Size: char * extra */
-        if ((extra) != (NULL) && (extra_size) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (extra_size) * sizeof(char));
-        }
-    }
-    struct hip___do_c_hip_module_launch_kernel_call *__cmd =
-        (struct hip___do_c_hip_module_launch_kernel_call *)command_channel_new_command(__chan,
-        sizeof(struct hip___do_c_hip_module_launch_kernel_call), __total_buffer_size);
-    __cmd->base.api_id = HIP_API;
-    __cmd->base.command_id = CALL_HIP___DO_C_HIP_MODULE_LAUNCH_KERNEL;
-
-    intptr_t __call_id = ava_get_call_id();
-    __cmd->__call_id = __call_id;
-
-    {
-
-        /* Input: hipFunction_t * f */
-        if ((f) != (NULL)) {
-            __cmd->f =
-                (hipFunction_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, f,
-                (1) * sizeof(hipFunction_t));
-        } else {
-            __cmd->f = NULL;
-        }
-        /* Input: unsigned int gridDimX */
-        __cmd->gridDimX = gridDimX;
-        /* Input: unsigned int gridDimY */
-        __cmd->gridDimY = gridDimY;
-        /* Input: unsigned int gridDimZ */
-        __cmd->gridDimZ = gridDimZ;
-        /* Input: unsigned int blockDimX */
-        __cmd->blockDimX = blockDimX;
-        /* Input: unsigned int blockDimY */
-        __cmd->blockDimY = blockDimY;
-        /* Input: unsigned int blockDimZ */
-        __cmd->blockDimZ = blockDimZ;
-        /* Input: unsigned int sharedMemBytes */
-        __cmd->sharedMemBytes = sharedMemBytes;
-        /* Input: hipStream_t stream */
-        __cmd->stream = stream;
-        /* Input: void ** kernelParams */
-        if ((kernelParams) != (NULL)) {
-            __cmd->kernelParams =
-                (void **)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, kernelParams,
-                (1) * sizeof(void *));
-        } else {
-            __cmd->kernelParams = NULL;
-        }
-        /* Input: char * extra */
-        if ((extra) != (NULL) && (extra_size) > (0)) {
-            __cmd->extra =
-                (char *)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, extra,
-                (extra_size) * sizeof(char));
-        } else {
-            __cmd->extra = NULL;
-        }
-        /* Input: size_t extra_size */
-        __cmd->extra_size = extra_size;
-    }
-
-    struct hip___do_c_hip_module_launch_kernel_call_record *__call_record =
-        (struct hip___do_c_hip_module_launch_kernel_call_record *)calloc(1,
-        sizeof(struct hip___do_c_hip_module_launch_kernel_call_record));
-
-    __call_record->f = f;
-
-    __call_record->gridDimX = gridDimX;
-
-    __call_record->gridDimY = gridDimY;
-
-    __call_record->gridDimZ = gridDimZ;
-
-    __call_record->blockDimX = blockDimX;
-
-    __call_record->blockDimY = blockDimY;
-
-    __call_record->blockDimZ = blockDimZ;
-
-    __call_record->sharedMemBytes = sharedMemBytes;
-
-    __call_record->stream = stream;
-
-    __call_record->kernelParams = kernelParams;
-
-    __call_record->extra_size = extra_size;
-
-    __call_record->extra = extra;
-
-    __call_record->__call_complete = 0;
-    __call_record->__handler_deallocate = 0;
-    ava_add_call(__call_id, __call_record);
-
-    command_channel_send_command(__chan, (struct command_base *)__cmd);
-
-    g_ptr_array_unref(__ava_alloc_list___do_c_hipModuleLaunchKernel);   /* Deallocate all memory in the alloc list */
-
-    handle_commands_until(HIP_API, __call_record->__call_complete);
-    hipError_t ret;
-    ret = __call_record->ret;
-    free(__call_record);
-    command_channel_free_command(__chan, (struct command_base *)__cmd);
     return ret;
 }
 

@@ -29,7 +29,6 @@ enum hip_functions {
         RET_HIP_HIP_MEMCPY2_D_ASYNC, CALL_HIP_HIP_STREAM_SYNCHRONIZE, RET_HIP_HIP_STREAM_SYNCHRONIZE,
         CALL_HIP___DO_C_HIP_GET_DEVICE_PROPERTIES, RET_HIP___DO_C_HIP_GET_DEVICE_PROPERTIES,
         CALL_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_KERNEL, RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_KERNEL,
-        CALL_HIP___DO_C_HIP_MODULE_LAUNCH_KERNEL, RET_HIP___DO_C_HIP_MODULE_LAUNCH_KERNEL,
         CALL_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED, RET_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED,
         CALL_HIP_NW_HSA_EXECUTABLE_CREATE_ALT, RET_HIP_NW_HSA_EXECUTABLE_CREATE_ALT, CALL_HIP_NW_HSA_ISA_FROM_NAME,
         RET_HIP_NW_HSA_ISA_FROM_NAME, CALL_HIP_HIP_PEEK_AT_LAST_ERROR, RET_HIP_HIP_PEEK_AT_LAST_ERROR,
@@ -607,48 +606,6 @@ struct hip___do_c_hip_hcc_module_launch_kernel_call_record {
     hipEvent_t start;
     char *extra;
     hipEvent_t stop;
-    hipError_t ret;
-    char __handler_deallocate;
-    volatile char __call_complete;
-};
-
-struct hip___do_c_hip_module_launch_kernel_call {
-    struct command_base base;
-    intptr_t __call_id;
-    hipFunction_t *f;
-    unsigned int gridDimX;
-    unsigned int gridDimY;
-    unsigned int gridDimZ;
-    unsigned int blockDimX;
-    unsigned int blockDimY;
-    unsigned int blockDimZ;
-    unsigned int sharedMemBytes;
-    hipStream_t stream;
-    void **kernelParams;
-    size_t extra_size;
-    char *extra;
-};
-
-struct hip___do_c_hip_module_launch_kernel_ret {
-    struct command_base base;
-    intptr_t __call_id;
-
-    hipError_t ret;
-};
-
-struct hip___do_c_hip_module_launch_kernel_call_record {
-    hipFunction_t *f;
-    unsigned int gridDimX;
-    unsigned int gridDimY;
-    unsigned int gridDimZ;
-    unsigned int blockDimX;
-    unsigned int blockDimY;
-    unsigned int blockDimZ;
-    unsigned int sharedMemBytes;
-    hipStream_t stream;
-    void **kernelParams;
-    size_t extra_size;
-    char *extra;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;

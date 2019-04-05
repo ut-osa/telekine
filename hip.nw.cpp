@@ -285,34 +285,6 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
     }
 }
 
-hipError_t
-__do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
-                      unsigned int gridDimY, unsigned int gridDimZ,
-                      unsigned int blockDimX, unsigned int blockDimY,
-                      unsigned int blockDimZ, unsigned int sharedMemBytes,
-                      hipStream_t stream, void** kernelParams, char* extra,
-                      size_t extra_size)
-{
-   ava_argument(f) {
-      ava_in; ava_buffer(1);
-      ava_element {
-         ava_opaque;
-      }
-   }
-    ava_argument(kernelParams) {
-        ava_in; ava_buffer(1);
-        ava_element {
-           ava_opaque;
-        }
-    }
-    ava_argument(extra) {
-        ava_in; ava_buffer(extra_size);
-    }
-    ava_argument (stream) {
-       ava_opaque;
-    }
-}
-
 hsa_status_t
 HSA_API nw_hsa_system_major_extension_supported(
       uint16_t extension,
