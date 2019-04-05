@@ -180,7 +180,9 @@ ava_add_dependency(void *a, void *b)
 
 #define __chan nw_global_command_channel
 
-void __attribute__ ((constructor)) init_hip_guestlib(void)
+pthread_once_t guestlib_init = PTHREAD_ONCE_INIT;
+
+void init_hip_guestlib(void)
 {
     __handle_command_hip_init();
     nw_init_guestlib(HIP_API);
@@ -2384,6 +2386,7 @@ hipMalloc(void **dptr, size_t size)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMalloc = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2436,6 +2439,7 @@ hipFree(void *ptr)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipFree = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2480,6 +2484,7 @@ hipMemcpyHtoD(hipDeviceptr_t dst, void *src, size_t sizeBytes)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpyHtoD = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2543,6 +2548,7 @@ hipMemcpyDtoH(void *dst, hipDeviceptr_t src, size_t sizeBytes)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpyDtoH = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2600,6 +2606,7 @@ hipMemcpyDtoD(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpyDtoD = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2653,6 +2660,7 @@ hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpy = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2787,6 +2795,7 @@ hipMemcpyHtoDAsync(hipDeviceptr_t dst, void *src, size_t sizeBytes, hipStream_t 
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpyHtoDAsync = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2855,6 +2864,7 @@ hipMemcpyDtoHAsync(void *dst, hipDeviceptr_t src, size_t sizeBytes, hipStream_t 
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpyDtoHAsync = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2917,6 +2927,7 @@ hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes, hip
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpyDtoDAsync = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -2975,6 +2986,7 @@ hipMemcpyAsync(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind,
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpyAsync = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3113,6 +3125,7 @@ hipGetDeviceCount(int *count)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipGetDeviceCount = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3162,6 +3175,7 @@ nw_hipSetDevice(int deviceId)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hipSetDevice = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3207,6 +3221,7 @@ hipMemGetInfo(size_t * __free, size_t * total)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemGetInfo = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3264,6 +3279,7 @@ nw_hipStreamCreate(hipStream_t * stream, hsa_agent_t * agent)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hipStreamCreate = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3321,6 +3337,7 @@ nw_hipGetDevice(int *deviceId)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hipGetDevice = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3370,6 +3387,7 @@ hipInit(unsigned int flags)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipInit = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3415,6 +3433,7 @@ hipCtxGetCurrent(hipCtx_t * ctx)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipCtxGetCurrent = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3465,6 +3484,7 @@ hipMemcpy2DAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemcpy2DAsync = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3616,6 +3636,7 @@ hipStreamSynchronize(hipStream_t stream)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipStreamSynchronize = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3662,6 +3683,7 @@ __do_c_hipGetDeviceProperties(char *prop, int deviceId)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_hipGetDeviceProperties = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3719,6 +3741,7 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_hipHccModuleLaunchKernel = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3840,6 +3863,7 @@ __do_c_hipModuleLaunchKernel(hipFunction_t * f, unsigned int gridDimX, unsigned 
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_hipModuleLaunchKernel = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -3963,6 +3987,7 @@ nw_hsa_system_major_extension_supported(uint16_t extension, uint16_t version_maj
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hsa_system_major_extension_supported = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4040,6 +4065,7 @@ nw_hsa_executable_create_alt(hsa_profile_t profile, hsa_default_float_rounding_m
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hsa_executable_create_alt = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4112,6 +4138,7 @@ nw_hsa_isa_from_name(const char *name, hsa_isa_t * isa)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hsa_isa_from_name = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4175,6 +4202,7 @@ hipPeekAtLastError()
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipPeekAtLastError = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4217,6 +4245,7 @@ hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attr, int deviceId)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipDeviceGetAttribute = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4275,6 +4304,7 @@ hipModuleLoadData(hipModule_t * module, const void *image)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipModuleLoadData = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4339,6 +4369,7 @@ __do_c_hsa_executable_symbol_get_info(hsa_executable_symbol_t executable_symbol,
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_hsa_executable_symbol_get_info = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4408,6 +4439,7 @@ nw_hipCtxSetCurrent(hipCtx_t ctx)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hipCtxSetCurrent = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4454,6 +4486,7 @@ hipEventCreate(hipEvent_t * event)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipEventCreate = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4503,6 +4536,7 @@ hipEventRecord(hipEvent_t event, hipStream_t stream)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipEventRecord = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4552,6 +4586,7 @@ hipEventSynchronize(hipEvent_t event)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipEventSynchronize = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4597,6 +4632,7 @@ hipEventDestroy(hipEvent_t event)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipEventDestroy = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4642,6 +4678,7 @@ hipEventElapsedTime(float *ms, hipEvent_t start, hipEvent_t stop)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipEventElapsedTime = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4700,6 +4737,7 @@ hipModuleLoad(hipModule_t * module, const char *fname)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipModuleLoad = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4763,6 +4801,7 @@ hipModuleUnload(hipModule_t module)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipModuleUnload = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4808,6 +4847,7 @@ nw_hipStreamDestroy(hipStream_t stream)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_nw_hipStreamDestroy = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4853,6 +4893,7 @@ hipModuleGetFunction(hipFunction_t * function, hipModule_t module, const char *k
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipModuleGetFunction = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4921,6 +4962,7 @@ hipGetLastError()
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipGetLastError = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -4962,6 +5004,7 @@ hipMemset(void *dst, int value, size_t sizeBytes)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipMemset = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5015,6 +5058,7 @@ __do_c_hsa_agent_get_info(hsa_agent_t agent, hsa_agent_info_t attribute, void *v
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_hsa_agent_get_info = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5084,6 +5128,7 @@ __do_c_load_executable(const char *file_buf, size_t file_len, hsa_executable_t *
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_load_executable = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5218,6 +5263,7 @@ __do_c_get_agents(hsa_agent_t * agents, size_t max_agents)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_get_agents = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5271,6 +5317,7 @@ __do_c_get_isas(hsa_agent_t agents, hsa_isa_t * isas, size_t max_isas)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_get_isas = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5336,6 +5383,7 @@ __do_c_get_kerenel_symbols(const hsa_executable_t * exec, const hsa_agent_t * ag
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_get_kerenel_symbols = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5459,6 +5507,7 @@ __do_c_query_host_address(uint64_t kernel_object_, char *kernel_header_)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_query_host_address = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5513,6 +5562,7 @@ __do_c_get_kernel_descriptor(const hsa_executable_symbol_t * symbol, const char 
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list___do_c_get_kernel_descriptor = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
@@ -5612,6 +5662,7 @@ hipCtxGetDevice(hipDevice_t * device)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
     GPtrArray *__ava_alloc_list_hipCtxGetDevice = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
