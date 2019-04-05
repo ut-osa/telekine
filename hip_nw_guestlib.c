@@ -180,16 +180,21 @@ ava_add_dependency(void *a, void *b)
 
 #define __chan nw_global_command_channel
 
-pthread_once_t guestlib_init = PTHREAD_ONCE_INIT;
+static bool was_initted;
+static pthread_once_t guestlib_init = PTHREAD_ONCE_INIT;
 
+/* DON'T CALL DIRECTLY! must be protected by pthread_once */
 void init_hip_guestlib(void)
 {
+    was_initted = true;
     __handle_command_hip_init();
     nw_init_guestlib(HIP_API);
 }
 
 void __attribute__ ((destructor)) destroy_hip_guestlib(void)
 {
+    if (!was_initted)
+       return;
     __handle_command_hip_destroy();
     nw_destroy_guestlib();
 }
