@@ -131,21 +131,15 @@ int main(int argc, char *argv[])
 
     /* polling new applications */
     do {
-        printf("about to accept\n");
-        fflush(stdout);
         client_fd = accept(listen_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen);
 
         /* get guestlib info */
-        printf("about to get guest lib info\n");
-        fflush(stdout);
         recv_socket(client_fd, &msg, sizeof(struct command_base));
         if (msg.command_type != MSG_NEW_APPLICATION) {
             printf("[manager] wrong message type\n");
             close(client_fd);
             continue;
         }
-        printf("about to fork\n");
-        fflush(stdout);
 
         /* spawn a worker and wait for it to be ready */
         child = fork();
@@ -153,8 +147,6 @@ int main(int argc, char *argv[])
             close(listen_fd);
             break;
         }
-        printf("about to open fifo\n");
-        fflush(stdout);
         /* wait for the worker to listen... */
         uint64_t val;
         int fifo_fd = open("/tmp/ava_fifo", O_RDONLY|O_CLOEXEC);
@@ -162,18 +154,16 @@ int main(int argc, char *argv[])
           perror("/tmp/ava_fifo");
           return 1;
         }
-        printf("about to read from fifo\n");
-        fflush(stdout);
-        read(fifo_fd, &val, sizeof(val));
-        printf("just done did read from fifo\n");
-        fflush(stdout);
-
-        /* return worker port to guestlib */
-        response.api_id = INTERNAL_API;
-        worker_port = (uintptr_t *)response.reserved_area;
-        *worker_port = worker_id + WORKER_PORT_BASE;
-        send_socket(client_fd, &response, sizeof(struct command_base));
-        close(client_fd);
+        if (read(fifo_fd, &val, sizeof(val)) != sizeof(val)) {
+           perror("Read /tmp/ava_fifo");
+        } else {
+           /* return worker port to guestlib */
+           response.api_id = INTERNAL_API;
+           worker_port = (uintptr_t *)response.reserved_area;
+           *worker_port = worker_id + WORKER_PORT_BASE;
+           send_socket(client_fd, &response, sizeof(struct command_base));
+           close(client_fd);
+        }
 
         worker_id++;
     } while (1);
