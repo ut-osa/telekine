@@ -13,7 +13,7 @@ typedef struct MemoryRegion {
 struct command_channel* command_channel_shm_worker_new(int vm_id, int rt_type, int listen_port,
         uintptr_t param_block_local_offset, size_t param_block_size);
 struct command_channel* command_channel_min_worker_new(int vm_id, int rt_type, int listen_port,
-        uintptr_t param_block_local_offset, size_t param_block_size, int fd);
+        uintptr_t param_block_local_offset, size_t param_block_size);
 struct command_channel* command_channel_socket_worker_new(int vm_id, int rt_type, int listen_port,
         uintptr_t param_block_local_offset, size_t param_block_size);
 

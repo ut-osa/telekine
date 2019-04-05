@@ -102,13 +102,21 @@ int main(int argc, char *argv[])
     }
 
     worker_bin = worker_bin_buf;
+    if (mkfifo("/tmp/ava_fifo", (S_IRWXO|S_IRWXG|S_IRWXU) & ~(S_IXUSR|S_IXGRP|S_IXOTH))) {
+       if (errno !=  EEXIST) {
+          perror("mkfifo /tmp/ava_fifo");
+          return 1;
+       }
+    }
 
     if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket");
+        return 1;
     }
     // Forcefully attaching socket to the port 4000
     if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &sock_opt, sizeof(sock_opt))) {
         perror("setsockopt");
+        return 1;
     }
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -120,33 +128,45 @@ int main(int argc, char *argv[])
     if (listen(listen_fd, 10) < 0) {
         perror("listen");
     }
-    int ready_pipe[2];
 
     /* polling new applications */
     do {
+        printf("about to accept\n");
+        fflush(stdout);
         client_fd = accept(listen_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen);
 
         /* get guestlib info */
+        printf("about to get guest lib info\n");
+        fflush(stdout);
         recv_socket(client_fd, &msg, sizeof(struct command_base));
         if (msg.command_type != MSG_NEW_APPLICATION) {
             printf("[manager] wrong message type\n");
             close(client_fd);
             continue;
         }
+        printf("about to fork\n");
+        fflush(stdout);
 
         /* spawn a worker and wait for it to be ready */
-        uint64_t val;
-        pipe(ready_pipe);
         child = fork();
         if (child == 0) {
-            close(ready_pipe[0]);
             close(listen_fd);
             break;
         }
+        printf("about to open fifo\n");
+        fflush(stdout);
         /* wait for the worker to listen... */
-        close(ready_pipe[1]);
-        read(ready_pipe[0], &val, sizeof(val));
-        close(ready_pipe[0]);
+        uint64_t val;
+        int fifo_fd = open("/tmp/ava_fifo", O_RDONLY|O_CLOEXEC);
+        if (fifo_fd < 0) {
+          perror("/tmp/ava_fifo");
+          return 1;
+        }
+        printf("about to read from fifo\n");
+        fflush(stdout);
+        read(fifo_fd, &val, sizeof(val));
+        printf("just done did read from fifo\n");
+        fflush(stdout);
 
         /* return worker port to guestlib */
         response.api_id = INTERNAL_API;
@@ -186,21 +206,19 @@ int main(int argc, char *argv[])
     char str_port[10];
     char str_pb_offset[10];
     char str_pb_size[10];
-    char str_rdy_pipe[10];
     pb_info = (struct param_block_info *)msg.reserved_area;
     sprintf(str_vm_id, "%d", msg.vm_id);
     sprintf(str_rt_type, "%d", msg.api_id);
     sprintf(str_port, "%d", worker_id + WORKER_PORT_BASE);
     sprintf(str_pb_offset, "%lu", pb_info->param_local_offset);
     sprintf(str_pb_size, "%lu", pb_info->param_block_size);
-    sprintf(str_rdy_pipe, "%d", ready_pipe[1]);
     char * argv_list[] = {worker_bin,
                          str_vm_id, str_rt_type, str_port,
-                         str_pb_offset, str_pb_size, str_rdy_pipe, NULL};
-    printf("[manager] %s vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx, rdy_pipe=%d\n",
+                         str_pb_offset, str_pb_size, NULL};
+    printf("[manager] %s vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx",
            worker_bin, msg.vm_id, msg.api_id, str_port,
            pb_info->param_local_offset,
-           pb_info->param_block_size,  ready_pipe[1]);
+           pb_info->param_block_size);
     if (execv(worker_bin, argv_list) < 0) {
         perror("execv worker");
     }

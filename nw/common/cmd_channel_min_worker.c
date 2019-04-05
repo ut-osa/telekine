@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 struct command_channel_min {
     struct command_channel_base base;
@@ -227,7 +228,7 @@ void command_channel_min_free_command(struct command_channel* c, struct command_
 }
 
 struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, int listen_port,
-        uintptr_t dummy2, size_t dummy3, int pipefd)
+        uintptr_t dummy2, size_t dummy3)
 {
     struct command_channel_min *chan = (struct command_channel_min *)malloc(sizeof(struct command_channel_min));
     command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
@@ -265,8 +266,13 @@ struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, 
     printf("[worker#%d] waiting for guestlib connection\n", listen_port);
 
     uint64_t rdy = 1;
-    write(pipefd, &rdy, sizeof(rdy));
-    close(pipefd);
+    int fifo_fd = open("/tmp/ava_fifo", O_WRONLY|O_CLOEXEC);
+    if (fifo_fd < 0) {
+       perror("/tmp/ava_fifo");
+       abort();
+    }
+    write(fifo_fd, &rdy, sizeof(rdy));
+    close(fifo_fd);
 
     chan->guestlib_fd = accept(chan->listen_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen);
 
