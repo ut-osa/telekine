@@ -14,6 +14,11 @@ typedef struct hipFuncAttributes hipFuncAttributes;
 #include <hsa_limited.h>
 
 hipError_t
+hipDeviceSynchronize(void)
+{
+}
+
+hipError_t
 hipMalloc(void **dptr,
           size_t size)
 {

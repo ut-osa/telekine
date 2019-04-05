@@ -189,6 +189,21 @@ void __attribute__ ((constructor)) init_hip_worker(void)
 static struct nw_handle_pool *handle_pool = NULL;
 
 static hipError_t
+__wrapper_hipDeviceSynchronize()
+{
+    hipError_t ret;
+    ret = hipDeviceSynchronize();
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
+static hipError_t
 __wrapper_hipMalloc(void **dptr, size_t size)
 {
     hipError_t ret;
@@ -973,6 +988,54 @@ __handle_command_hip(struct command_base *__cmd)
      ava_is_out;
     switch (__cmd->command_id) {
 
+    case CALL_HIP_HIP_DEVICE_SYNCHRONIZE:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipDeviceSynchronize = g_ptr_array_new_full(0, free);
+        struct hip_hip_device_synchronize_call *__call = (struct hip_hip_device_synchronize_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_device_synchronize_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipDeviceSynchronize();
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+        }
+        struct hip_hip_device_synchronize_ret *__ret =
+            (struct hip_hip_device_synchronize_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_device_synchronize_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_DEVICE_SYNCHRONIZE;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipDeviceSynchronize);       /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
     case CALL_HIP_HIP_MALLOC:{
         ava_is_in = 1;
         ava_is_out = 0;

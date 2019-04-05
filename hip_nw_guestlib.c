@@ -230,6 +230,32 @@ __handle_command_hip(struct command_base *__cmd)
     int ava_is_in,
      ava_is_out;
     switch (__cmd->command_id) {
+    case RET_HIP_HIP_DEVICE_SYNCHRONIZE:{
+        ava_is_in = 0;
+        ava_is_out = 1;
+        struct hip_hip_device_synchronize_ret *__ret = (struct hip_hip_device_synchronize_ret *)__cmd;
+        assert(__ret->base.api_id == HIP_API);
+        assert(__ret->base.command_size == sizeof(struct hip_hip_device_synchronize_ret));
+        struct hip_hip_device_synchronize_call_record *__local =
+            (struct hip_hip_device_synchronize_call_record *)ava_remove_call(__ret->__call_id);
+
+        {
+
+            hipError_t ret;
+            ret = __ret->ret;
+
+            /* Output: hipError_t ret */
+            __local->ret = __ret->ret;
+
+        }
+
+        if (__local->__handler_deallocate) {
+            free(__local);
+        }
+        __local->__call_complete = 1;
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
     case RET_HIP_HIP_MALLOC:{
         ava_is_in = 0;
         ava_is_out = 1;
@@ -2382,6 +2408,49 @@ __handle_command_hip(struct command_base *__cmd)
 ////// API function stub implementations
 
 EXPORTED hipError_t
+hipDeviceSynchronize()
+{
+    const int ava_is_in = 1,
+        ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
+    GPtrArray *__ava_alloc_list_hipDeviceSynchronize = g_ptr_array_new_full(0, free);
+
+    size_t __total_buffer_size = 0; {
+    }
+    struct hip_hip_device_synchronize_call *__cmd =
+        (struct hip_hip_device_synchronize_call *)command_channel_new_command(__chan,
+        sizeof(struct hip_hip_device_synchronize_call), __total_buffer_size);
+    __cmd->base.api_id = HIP_API;
+    __cmd->base.command_id = CALL_HIP_HIP_DEVICE_SYNCHRONIZE;
+
+    intptr_t __call_id = ava_get_call_id();
+    __cmd->__call_id = __call_id;
+
+    {
+
+    }
+
+    struct hip_hip_device_synchronize_call_record *__call_record =
+        (struct hip_hip_device_synchronize_call_record *)calloc(1,
+        sizeof(struct hip_hip_device_synchronize_call_record));
+
+    __call_record->__call_complete = 0;
+    __call_record->__handler_deallocate = 0;
+    ava_add_call(__call_id, __call_record);
+
+    command_channel_send_command(__chan, (struct command_base *)__cmd);
+
+    g_ptr_array_unref(__ava_alloc_list_hipDeviceSynchronize);   /* Deallocate all memory in the alloc list */
+
+    handle_commands_until(HIP_API, __call_record->__call_complete);
+    hipError_t ret;
+    ret = __call_record->ret;
+    free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
+    return ret;
+}
+
+EXPORTED hipError_t
 hipMalloc(void **dptr, size_t size)
 {
     const int ava_is_in = 1,
@@ -2431,6 +2500,7 @@ hipMalloc(void **dptr, size_t size)
     hipError_t ret;
     ret = __call_record->ret;
     free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
     return ret;
 }
 
@@ -2476,6 +2546,7 @@ hipFree(void *ptr)
     hipError_t ret;
     ret = __call_record->ret;
     free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
     return ret;
 }
 
@@ -5705,12 +5776,6 @@ hipCtxGetDevice(hipDevice_t * device)
     free(__call_record);
     command_channel_free_command(__chan, (struct command_base *)__cmd);
     return ret;
-}
-
-EXPORTED hipError_t
-hipDeviceSynchronize()
-{
-    abort_with_reason("Unsupported API function: hipDeviceSynchronize");
 }
 
 EXPORTED hipError_t
