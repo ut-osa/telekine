@@ -107,7 +107,6 @@ hipStreamCreate(hipStream_t* stream)
       pthread_mutex_lock(&stream_agent_lock);
       stream_to_agent.emplace(*stream, agent);
       pthread_mutex_unlock(&stream_agent_lock);
-      cout << "stream to agent added!\n";
    }
 
    return ret;
@@ -125,6 +124,24 @@ hipStreamDestroy(hipStream_t stream)
       pthread_mutex_unlock(&stream_agent_lock);
    }
    return ret;
+}
+
+hipError_t
+hipHostMalloc(void** ptr, size_t size, unsigned int flags)
+{
+   void *res = malloc(size);
+   if (res) {
+      *ptr = res;
+      return hipSuccess;
+   }
+   return hipErrorMemoryAllocation;
+}
+
+hipError_t
+hipHostFree(void* ptr)
+{
+   free(ptr);
+   return hipSuccess;
 }
 
 const char* ihipErrorString(hipError_t hip_error) {
