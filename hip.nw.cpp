@@ -203,33 +203,6 @@ hipCtxGetCurrent(hipCtx_t* ctx)
    }
 }
 
-hipError_t hipMemcpy2DAsync(void* dst, size_t dpitch, const void* src,
-                            size_t spitch, size_t width, size_t height,
-                            hipMemcpyKind kind, hipStream_t stream)
-{
-   ava_argument(dst) {
-      ava_depends_on(kind);
-      if (kind == hipMemcpyDeviceToHost) {
-         ava_out;
-         ava_buffer(width * height);
-      } else {
-         ava_opaque;
-      }
-   }
-   ava_argument(src) {
-      ava_depends_on(kind);
-      if (kind == hipMemcpyHostToDevice) {
-         ava_in;
-         ava_buffer(width * height);
-      } else {
-         ava_opaque;
-      }
-   }
-   ava_argument(stream) {
-      ava_opaque;
-   }
-}
-
 hipError_t hipStreamSynchronize(hipStream_t stream)
 {
    ava_argument(stream) {

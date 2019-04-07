@@ -991,98 +991,6 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case RET_HIP_HIP_MEMCPY2_D_ASYNC:{
-        ava_is_in = 0;
-        ava_is_out = 1;
-        struct hip_hip_memcpy2_d_async_ret *__ret = (struct hip_hip_memcpy2_d_async_ret *)__cmd;
-        assert(__ret->base.api_id == HIP_API);
-        assert(__ret->base.command_size == sizeof(struct hip_hip_memcpy2_d_async_ret));
-        struct hip_hip_memcpy2_d_async_call_record *__local =
-            (struct hip_hip_memcpy2_d_async_call_record *)ava_remove_call(__ret->__call_id);
-
-        {
-
-            size_t dpitch;
-            dpitch = __local->dpitch;
-
-            size_t spitch;
-            spitch = __local->spitch;
-
-            size_t width;
-            width = __local->width;
-
-            size_t height;
-            height = __local->height;
-
-            hipMemcpyKind kind;
-            kind = __local->kind;
-
-            void *src;
-            src = __local->src;
-
-            void *dst;
-            dst = __local->dst;
-
-            hipStream_t stream;
-            stream = __local->stream;
-
-            hipError_t ret;
-            ret = __ret->ret;
-
-            /* Output: void * dst */
-            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                if (kind == hipMemcpyDeviceToHost
-                    && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-                    && __local->dst != NULL && __ret->dst != NULL) {
-                    memcpy(__local->dst, (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-                            && (__ret->dst) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
-                                    __ret->dst))) : (__ret->dst),
-                        ((kind == hipMemcpyDeviceToHost) ? (width * height) : (0)) * sizeof(void));
-                }
-            } else {
-                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                    if (kind == hipMemcpyDeviceToHost
-                        && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-                        && __local->dst != NULL && __ret->dst != NULL) {
-                        void *__tmp_dst_0;
-                        __tmp_dst_0 = (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
-                            && (__ret->dst) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
-                                    __ret->dst))) : (__ret->dst);
-                        const size_t __dst_size_0 = ((kind == hipMemcpyDeviceToHost) ? (width * height) : (0));
-                        for (size_t __dst_index_0 = 0; __dst_index_0 < __dst_size_0; __dst_index_0++) {
-                            const size_t ava_index = __dst_index_0;
-
-                            char *__dst_a_0;
-                            __dst_a_0 = (__local->dst) + __dst_index_0;
-
-                            char *__dst_b_0;
-                            __dst_b_0 = (__tmp_dst_0) + __dst_index_0;
-
-                            if (kind == hipMemcpyDeviceToHost) {
-                                *__dst_a_0 = *__dst_b_0;
-                            }
-                        }
-                    }
-                } else {
-                    if (kind == hipMemcpyDeviceToHost
-                        && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_OPAQUE)) {
-                        __local->dst = __ret->dst;
-                    }
-                }
-            }
-
-            /* Output: hipError_t ret */
-            __local->ret = __ret->ret;
-
-        }
-
-        if (__local->__handler_deallocate) {
-            free(__local);
-        }
-        __local->__call_complete = 1;
-        command_channel_free_command(__chan, (struct command_base *)__ret);
-        break;
-    }
     case RET_HIP_HIP_STREAM_SYNCHRONIZE:{
         ava_is_in = 0;
         ava_is_out = 1;
@@ -3493,159 +3401,6 @@ hipCtxGetCurrent(hipCtx_t * ctx)
 }
 
 EXPORTED hipError_t
-hipMemcpy2DAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-    hipMemcpyKind kind, hipStream_t stream)
-{
-    const int ava_is_in = 1,
-        ava_is_out = 0;
-    pthread_once(&guestlib_init, init_hip_guestlib);
-    GPtrArray *__ava_alloc_list_hipMemcpy2DAsync = g_ptr_array_new_full(0, free);
-
-    size_t __total_buffer_size = 0; {
-        /* Size: const void * src */
-        if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
-                && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
-                __total_buffer_size +=
-                    command_channel_buffer_size(__chan,
-                    ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
-            }
-        } else {
-            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
-                    && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
-                    __total_buffer_size +=
-                        command_channel_buffer_size(__chan,
-                        ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
-                }
-            }
-    }}
-    struct hip_hip_memcpy2_d_async_call *__cmd =
-        (struct hip_hip_memcpy2_d_async_call *)command_channel_new_command(__chan,
-        sizeof(struct hip_hip_memcpy2_d_async_call), __total_buffer_size);
-    __cmd->base.api_id = HIP_API;
-    __cmd->base.command_id = CALL_HIP_HIP_MEMCPY2_D_ASYNC;
-
-    intptr_t __call_id = ava_get_call_id();
-    __cmd->__call_id = __call_id;
-
-    {
-
-        /* Input: void * dst */
-        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if (kind == hipMemcpyDeviceToHost
-                && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
-                && ((kind == hipMemcpyDeviceToHost) ? (width * height) : (0)) > (0)) {
-                __cmd->dst = HAS_OUT_BUFFER_SENTINEL;
-            } else {
-                __cmd->dst = NULL;
-            }
-        } else {
-            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                if (kind == hipMemcpyDeviceToHost
-                    && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
-                    && ((kind == hipMemcpyDeviceToHost) ? (width * height) : (0)) > (0)) {
-                    __cmd->dst = HAS_OUT_BUFFER_SENTINEL;
-                } else {
-                    __cmd->dst = NULL;
-                }
-            } else {
-                __cmd->dst = dst;
-            }
-        }
-        /* Input: size_t dpitch */
-        __cmd->dpitch = dpitch;
-        /* Input: const void * src */
-        if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-            if (kind == hipMemcpyHostToDevice
-                && ((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
-                && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
-                __cmd->src =
-                    (void *)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, src,
-                    ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
-            } else {
-                __cmd->src = NULL;
-            }
-        } else {
-            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
-                if (kind == hipMemcpyHostToDevice
-                    && ((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (src) != (NULL)
-                    && ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) > (0)) {
-                    void *__tmp_src_0;
-                    __tmp_src_0 =
-                        (void *)calloc(1,
-                        ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
-                    g_ptr_array_add(__ava_alloc_list_hipMemcpy2DAsync, __tmp_src_0);
-                    const size_t __src_size_0 = ((kind == hipMemcpyHostToDevice) ? (width * height) : (0));
-                    for (size_t __src_index_0 = 0; __src_index_0 < __src_size_0; __src_index_0++) {
-                        const size_t ava_index = __src_index_0;
-
-                        char *__src_a_0;
-                        __src_a_0 = (src) + __src_index_0;
-
-                        char *__src_b_0;
-                        __src_b_0 = (__tmp_src_0) + __src_index_0;
-
-                        *__src_b_0 = *__src_a_0;
-                    }
-                    __cmd->src =
-                        (void *)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, __tmp_src_0,
-                        ((kind == hipMemcpyHostToDevice) ? (width * height) : (0)) * sizeof(const void));
-                } else {
-                    __cmd->src = NULL;
-                }
-            } else {
-                __cmd->src = src;
-            }
-        }
-        /* Input: size_t spitch */
-        __cmd->spitch = spitch;
-        /* Input: size_t width */
-        __cmd->width = width;
-        /* Input: size_t height */
-        __cmd->height = height;
-        /* Input: hipMemcpyKind kind */
-        __cmd->kind = kind;
-        /* Input: hipStream_t stream */
-        __cmd->stream = stream;
-    }
-
-    struct hip_hip_memcpy2_d_async_call_record *__call_record =
-        (struct hip_hip_memcpy2_d_async_call_record *)calloc(1, sizeof(struct hip_hip_memcpy2_d_async_call_record));
-
-    __call_record->dpitch = dpitch;
-
-    __call_record->spitch = spitch;
-
-    __call_record->width = width;
-
-    __call_record->height = height;
-
-    __call_record->kind = kind;
-
-    __call_record->src = src;
-
-    __call_record->dst = dst;
-
-    __call_record->stream = stream;
-
-    __call_record->__call_complete = 0;
-    __call_record->__handler_deallocate = 0;
-    ava_add_call(__call_id, __call_record);
-
-    command_channel_send_command(__chan, (struct command_base *)__cmd);
-
-    g_ptr_array_unref(__ava_alloc_list_hipMemcpy2DAsync);       /* Deallocate all memory in the alloc list */
-
-    handle_commands_until(HIP_API, __call_record->__call_complete);
-    hipError_t ret;
-    ret = __call_record->ret;
-    free(__call_record);
-    command_channel_free_command(__chan, (struct command_base *)__cmd);
-    return ret;
-}
-
-EXPORTED hipError_t
 hipStreamSynchronize(hipStream_t stream)
 {
     const int ava_is_in = 1,
@@ -3866,6 +3621,7 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
     hipError_t ret;
     ret = __call_record->ret;
     free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
     return ret;
 }
 
@@ -5915,6 +5671,13 @@ EXPORTED hipError_t
 hipMemcpyParam2D(const hip_Memcpy2D * pCopy)
 {
     abort_with_reason("Unsupported API function: hipMemcpyParam2D");
+}
+
+EXPORTED hipError_t
+hipMemcpy2DAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
+    hipMemcpyKind kind, hipStream_t stream)
+{
+    abort_with_reason("Unsupported API function: hipMemcpy2DAsync");
 }
 
 EXPORTED hipError_t

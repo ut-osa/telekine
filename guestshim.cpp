@@ -144,6 +144,28 @@ hipHostFree(void* ptr)
    return hipSuccess;
 }
 
+hipError_t
+hipMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t spitch,
+					  size_t width, size_t height, hipMemcpyKind kind,
+					  hipStream_t stream)
+{
+	 hipError_t e;
+    if((width == dpitch) && (width == spitch)) {
+            e = hipMemcpyAsync(dst, src, width*height, kind, stream);
+    } else {
+			if(kind != hipMemcpyDeviceToDevice){
+				 for (int i = 0; i < height && e; ++i)
+					  e = hipMemcpyAsync((unsigned char*)dst + i * dpitch,
+											   (unsigned char*)src + i * spitch, width,
+												kind, stream);
+			} else {
+				assert("DeviceToDevice hipMemcpy2DAsync not implemented!" && 0);
+			}
+    }
+
+    return e;
+}
+
 const char* ihipErrorString(hipError_t hip_error) {
     switch (hip_error) {
         case hipSuccess:
