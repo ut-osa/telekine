@@ -207,7 +207,7 @@ int send_socket(int sockfd, void *buf, size_t size)
         if ((ret = send(sockfd, buf, size, 0)) <= 0) {
             perror("ERROR sending to socket");
             close(sockfd);
-            exit(0);
+            abort();
         }
         size -= ret;
         buf += ret;
