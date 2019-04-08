@@ -28,6 +28,33 @@ inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {
 }
 
 extern "C" hipError_t
+nw_hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
+               hipStream_t stream)
+{
+
+   return hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+}
+
+extern "C" hipError_t
+nw_hipCtxGetDevice(hipDevice_t* device)
+{
+   return hipCtxGetDevice(device);
+}
+
+extern "C" hipError_t
+nw_hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId)
+{
+   return hipDeviceGetAttribute(pi, attr, deviceId);
+}
+
+extern "C" hipError_t
+nw_hipStreamSynchronize(hipStream_t stream)
+{
+   return hipStreamSynchronize(stream);
+}
+
+
+extern "C" hipError_t
 nw_hipCtxSetCurrent(hipCtx_t ctx)
 {
    return hipCtxSetCurrent(ctx);

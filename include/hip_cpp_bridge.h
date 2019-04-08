@@ -52,6 +52,19 @@ size_t __do_c_get_kerenel_symbols(
       size_t symbols_len);
 
 hipError_t
+nw_hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
+               hipStream_t stream);
+
+hipError_t
+nw_hipCtxGetDevice(hipDevice_t* device);
+
+hipError_t
+nw_hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId);
+
+hipError_t
+nw_hipStreamSynchronize(hipStream_t stream);
+
+hipError_t
 nw_hipCtxSetCurrent(hipCtx_t ctx);
 
 hipError_t

@@ -21,18 +21,18 @@ enum hip_functions {
         CALL_HIP_HIP_MEMCPY_DTO_H, RET_HIP_HIP_MEMCPY_DTO_H, CALL_HIP_HIP_MEMCPY_DTO_D, RET_HIP_HIP_MEMCPY_DTO_D,
         CALL_HIP_HIP_MEMCPY, RET_HIP_HIP_MEMCPY, CALL_HIP_HIP_MEMCPY_HTO_D_ASYNC, RET_HIP_HIP_MEMCPY_HTO_D_ASYNC,
         CALL_HIP_HIP_MEMCPY_DTO_H_ASYNC, RET_HIP_HIP_MEMCPY_DTO_H_ASYNC, CALL_HIP_HIP_MEMCPY_DTO_D_ASYNC,
-        RET_HIP_HIP_MEMCPY_DTO_D_ASYNC, CALL_HIP_HIP_MEMCPY_ASYNC, RET_HIP_HIP_MEMCPY_ASYNC,
+        RET_HIP_HIP_MEMCPY_DTO_D_ASYNC, CALL_HIP_NW_HIP_MEMCPY_ASYNC, RET_HIP_NW_HIP_MEMCPY_ASYNC,
         CALL_HIP_HIP_GET_DEVICE_COUNT, RET_HIP_HIP_GET_DEVICE_COUNT, CALL_HIP_NW_HIP_SET_DEVICE,
         RET_HIP_NW_HIP_SET_DEVICE, CALL_HIP_HIP_MEM_GET_INFO, RET_HIP_HIP_MEM_GET_INFO, CALL_HIP_NW_HIP_STREAM_CREATE,
         RET_HIP_NW_HIP_STREAM_CREATE, CALL_HIP_NW_HIP_GET_DEVICE, RET_HIP_NW_HIP_GET_DEVICE, CALL_HIP_HIP_INIT,
-        RET_HIP_HIP_INIT, CALL_HIP_HIP_CTX_GET_CURRENT, RET_HIP_HIP_CTX_GET_CURRENT, CALL_HIP_HIP_STREAM_SYNCHRONIZE,
-        RET_HIP_HIP_STREAM_SYNCHRONIZE, CALL_HIP___DO_C_HIP_GET_DEVICE_PROPERTIES,
+        RET_HIP_HIP_INIT, CALL_HIP_HIP_CTX_GET_CURRENT, RET_HIP_HIP_CTX_GET_CURRENT, CALL_HIP_NW_HIP_STREAM_SYNCHRONIZE,
+        RET_HIP_NW_HIP_STREAM_SYNCHRONIZE, CALL_HIP___DO_C_HIP_GET_DEVICE_PROPERTIES,
         RET_HIP___DO_C_HIP_GET_DEVICE_PROPERTIES, CALL_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_KERNEL,
         RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_KERNEL, CALL_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED,
         RET_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED, CALL_HIP_NW_HSA_EXECUTABLE_CREATE_ALT,
         RET_HIP_NW_HSA_EXECUTABLE_CREATE_ALT, CALL_HIP_NW_HSA_ISA_FROM_NAME, RET_HIP_NW_HSA_ISA_FROM_NAME,
-        CALL_HIP_HIP_PEEK_AT_LAST_ERROR, RET_HIP_HIP_PEEK_AT_LAST_ERROR, CALL_HIP_HIP_DEVICE_GET_ATTRIBUTE,
-        RET_HIP_HIP_DEVICE_GET_ATTRIBUTE, CALL_HIP_HIP_MODULE_LOAD_DATA, RET_HIP_HIP_MODULE_LOAD_DATA,
+        CALL_HIP_HIP_PEEK_AT_LAST_ERROR, RET_HIP_HIP_PEEK_AT_LAST_ERROR, CALL_HIP_NW_HIP_DEVICE_GET_ATTRIBUTE,
+        RET_HIP_NW_HIP_DEVICE_GET_ATTRIBUTE, CALL_HIP_HIP_MODULE_LOAD_DATA, RET_HIP_HIP_MODULE_LOAD_DATA,
         CALL_HIP___DO_C_HSA_EXECUTABLE_SYMBOL_GET_INFO, RET_HIP___DO_C_HSA_EXECUTABLE_SYMBOL_GET_INFO,
         CALL_HIP_NW_HIP_CTX_SET_CURRENT, RET_HIP_NW_HIP_CTX_SET_CURRENT, CALL_HIP_HIP_EVENT_CREATE,
         RET_HIP_HIP_EVENT_CREATE, CALL_HIP_HIP_EVENT_RECORD, RET_HIP_HIP_EVENT_RECORD, CALL_HIP_HIP_EVENT_SYNCHRONIZE,
@@ -45,7 +45,7 @@ enum hip_functions {
         RET_HIP___DO_C_LOAD_EXECUTABLE, CALL_HIP___DO_C_GET_AGENTS, RET_HIP___DO_C_GET_AGENTS, CALL_HIP___DO_C_GET_ISAS,
         RET_HIP___DO_C_GET_ISAS, CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS,
         CALL_HIP___DO_C_QUERY_HOST_ADDRESS, RET_HIP___DO_C_QUERY_HOST_ADDRESS, CALL_HIP___DO_C_GET_KERNEL_DESCRIPTOR,
-        RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR, CALL_HIP_HIP_CTX_GET_DEVICE, RET_HIP_HIP_CTX_GET_DEVICE
+        RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR, CALL_HIP_NW_HIP_CTX_GET_DEVICE, RET_HIP_NW_HIP_CTX_GET_DEVICE
 };
 
 #include "hip_nw_utility_types.h"
@@ -314,7 +314,7 @@ struct hip_hip_memcpy_dto_d_async_call_record {
     volatile char __call_complete;
 };
 
-struct hip_hip_memcpy_async_call {
+struct hip_nw_hip_memcpy_async_call {
     struct command_base base;
     intptr_t __call_id;
     size_t sizeBytes;
@@ -324,14 +324,14 @@ struct hip_hip_memcpy_async_call {
     void *dst;
 };
 
-struct hip_hip_memcpy_async_ret {
+struct hip_nw_hip_memcpy_async_ret {
     struct command_base base;
     intptr_t __call_id;
     void *dst;
     hipError_t ret;
 };
 
-struct hip_hip_memcpy_async_call_record {
+struct hip_nw_hip_memcpy_async_call_record {
     size_t sizeBytes;
     hipMemcpyKind kind;
     hipStream_t stream;
@@ -488,20 +488,20 @@ struct hip_hip_ctx_get_current_call_record {
     volatile char __call_complete;
 };
 
-struct hip_hip_stream_synchronize_call {
+struct hip_nw_hip_stream_synchronize_call {
     struct command_base base;
     intptr_t __call_id;
     hipStream_t stream;
 };
 
-struct hip_hip_stream_synchronize_ret {
+struct hip_nw_hip_stream_synchronize_ret {
     struct command_base base;
     intptr_t __call_id;
 
     hipError_t ret;
 };
 
-struct hip_hip_stream_synchronize_call_record {
+struct hip_nw_hip_stream_synchronize_call_record {
     hipStream_t stream;
     hipError_t ret;
     char __handler_deallocate;
@@ -670,7 +670,7 @@ struct hip_hip_peek_at_last_error_call_record {
     volatile char __call_complete;
 };
 
-struct hip_hip_device_get_attribute_call {
+struct hip_nw_hip_device_get_attribute_call {
     struct command_base base;
     intptr_t __call_id;
     int *pi;
@@ -678,14 +678,14 @@ struct hip_hip_device_get_attribute_call {
     int deviceId;
 };
 
-struct hip_hip_device_get_attribute_ret {
+struct hip_nw_hip_device_get_attribute_ret {
     struct command_base base;
     intptr_t __call_id;
     int *pi;
     hipError_t ret;
 };
 
-struct hip_hip_device_get_attribute_call_record {
+struct hip_nw_hip_device_get_attribute_call_record {
     int *pi;
     hipDeviceAttribute_t attr;
     int deviceId;
@@ -1167,20 +1167,20 @@ struct hip___do_c_get_kernel_descriptor_call_record {
     volatile char __call_complete;
 };
 
-struct hip_hip_ctx_get_device_call {
+struct hip_nw_hip_ctx_get_device_call {
     struct command_base base;
     intptr_t __call_id;
     hipDevice_t *device;
 };
 
-struct hip_hip_ctx_get_device_ret {
+struct hip_nw_hip_ctx_get_device_ret {
     struct command_base base;
     intptr_t __call_id;
     hipDevice_t *device;
     hipError_t ret;
 };
 
-struct hip_hip_ctx_get_device_call_record {
+struct hip_nw_hip_ctx_get_device_call_record {
     hipDevice_t *device;
     hipError_t ret;
     char __handler_deallocate;

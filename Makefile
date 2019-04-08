@@ -32,8 +32,8 @@ CXXFLAGS = -g $(CFLAGS) -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecate
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) worker libguestlib.so guestshim.so crypto_guestshim.so \
-	crypto_impl.so
+all: $(EXECUTABLE) worker libguestlib.so guestshim.so
+#crypto_guestshim.so crypto_impl.so
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden

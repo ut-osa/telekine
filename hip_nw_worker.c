@@ -339,10 +339,10 @@ __wrapper_hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src, size_t size
 }
 
 static hipError_t
-__wrapper_hipMemcpyAsync(size_t sizeBytes, hipMemcpyKind kind, const void *src, hipStream_t stream, void *dst)
+__wrapper_nw_hipMemcpyAsync(size_t sizeBytes, hipMemcpyKind kind, const void *src, void *dst, hipStream_t stream)
 {
     hipError_t ret;
-    ret = hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+    ret = nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
 
     /* Report resources */
 
@@ -459,10 +459,10 @@ __wrapper_hipCtxGetCurrent(hipCtx_t * ctx)
 }
 
 static hipError_t
-__wrapper_hipStreamSynchronize(hipStream_t stream)
+__wrapper_nw_hipStreamSynchronize(hipStream_t stream)
 {
     hipError_t ret;
-    ret = hipStreamSynchronize(stream);
+    ret = nw_hipStreamSynchronize(stream);
 
     /* Report resources */
 
@@ -571,10 +571,10 @@ __wrapper_hipPeekAtLastError()
 }
 
 static hipError_t
-__wrapper_hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attr, int deviceId)
+__wrapper_nw_hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attr, int deviceId)
 {
     hipError_t ret;
-    ret = hipDeviceGetAttribute(pi, attr, deviceId);
+    ret = nw_hipDeviceGetAttribute(pi, attr, deviceId);
 
     /* Report resources */
 
@@ -904,10 +904,10 @@ __wrapper___do_c_get_kernel_descriptor(const char *name, const hsa_executable_sy
 }
 
 static hipError_t
-__wrapper_hipCtxGetDevice(hipDevice_t * device)
+__wrapper_nw_hipCtxGetDevice(hipDevice_t * device)
 {
     hipError_t ret;
-    ret = hipCtxGetDevice(device);
+    ret = nw_hipCtxGetDevice(device);
 
     /* Report resources */
 
@@ -1764,13 +1764,13 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case CALL_HIP_HIP_MEMCPY_ASYNC:{
+    case CALL_HIP_NW_HIP_MEMCPY_ASYNC:{
         ava_is_in = 1;
         ava_is_out = 0;
-        GPtrArray *__ava_alloc_list_hipMemcpyAsync = g_ptr_array_new_full(0, free);
-        struct hip_hip_memcpy_async_call *__call = (struct hip_hip_memcpy_async_call *)__cmd;
+        GPtrArray *__ava_alloc_list_nw_hipMemcpyAsync = g_ptr_array_new_full(0, free);
+        struct hip_nw_hip_memcpy_async_call *__call = (struct hip_nw_hip_memcpy_async_call *)__cmd;
         assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_async_call));
+        assert(__call->base.command_size == sizeof(struct hip_nw_hip_memcpy_async_call));
 #ifdef AVA_RECORD_REPLAY
 
 #endif
@@ -1805,7 +1805,7 @@ __handle_command_hip(struct command_base *__cmd)
                 if (__call->src != NULL) {
                     const size_t __size = ((size_t) (kind == hipMemcpyHostToDevice) ? (sizeBytes) : (0));
                     src = (void *)calloc(__size, sizeof(const void));
-                    g_ptr_array_add(__ava_alloc_list_hipMemcpyAsync, src);
+                    g_ptr_array_add(__ava_alloc_list_nw_hipMemcpyAsync, src);
                     if (kind == hipMemcpyHostToDevice) {
                         void *__tmp_src_0;
                         __tmp_src_0 = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
@@ -1846,7 +1846,7 @@ __handle_command_hip(struct command_base *__cmd)
             if (__call->dst != NULL) {
                 const size_t __size = ((size_t) (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0));
                 dst = (void *)calloc(__size, sizeof(void));
-                g_ptr_array_add(__ava_alloc_list_hipMemcpyAsync, dst);
+                g_ptr_array_add(__ava_alloc_list_nw_hipMemcpyAsync, dst);
             } else {
                 dst = NULL;
             }
@@ -1856,7 +1856,7 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_hipMemcpyAsync(sizeBytes, kind, src, stream, dst);
+        ret = __wrapper_nw_hipMemcpyAsync(sizeBytes, kind, src, dst, stream);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -1879,11 +1879,11 @@ __handle_command_hip(struct command_base *__cmd)
                     }
                 }
         }}
-        struct hip_hip_memcpy_async_ret *__ret =
-            (struct hip_hip_memcpy_async_ret *)command_channel_new_command(__chan,
-            sizeof(struct hip_hip_memcpy_async_ret), __total_buffer_size);
+        struct hip_nw_hip_memcpy_async_ret *__ret =
+            (struct hip_nw_hip_memcpy_async_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_nw_hip_memcpy_async_ret), __total_buffer_size);
         __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_HIP_MEMCPY_ASYNC;
+        __ret->base.command_id = RET_HIP_NW_HIP_MEMCPY_ASYNC;
         __ret->__call_id = __call->__call_id;
 
         /* Output: hipError_t ret */
@@ -1908,7 +1908,7 @@ __handle_command_hip(struct command_base *__cmd)
                     const size_t __size = (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0);
                     void *__tmp_dst_0;
                     __tmp_dst_0 = (void *)calloc(__size, sizeof(void));
-                    g_ptr_array_add(__ava_alloc_list_hipMemcpyAsync, __tmp_dst_0);
+                    g_ptr_array_add(__ava_alloc_list_nw_hipMemcpyAsync, __tmp_dst_0);
                     const size_t __dst_size_0 = (__size);
                     for (size_t __dst_index_0 = 0; __dst_index_0 < __dst_size_0; __dst_index_0++) {
                         const size_t ava_index = __dst_index_0;
@@ -1946,7 +1946,7 @@ __handle_command_hip(struct command_base *__cmd)
 
 #endif
 
-        g_ptr_array_unref(__ava_alloc_list_hipMemcpyAsync);     /* Deallocate all memory in the alloc list */
+        g_ptr_array_unref(__ava_alloc_list_nw_hipMemcpyAsync);  /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
@@ -2501,13 +2501,13 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case CALL_HIP_HIP_STREAM_SYNCHRONIZE:{
+    case CALL_HIP_NW_HIP_STREAM_SYNCHRONIZE:{
         ava_is_in = 1;
         ava_is_out = 0;
-        GPtrArray *__ava_alloc_list_hipStreamSynchronize = g_ptr_array_new_full(0, free);
-        struct hip_hip_stream_synchronize_call *__call = (struct hip_hip_stream_synchronize_call *)__cmd;
+        GPtrArray *__ava_alloc_list_nw_hipStreamSynchronize = g_ptr_array_new_full(0, free);
+        struct hip_nw_hip_stream_synchronize_call *__call = (struct hip_nw_hip_stream_synchronize_call *)__cmd;
         assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_hip_stream_synchronize_call));
+        assert(__call->base.command_size == sizeof(struct hip_nw_hip_stream_synchronize_call));
 #ifdef AVA_RECORD_REPLAY
 
 #endif
@@ -2521,17 +2521,17 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_hipStreamSynchronize(stream);
+        ret = __wrapper_nw_hipStreamSynchronize(stream);
 
         ava_is_in = 0;
         ava_is_out = 1;
         size_t __total_buffer_size = 0; {
         }
-        struct hip_hip_stream_synchronize_ret *__ret =
-            (struct hip_hip_stream_synchronize_ret *)command_channel_new_command(__chan,
-            sizeof(struct hip_hip_stream_synchronize_ret), __total_buffer_size);
+        struct hip_nw_hip_stream_synchronize_ret *__ret =
+            (struct hip_nw_hip_stream_synchronize_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_nw_hip_stream_synchronize_ret), __total_buffer_size);
         __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_HIP_STREAM_SYNCHRONIZE;
+        __ret->base.command_id = RET_HIP_NW_HIP_STREAM_SYNCHRONIZE;
         __ret->__call_id = __call->__call_id;
 
         /* Output: hipError_t ret */
@@ -2549,7 +2549,7 @@ __handle_command_hip(struct command_base *__cmd)
 
 #endif
 
-        g_ptr_array_unref(__ava_alloc_list_hipStreamSynchronize);       /* Deallocate all memory in the alloc list */
+        g_ptr_array_unref(__ava_alloc_list_nw_hipStreamSynchronize);    /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
@@ -3155,13 +3155,13 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case CALL_HIP_HIP_DEVICE_GET_ATTRIBUTE:{
+    case CALL_HIP_NW_HIP_DEVICE_GET_ATTRIBUTE:{
         ava_is_in = 1;
         ava_is_out = 0;
-        GPtrArray *__ava_alloc_list_hipDeviceGetAttribute = g_ptr_array_new_full(0, free);
-        struct hip_hip_device_get_attribute_call *__call = (struct hip_hip_device_get_attribute_call *)__cmd;
+        GPtrArray *__ava_alloc_list_nw_hipDeviceGetAttribute = g_ptr_array_new_full(0, free);
+        struct hip_nw_hip_device_get_attribute_call *__call = (struct hip_nw_hip_device_get_attribute_call *)__cmd;
         assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_hip_device_get_attribute_call));
+        assert(__call->base.command_size == sizeof(struct hip_nw_hip_device_get_attribute_call));
 #ifdef AVA_RECORD_REPLAY
 
 #endif
@@ -3174,7 +3174,7 @@ __handle_command_hip(struct command_base *__cmd)
         if (__call->pi != NULL) {
             const size_t __size = ((size_t) 1);
             pi = (int *)calloc(__size, sizeof(int));
-            g_ptr_array_add(__ava_alloc_list_hipDeviceGetAttribute, pi);
+            g_ptr_array_add(__ava_alloc_list_nw_hipDeviceGetAttribute, pi);
         } else {
             pi = NULL;
         }
@@ -3191,7 +3191,7 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_hipDeviceGetAttribute(pi, attr, deviceId);
+        ret = __wrapper_nw_hipDeviceGetAttribute(pi, attr, deviceId);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -3201,11 +3201,11 @@ __handle_command_hip(struct command_base *__cmd)
                 __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(int));
             }
         }
-        struct hip_hip_device_get_attribute_ret *__ret =
-            (struct hip_hip_device_get_attribute_ret *)command_channel_new_command(__chan,
-            sizeof(struct hip_hip_device_get_attribute_ret), __total_buffer_size);
+        struct hip_nw_hip_device_get_attribute_ret *__ret =
+            (struct hip_nw_hip_device_get_attribute_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_nw_hip_device_get_attribute_ret), __total_buffer_size);
         __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_HIP_DEVICE_GET_ATTRIBUTE;
+        __ret->base.command_id = RET_HIP_NW_HIP_DEVICE_GET_ATTRIBUTE;
         __ret->__call_id = __call->__call_id;
 
         /* Output: hipError_t ret */
@@ -3231,7 +3231,7 @@ __handle_command_hip(struct command_base *__cmd)
 
 #endif
 
-        g_ptr_array_unref(__ava_alloc_list_hipDeviceGetAttribute);      /* Deallocate all memory in the alloc list */
+        g_ptr_array_unref(__ava_alloc_list_nw_hipDeviceGetAttribute);   /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
@@ -5031,13 +5031,13 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case CALL_HIP_HIP_CTX_GET_DEVICE:{
+    case CALL_HIP_NW_HIP_CTX_GET_DEVICE:{
         ava_is_in = 1;
         ava_is_out = 0;
-        GPtrArray *__ava_alloc_list_hipCtxGetDevice = g_ptr_array_new_full(0, free);
-        struct hip_hip_ctx_get_device_call *__call = (struct hip_hip_ctx_get_device_call *)__cmd;
+        GPtrArray *__ava_alloc_list_nw_hipCtxGetDevice = g_ptr_array_new_full(0, free);
+        struct hip_nw_hip_ctx_get_device_call *__call = (struct hip_nw_hip_ctx_get_device_call *)__cmd;
         assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_hip_ctx_get_device_call));
+        assert(__call->base.command_size == sizeof(struct hip_nw_hip_ctx_get_device_call));
 #ifdef AVA_RECORD_REPLAY
 
 #endif
@@ -5052,14 +5052,14 @@ __handle_command_hip(struct command_base *__cmd)
         if (__call->device != NULL) {
             const size_t __size = ((size_t) 1);
             device = (hipDevice_t *) calloc(__size, sizeof(hipDevice_t));
-            g_ptr_array_add(__ava_alloc_list_hipCtxGetDevice, device);
+            g_ptr_array_add(__ava_alloc_list_nw_hipCtxGetDevice, device);
         } else {
             device = NULL;
         }
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_hipCtxGetDevice(device);
+        ret = __wrapper_nw_hipCtxGetDevice(device);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -5069,11 +5069,11 @@ __handle_command_hip(struct command_base *__cmd)
                 __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(hipDevice_t));
             }
         }
-        struct hip_hip_ctx_get_device_ret *__ret =
-            (struct hip_hip_ctx_get_device_ret *)command_channel_new_command(__chan,
-            sizeof(struct hip_hip_ctx_get_device_ret), __total_buffer_size);
+        struct hip_nw_hip_ctx_get_device_ret *__ret =
+            (struct hip_nw_hip_ctx_get_device_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_nw_hip_ctx_get_device_ret), __total_buffer_size);
         __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_HIP_CTX_GET_DEVICE;
+        __ret->base.command_id = RET_HIP_NW_HIP_CTX_GET_DEVICE;
         __ret->__call_id = __call->__call_id;
 
         /* Output: hipError_t ret */
@@ -5100,7 +5100,7 @@ __handle_command_hip(struct command_base *__cmd)
 
 #endif
 
-        g_ptr_array_unref(__ava_alloc_list_hipCtxGetDevice);    /* Deallocate all memory in the alloc list */
+        g_ptr_array_unref(__ava_alloc_list_nw_hipCtxGetDevice); /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;

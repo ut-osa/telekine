@@ -56,6 +56,33 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                        startEvent, stopEvent);
 }
 
+extern "C" hipError_t
+hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
+               hipStream_t stream)
+{
+
+   return nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+}
+
+extern "C" hipError_t
+hipCtxGetDevice(hipDevice_t* device)
+{
+   return nw_hipCtxGetDevice(device);
+}
+
+extern "C" hipError_t
+hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId)
+{
+   return nw_hipDeviceGetAttribute(pi, attr, deviceId);
+}
+
+extern "C" hipError_t
+hipStreamSynchronize(hipStream_t stream)
+{
+   return nw_hipStreamSynchronize(stream);
+}
+
+
 hipError_t hipCtxSetCurrent(hipCtx_t ctx)
 {
    hipError_t ret = hipSuccess;

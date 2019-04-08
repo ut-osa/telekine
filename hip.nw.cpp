@@ -115,7 +115,7 @@ hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes, hip
 }
 
 hipError_t
-hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
+nw_hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
    ava_argument(dst) {
@@ -203,7 +203,8 @@ hipCtxGetCurrent(hipCtx_t* ctx)
    }
 }
 
-hipError_t hipStreamSynchronize(hipStream_t stream)
+hipError_t
+nw_hipStreamSynchronize(hipStream_t stream)
 {
    ava_argument(stream) {
       ava_opaque;
@@ -306,7 +307,7 @@ hipError_t hipPeekAtLastError(void)
 }
 
 hipError_t
-hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId)
+nw_hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId)
 {
    ava_argument(pi) {
       ava_out; ava_buffer(1);
@@ -568,7 +569,8 @@ __do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
    }
 }
 
-hipError_t hipCtxGetDevice(hipDevice_t* device)
+hipError_t
+nw_hipCtxGetDevice(hipDevice_t* device)
 {
    ava_argument(device) {
       ava_out; ava_buffer(1);
