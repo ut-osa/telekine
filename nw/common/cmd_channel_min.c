@@ -197,6 +197,7 @@ struct command_channel* command_channel_min_new()
     command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
 
     /* connect manager to get worker port */
+    int ret;
     int manager_fd;
 
     const char *ip_str = getenv("AVA_IP");
@@ -208,9 +209,12 @@ struct command_channel* command_channel_min_new()
        .ai_socktype = SOCK_STREAM,
     };
     struct addrinfo *result, *rp;
-    if (getaddrinfo(ip_str, "4000", &hints, &result)) {
-       perror(ip_str);
-       exit(1);
+    if ((ret = getaddrinfo(ip_str, "4000", &hints, &result))) {
+       if (ret == EAI_SYSTEM)
+          perror(ip_str);
+       else
+          fprintf(stderr, "%s: %s\n", ip_str, gai_strerror(ret));
+       abort();
     }
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
@@ -223,7 +227,7 @@ struct command_channel* command_channel_min_new()
     }
     if (rp == NULL) {
        fprintf(stderr, "%s:%d couldn't connect!\n", __FILE__, __LINE__);
-       exit(1);
+       abort();
     }
     freeaddrinfo(result);
 
