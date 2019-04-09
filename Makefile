@@ -72,7 +72,7 @@ manager:
 guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so
 	g++ -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
 	   -Wl,--no-allow-shlib-undefined \
-		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib
+		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread 
 
 crypto_impl.so: HIP-encryptedMemcpy/crypto/aes_gcm.o
 	$(HIPCC) -shared $^ -o $@ -lsodium -ldl

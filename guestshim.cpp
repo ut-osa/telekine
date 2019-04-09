@@ -24,6 +24,8 @@
 
 #include <iostream>
 
+#include "./command_scheduler.h"
+
 using namespace std;
 using namespace hc;
 
@@ -32,8 +34,125 @@ using namespace hc;
 static unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
 pthread_mutex_t stream_agent_lock = PTHREAD_MUTEX_INITIALIZER;
 
-int current_device = 0;
-hipCtx_t current_ctx = nullptr;
+thread_local int current_device = 0;
+thread_local hipCtx_t current_ctx = nullptr;
+thread_local hipDevice_t current_ctx_device = -1;
+
+CommandScheduler::CommandScheduler(hipStream_t stream, int batch_size)
+    : waiting_(false), batch_size_(batch_size), stream_(stream),
+      process_thread_(new std::thread(&CommandScheduler::ProcessThread, this)) {}
+
+void CommandScheduler::AddKernelLaunch(
+        hipFunction_t f, uint32_t globalWorkSizeX, uint32_t globalWorkSizeY,
+        uint32_t globalWorkSizeZ, uint32_t localWorkSizeX, uint32_t localWorkSizeY,
+        uint32_t localWorkSizeZ, size_t sharedMemBytes, void** extra) {
+    {
+        std::lock_guard<std::mutex> lk2(mu2_);
+        std::lock_guard<std::mutex> lk1(mu1_);
+        KernelLaunchParam param;
+        param.f = f;
+        param.globalWorkSizeX = globalWorkSizeX;
+        param.globalWorkSizeY = globalWorkSizeY;
+        param.globalWorkSizeZ = globalWorkSizeZ;
+        param.localWorkSizeX = localWorkSizeX;
+        param.localWorkSizeY = localWorkSizeY;
+        param.localWorkSizeZ = localWorkSizeZ;
+        param.sharedMemBytes = sharedMemBytes;
+
+        size_t kern_arg_size = *(size_t*)(extra[3]);
+        void* kern_arg = extra[1];
+        param.kernArgSize = kern_arg_size;
+        param.kernArg = malloc(kern_arg_size);
+        memcpy(param.kernArg, kern_arg, kern_arg_size);
+
+        pending_kernel_launches_.push(param);
+    }
+    cv_.notify_all();
+}
+
+void CommandScheduler::AddMemcpy(
+        void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind) {
+
+}
+
+void CommandScheduler::Wait() {
+    std::lock_guard<std::mutex> lk2(mu2_);
+    waiting_.store(true);
+    {
+        std::unique_lock<std::mutex> lk1(mu1_);
+        cv_.wait(lk1, [this] () {
+            return pending_kernel_launches_.size() == 0;
+        });
+    }
+    waiting_.store(false);
+}
+
+void CommandScheduler::ProcessThread() {
+    int batch_idx = 0;
+    while (true) {
+        KernelLaunchParam param;
+        bool waiting_and_last = false;
+        {
+            std::unique_lock<std::mutex> lk1(mu1_);
+            cv_.wait(lk1, [this] () {
+                return pending_kernel_launches_.size() > 0;
+            });
+            param = pending_kernel_launches_.front();
+            if (pending_kernel_launches_.size() == 1 && waiting_.load()) {
+                waiting_and_last = true;
+            }
+        }
+
+        batch_idx++;
+
+        void* extra[] = {
+            HIP_LAUNCH_PARAM_BUFFER_POINTER,
+            param.kernArg,
+            HIP_LAUNCH_PARAM_BUFFER_SIZE,
+            &param.kernArgSize,
+            HIP_LAUNCH_PARAM_END
+        };
+
+        __do_c_hipHccModuleLaunchKernel(
+            param.f, param.globalWorkSizeX, param.globalWorkSizeY, param.globalWorkSizeZ,
+            param.localWorkSizeX, param.localWorkSizeY, param.localWorkSizeZ,
+            param.sharedMemBytes, stream_, NULL, (char *)param.kernArg,
+            param.kernArgSize, NULL, NULL);
+
+        free(param.kernArg);
+
+        if (batch_idx == batch_size_ || waiting_and_last) {
+            batch_idx = 0;
+        }
+
+        {
+            std::lock_guard<std::mutex> lk1(mu1_);
+            pending_kernel_launches_.pop();
+        }
+        cv_.notify_all();
+    }
+}
+
+CommandScheduler* CommandScheduler::GetForStream(hipStream_t stream) {
+    std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
+    if (command_scheduler_map_.count(stream) > 0) {
+        return command_scheduler_map_[stream];
+    } else {
+        int batch_size = 64;
+        char* s = getenv("HIP_COMMAND_SCHEDULER_BATCH_SIZE");
+        if (s != NULL) {
+            batch_size = atoi(s);
+        }
+        fprintf(stderr, "Create new CommandScheduler with stream = %p, batch_size = %d\n",
+                (void*)stream, batch_size);
+        CommandScheduler* command_scheduler = new CommandScheduler(stream, batch_size);
+        command_scheduler_map_[stream] = command_scheduler;
+        return command_scheduler;
+    }
+}
+
+std::map<hipStream_t, CommandScheduler*> CommandScheduler::command_scheduler_map_{};
+std::mutex CommandScheduler::command_scheduler_map_mu_{};
 
 hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                     uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
@@ -48,12 +167,19 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
    assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
    assert(extra[4] == HIP_LAUNCH_PARAM_END);
 
-   return __do_c_hipHccModuleLaunchKernel(f, globalWorkSizeX, globalWorkSizeY,
-                                       globalWorkSizeZ, localWorkSizeX,
-                                       localWorkSizeY, localWorkSizeZ,
-                                       sharedMemBytes, hStream, kernelParams,
-                                       (char *)(extra[1]), extra_size,
-                                       startEvent, stopEvent);
+   if (startEvent == NULL && stopEvent == NULL && kernelParams == NULL) {
+       CommandScheduler::GetForStream(hStream)->AddKernelLaunch(
+           f, globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ,
+           localWorkSizeX, localWorkSizeY, localWorkSizeZ,
+           sharedMemBytes, extra);
+        return hipSuccess;
+   } else {
+       return __do_c_hipHccModuleLaunchKernel(
+           f, globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ,
+           localWorkSizeX, localWorkSizeY, localWorkSizeZ,
+           sharedMemBytes, hStream, kernelParams,
+           (char *)(extra[1]), extra_size, startEvent, stopEvent);
+   }
 }
 
 extern "C" hipError_t
@@ -67,19 +193,37 @@ hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
 extern "C" hipError_t
 hipCtxGetDevice(hipDevice_t* device)
 {
-   return nw_hipCtxGetDevice(device);
+    if (current_ctx_device == -1) {
+        *device = current_ctx_device;
+        return hipSuccess;
+    } else {
+        return nw_hipCtxGetDevice(&current_ctx_device);
+    }
 }
 
 extern "C" hipError_t
 hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId)
 {
-   return nw_hipDeviceGetAttribute(pi, attr, deviceId);
+    static std::map<std::pair<hipDeviceAttribute_t, int>, int> cache;
+    static std::mutex mu;
+    std::lock_guard<std::mutex> lk{mu};
+    if (cache.count(std::make_pair(attr, deviceId)) == 0) {
+        int value;
+        hipError_t status = nw_hipDeviceGetAttribute(&value, attr, deviceId);
+        if (status != hipSuccess) {
+            return status;
+        }
+        cache[std::make_pair(attr, deviceId)] = value;
+    }
+    *pi = cache[std::make_pair(attr, deviceId)];
+    return hipSuccess;
 }
 
 extern "C" hipError_t
 hipStreamSynchronize(hipStream_t stream)
 {
-   return nw_hipStreamSynchronize(stream);
+    CommandScheduler::GetForStream(stream)->Wait();
+    return nw_hipStreamSynchronize(stream);
 }
 
 
@@ -329,7 +473,19 @@ hipGetErrorString(hipError_t hip_error) {
 extern "C" hipError_t
 hipGetDeviceProperties(hipDeviceProp_t *prop, int deviceId)
 {
-   return __do_c_hipGetDeviceProperties((char *)prop, deviceId);
+    static std::map<int, hipDeviceProp_t*> cache;
+    static std::mutex mu;
+    std::lock_guard<std::mutex> lk{mu};
+    if (cache.count(deviceId) == 0) {
+        hipDeviceProp_t* _prop = new hipDeviceProp_t;
+        hipError_t status = __do_c_hipGetDeviceProperties((char *)_prop, deviceId);
+        if (status != hipSuccess) {
+            return status;
+        }
+        cache[deviceId] = _prop;
+    }
+    *prop = *cache[deviceId];
+    return hipSuccess;
 }
 
 extern "C" hipError_t
