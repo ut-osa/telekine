@@ -26,6 +26,8 @@
 
 #include "./command_scheduler.h"
 
+#include <chrono>
+
 using namespace std;
 using namespace hc;
 
@@ -65,7 +67,7 @@ void CommandScheduler::AddKernelLaunch(
         param.kernArg = malloc(kern_arg_size);
         memcpy(param.kernArg, kern_arg, kern_arg_size);
 
-        pending_kernel_launches_.push(param);
+        pending_kernel_launches_.push_back(param);
     }
     cv_.notify_all();
 }
@@ -88,46 +90,71 @@ void CommandScheduler::Wait() {
 }
 
 void CommandScheduler::ProcessThread() {
-    int batch_idx = 0;
     while (true) {
-        KernelLaunchParam param;
+        std::vector<KernelLaunchParam> params;
         bool waiting_and_last = false;
         {
             std::unique_lock<std::mutex> lk1(mu1_);
-            cv_.wait(lk1, [this] () {
-                return pending_kernel_launches_.size() > 0;
+            cv_.wait_for(lk1, std::chrono::milliseconds(10), [this] () {
+                return pending_kernel_launches_.size() > batch_size_ * 0.5;
             });
-            param = pending_kernel_launches_.front();
-            if (pending_kernel_launches_.size() == 1 && waiting_.load()) {
+            if (pending_kernel_launches_.size() == 0) continue;
+            for (int i = 0; i < batch_size_; i++) {
+                if (i >= pending_kernel_launches_.size()) break;
+                params.push_back(pending_kernel_launches_[i]);
+            }
+            if (pending_kernel_launches_.size() == params.size() && waiting_.load()) {
                 waiting_and_last = true;
             }
         }
 
-        batch_idx++;
+        // fprintf(stderr, "Sending batch of %d\n", (int)params.size());
 
-        void* extra[] = {
-            HIP_LAUNCH_PARAM_BUFFER_POINTER,
-            param.kernArg,
-            HIP_LAUNCH_PARAM_BUFFER_SIZE,
-            &param.kernArgSize,
-            HIP_LAUNCH_PARAM_END
-        };
+        std::vector<hipFunction_t> f;
+        std::vector<uint32_t> globalWorkSizeX;
+        std::vector<uint32_t> globalWorkSizeY;
+        std::vector<uint32_t> globalWorkSizeZ;
+        std::vector<uint32_t> localWorkSizeX;
+        std::vector<uint32_t> localWorkSizeY;
+        std::vector<uint32_t> localWorkSizeZ;
+        std::vector<size_t> sharedMemBytes;
+        std::vector<size_t> extra_size;
 
-        __do_c_hipHccModuleLaunchKernel(
-            param.f, param.globalWorkSizeX, param.globalWorkSizeY, param.globalWorkSizeZ,
-            param.localWorkSizeX, param.localWorkSizeY, param.localWorkSizeZ,
-            param.sharedMemBytes, stream_, NULL, (char *)param.kernArg,
-            param.kernArgSize, NULL, NULL);
-
-        free(param.kernArg);
-
-        if (batch_idx == batch_size_ || waiting_and_last) {
-            batch_idx = 0;
+        size_t total_extra_size = 0;
+        for (int i = 0; i < params.size(); i++) {
+            f.push_back(params[i].f);
+            globalWorkSizeX.push_back(params[i].globalWorkSizeX);
+            globalWorkSizeY.push_back(params[i].globalWorkSizeY);
+            globalWorkSizeZ.push_back(params[i].globalWorkSizeZ);
+            localWorkSizeX.push_back(params[i].localWorkSizeX);
+            localWorkSizeY.push_back(params[i].localWorkSizeY);
+            localWorkSizeZ.push_back(params[i].localWorkSizeZ);
+            sharedMemBytes.push_back(params[i].sharedMemBytes);
+            extra_size.push_back(params[i].kernArgSize);
+            total_extra_size += params[i].kernArgSize;
         }
+        char* all_extra = (char*)malloc(total_extra_size);
+        size_t cursor = 0;
+        for (int i = 0; i < params.size(); i++) {
+            memcpy(all_extra + cursor, params[i].kernArg, params[i].kernArgSize);
+            cursor += params[i].kernArgSize;
+            free(params[i].kernArg);
+        }
+
+        __do_c_hipHccModuleLaunchMultiKernel(
+            params.size(), f.data(),
+            globalWorkSizeX.data(), globalWorkSizeY.data(), globalWorkSizeZ.data(),
+            localWorkSizeX.data(), localWorkSizeY.data(), localWorkSizeZ.data(),
+            sharedMemBytes.data(), stream_,
+            all_extra, total_extra_size, extra_size.data());
+
+        free(all_extra);
 
         {
             std::lock_guard<std::mutex> lk1(mu1_);
-            pending_kernel_launches_.pop();
+            for (int i = 0; i < params.size(); i++) {
+                pending_kernel_launches_.pop_front();
+            }
         }
         cv_.notify_all();
     }
@@ -186,7 +213,7 @@ extern "C" hipError_t
 hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
-
+    // fprintf(stderr, "hipMemcpyAsync with kind = %d, size = %zu\n", (int)kind, sizeBytes);
    return nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
 }
 
@@ -222,6 +249,7 @@ hipDeviceGetAttribute(int* pi, hipDeviceAttribute_t attr, int deviceId)
 extern "C" hipError_t
 hipStreamSynchronize(hipStream_t stream)
 {
+    // fprintf(stderr, "hipStreamSynchronize\n");
     CommandScheduler::GetForStream(stream)->Wait();
     return nw_hipStreamSynchronize(stream);
 }

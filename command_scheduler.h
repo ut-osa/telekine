@@ -4,7 +4,7 @@
 #include <thread>
 #include <condition_variable>
 #include <atomic>
-#include <queue>
+#include <deque>
 #include <map>
 #include <memory>
 
@@ -38,7 +38,7 @@ private:
         void* kernArg;
     };
     
-    std::queue<KernelLaunchParam> pending_kernel_launches_;
+    std::deque<KernelLaunchParam> pending_kernel_launches_;
     std::atomic<bool> waiting_;
     std::mutex mu1_;
     std::mutex mu2_;

@@ -286,6 +286,34 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
 }
 
 extern "C" hipError_t
+__do_c_hipHccModuleLaunchMultiKernel(
+      int numKernels, hipFunction_t* f,
+      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
+      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
+      size_t* sharedMemBytes, hipStream_t stream,
+      char* all_extra, size_t total_extra_size, size_t* extra_size) {
+   // if (numKernels == 1) {
+   //    fprintf(stderr, "Launching a batch of size 1\n");
+   // }
+   char* extra = all_extra;
+   for (int i = 0; i < numKernels; i++) {
+      void* new_extra[5] = {
+         HIP_LAUNCH_PARAM_BUFFER_POINTER, extra,
+         HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size[i],
+         HIP_LAUNCH_PARAM_END};
+      hipError_t status = hipHccModuleLaunchKernel(
+         f[i], globalWorkSizeX[i], globalWorkSizeY[i], globalWorkSizeZ[i],
+         localWorkSizeX[i], localWorkSizeY[i], localWorkSizeZ[i], sharedMemBytes[i],
+         stream, nullptr, new_extra, nullptr, nullptr);
+      if (status != hipSuccess) {
+         return status;
+      }
+      extra += extra_size[i];
+   }
+   return hipSuccess;
+}
+
+extern "C" hipError_t
 __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
                       unsigned int gridDimY, unsigned int gridDimZ,
                       unsigned int blockDimX, unsigned int blockDimY,
@@ -306,17 +334,17 @@ __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
                                 kernelParams, new_extra);
 }
 
-hipError_t
-__do_c_hipHccModuleLaunchMultiKernel(
-      int numKernels, hipFunction_t* f,
-      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
-      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
-      size_t* sharedMemBytes, hipStream_t stream,
-      char* all_extra, size_t total_extra_size, size_t* extra_size)
-{
-   assert(0 && "TODO");
-   return hipSuccess;
-}
+// hipError_t
+// __do_c_hipHccModuleLaunchMultiKernel(
+//       int numKernels, hipFunction_t* f,
+//       uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
+//       uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
+//       size_t* sharedMemBytes, hipStream_t stream,
+//       char* all_extra, size_t total_extra_size, size_t* extra_size)
+// {
+//    assert(0 && "TODO");
+//    return hipSuccess;
+// }
 
 extern "C"
 hsa_status_t HSA_API nw_hsa_executable_create_alt(
