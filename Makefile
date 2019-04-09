@@ -6,6 +6,9 @@ export HIPCC_VERBOSE
 HIP_PLATFORM = hcc
 export HIP_PLATFORM
 HIPCC = ./hipcc --amdgpu-target=gfx900
+ifeq ($(NW_PATH),)
+	NW_PATH := /home/thunt/nightwatch-combined/nwcc
+endif
 
 
 TARGET = hcc
@@ -62,7 +65,7 @@ $(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so
 
 
 regen: hip.nw.cpp
-	../nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
+	$(NW_PATH)/nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
 .PHONY: regen
 
 manager:
