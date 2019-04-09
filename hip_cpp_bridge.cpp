@@ -306,6 +306,18 @@ __do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
                                 kernelParams, new_extra);
 }
 
+hipError_t
+__do_c_hipHccModuleLaunchMultiKernel(
+      int numKernels, hipFunction_t* f,
+      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
+      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
+      size_t* sharedMemBytes, hipStream_t stream,
+      char* all_extra, size_t total_extra_size, size_t* extra_size)
+{
+   assert(0 && "TODO");
+   return hipSuccess;
+}
+
 extern "C"
 hsa_status_t HSA_API nw_hsa_executable_create_alt(
     hsa_profile_t profile,

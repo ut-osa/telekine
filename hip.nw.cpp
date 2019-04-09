@@ -259,6 +259,51 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
     }
 }
 
+hipError_t
+__do_c_hipHccModuleLaunchMultiKernel(
+      int numKernels, hipFunction_t* f,
+      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
+      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
+      size_t* sharedMemBytes, hipStream_t stream,
+      char* all_extra, size_t total_extra_size, size_t* extra_size) {
+   ava_argument(f) {
+      ava_in; ava_buffer(numKernels);
+      ava_element {
+         ava_opaque;
+      }
+   }
+   ava_argument(globalWorkSizeX) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(globalWorkSizeY) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(globalWorkSizeZ) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(localWorkSizeX) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(localWorkSizeY) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(localWorkSizeZ) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(sharedMemBytes) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(stream) {
+      ava_opaque;
+   }
+   ava_argument(all_extra) {
+      ava_in; ava_buffer(total_extra_size);
+   }
+   ava_argument(extra_size) {
+      ava_in; ava_buffer(numKernels);
+   }
+}
+
 hsa_status_t
 HSA_API nw_hsa_system_major_extension_supported(
       uint16_t extension,

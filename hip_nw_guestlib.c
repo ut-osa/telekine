@@ -1128,6 +1128,72 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
+    case RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL:{
+        ava_is_in = 0;
+        ava_is_out = 1;
+        struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret *__ret =
+            (struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret *)__cmd;
+        assert(__ret->base.api_id == HIP_API);
+        assert(__ret->base.command_size == sizeof(struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret));
+        struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record *__local =
+            (struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record *)ava_remove_call(__ret->__call_id);
+
+        {
+
+            int numKernels;
+            numKernels = __local->numKernels;
+
+            size_t *sharedMemBytes;
+            sharedMemBytes = __local->sharedMemBytes;
+
+            uint32_t *localWorkSizeY;
+            localWorkSizeY = __local->localWorkSizeY;
+
+            size_t *extra_size;
+            extra_size = __local->extra_size;
+
+            uint32_t *localWorkSizeZ;
+            localWorkSizeZ = __local->localWorkSizeZ;
+
+            uint32_t *localWorkSizeX;
+            localWorkSizeX = __local->localWorkSizeX;
+
+            uint32_t *globalWorkSizeX;
+            globalWorkSizeX = __local->globalWorkSizeX;
+
+            hipStream_t stream;
+            stream = __local->stream;
+
+            uint32_t *globalWorkSizeZ;
+            globalWorkSizeZ = __local->globalWorkSizeZ;
+
+            uint32_t *globalWorkSizeY;
+            globalWorkSizeY = __local->globalWorkSizeY;
+
+            hipFunction_t *f;
+            f = __local->f;
+
+            size_t total_extra_size;
+            total_extra_size = __local->total_extra_size;
+
+            char *all_extra;
+            all_extra = __local->all_extra;
+
+            hipError_t ret;
+            ret = __ret->ret;
+
+            /* Output: hipError_t ret */
+            __local->ret = __ret->ret;
+
+        }
+
+        if (__local->__handler_deallocate) {
+            free(__local);
+        }
+        __local->__call_complete = 1;
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
     case RET_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED:{
         ava_is_in = 0;
         ava_is_out = 1;
@@ -3616,6 +3682,213 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
     command_channel_send_command(__chan, (struct command_base *)__cmd);
 
     g_ptr_array_unref(__ava_alloc_list___do_c_hipHccModuleLaunchKernel);        /* Deallocate all memory in the alloc list */
+
+    handle_commands_until(HIP_API, __call_record->__call_complete);
+    hipError_t ret;
+    ret = __call_record->ret;
+    free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
+    return ret;
+}
+
+EXPORTED hipError_t
+__do_c_hipHccModuleLaunchMultiKernel(int numKernels, hipFunction_t * f, uint32_t * globalWorkSizeX,
+    uint32_t * globalWorkSizeY, uint32_t * globalWorkSizeZ, uint32_t * localWorkSizeX, uint32_t * localWorkSizeY,
+    uint32_t * localWorkSizeZ, size_t * sharedMemBytes, hipStream_t stream, char *all_extra, size_t total_extra_size,
+    size_t * extra_size)
+{
+    const int ava_is_in = 1,
+        ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
+    GPtrArray *__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel = g_ptr_array_new_full(0, free);
+
+    size_t __total_buffer_size = 0; {
+        /* Size: size_t * sharedMemBytes */
+        if ((sharedMemBytes) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(size_t));
+        }
+
+        /* Size: uint32_t * localWorkSizeY */
+        if ((localWorkSizeY) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
+        }
+
+        /* Size: size_t * extra_size */
+        if ((extra_size) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(size_t));
+        }
+
+        /* Size: uint32_t * localWorkSizeZ */
+        if ((localWorkSizeZ) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
+        }
+
+        /* Size: uint32_t * localWorkSizeX */
+        if ((localWorkSizeX) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
+        }
+
+        /* Size: uint32_t * globalWorkSizeX */
+        if ((globalWorkSizeX) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
+        }
+
+        /* Size: uint32_t * globalWorkSizeZ */
+        if ((globalWorkSizeZ) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
+        }
+
+        /* Size: uint32_t * globalWorkSizeY */
+        if ((globalWorkSizeY) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
+        }
+
+        /* Size: hipFunction_t * f */
+        if ((f) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(hipFunction_t));
+        }
+
+        /* Size: char * all_extra */
+        if ((all_extra) != (NULL) && (total_extra_size) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (total_extra_size) * sizeof(char));
+        }
+    }
+    struct hip___do_c_hip_hcc_module_launch_multi_kernel_call *__cmd =
+        (struct hip___do_c_hip_hcc_module_launch_multi_kernel_call *)command_channel_new_command(__chan,
+        sizeof(struct hip___do_c_hip_hcc_module_launch_multi_kernel_call), __total_buffer_size);
+    __cmd->base.api_id = HIP_API;
+    __cmd->base.command_id = CALL_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL;
+
+    intptr_t __call_id = ava_get_call_id();
+    __cmd->__call_id = __call_id;
+
+    {
+
+        /* Input: int numKernels */
+        __cmd->numKernels = numKernels;
+        /* Input: hipFunction_t * f */
+        if ((f) != (NULL) && (numKernels) > (0)) {
+            __cmd->f =
+                (hipFunction_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, f,
+                (numKernels) * sizeof(hipFunction_t));
+        } else {
+            __cmd->f = NULL;
+        }
+        /* Input: uint32_t * globalWorkSizeX */
+        if ((globalWorkSizeX) != (NULL) && (numKernels) > (0)) {
+            __cmd->globalWorkSizeX =
+                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, globalWorkSizeX,
+                (numKernels) * sizeof(uint32_t));
+        } else {
+            __cmd->globalWorkSizeX = NULL;
+        }
+        /* Input: uint32_t * globalWorkSizeY */
+        if ((globalWorkSizeY) != (NULL) && (numKernels) > (0)) {
+            __cmd->globalWorkSizeY =
+                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, globalWorkSizeY,
+                (numKernels) * sizeof(uint32_t));
+        } else {
+            __cmd->globalWorkSizeY = NULL;
+        }
+        /* Input: uint32_t * globalWorkSizeZ */
+        if ((globalWorkSizeZ) != (NULL) && (numKernels) > (0)) {
+            __cmd->globalWorkSizeZ =
+                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, globalWorkSizeZ,
+                (numKernels) * sizeof(uint32_t));
+        } else {
+            __cmd->globalWorkSizeZ = NULL;
+        }
+        /* Input: uint32_t * localWorkSizeX */
+        if ((localWorkSizeX) != (NULL) && (numKernels) > (0)) {
+            __cmd->localWorkSizeX =
+                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, localWorkSizeX,
+                (numKernels) * sizeof(uint32_t));
+        } else {
+            __cmd->localWorkSizeX = NULL;
+        }
+        /* Input: uint32_t * localWorkSizeY */
+        if ((localWorkSizeY) != (NULL) && (numKernels) > (0)) {
+            __cmd->localWorkSizeY =
+                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, localWorkSizeY,
+                (numKernels) * sizeof(uint32_t));
+        } else {
+            __cmd->localWorkSizeY = NULL;
+        }
+        /* Input: uint32_t * localWorkSizeZ */
+        if ((localWorkSizeZ) != (NULL) && (numKernels) > (0)) {
+            __cmd->localWorkSizeZ =
+                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, localWorkSizeZ,
+                (numKernels) * sizeof(uint32_t));
+        } else {
+            __cmd->localWorkSizeZ = NULL;
+        }
+        /* Input: size_t * sharedMemBytes */
+        if ((sharedMemBytes) != (NULL) && (numKernels) > (0)) {
+            __cmd->sharedMemBytes =
+                (size_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, sharedMemBytes,
+                (numKernels) * sizeof(size_t));
+        } else {
+            __cmd->sharedMemBytes = NULL;
+        }
+        /* Input: hipStream_t stream */
+        __cmd->stream = stream;
+        /* Input: char * all_extra */
+        if ((all_extra) != (NULL) && (total_extra_size) > (0)) {
+            __cmd->all_extra =
+                (char *)command_channel_attach_buffer(__chan, (struct command_base *)__cmd, all_extra,
+                (total_extra_size) * sizeof(char));
+        } else {
+            __cmd->all_extra = NULL;
+        }
+        /* Input: size_t total_extra_size */
+        __cmd->total_extra_size = total_extra_size;
+        /* Input: size_t * extra_size */
+        if ((extra_size) != (NULL) && (numKernels) > (0)) {
+            __cmd->extra_size =
+                (size_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, extra_size,
+                (numKernels) * sizeof(size_t));
+        } else {
+            __cmd->extra_size = NULL;
+        }
+    }
+
+    struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record *__call_record =
+        (struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record *)calloc(1,
+        sizeof(struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record));
+
+    __call_record->numKernels = numKernels;
+
+    __call_record->sharedMemBytes = sharedMemBytes;
+
+    __call_record->localWorkSizeY = localWorkSizeY;
+
+    __call_record->extra_size = extra_size;
+
+    __call_record->localWorkSizeZ = localWorkSizeZ;
+
+    __call_record->localWorkSizeX = localWorkSizeX;
+
+    __call_record->globalWorkSizeX = globalWorkSizeX;
+
+    __call_record->stream = stream;
+
+    __call_record->globalWorkSizeZ = globalWorkSizeZ;
+
+    __call_record->globalWorkSizeY = globalWorkSizeY;
+
+    __call_record->f = f;
+
+    __call_record->total_extra_size = total_extra_size;
+
+    __call_record->all_extra = all_extra;
+
+    __call_record->__call_complete = 0;
+    __call_record->__handler_deallocate = 0;
+    ava_add_call(__call_id, __call_record);
+
+    command_channel_send_command(__chan, (struct command_base *)__cmd);
+
+    g_ptr_array_unref(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel);   /* Deallocate all memory in the alloc list */
 
     handle_commands_until(HIP_API, __call_record->__call_complete);
     hipError_t ret;

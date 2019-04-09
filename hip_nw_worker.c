@@ -508,6 +508,27 @@ __wrapper___do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSi
     return ret;
 }
 
+static hipError_t
+__wrapper___do_c_hipHccModuleLaunchMultiKernel(int numKernels, size_t * sharedMemBytes, uint32_t * localWorkSizeY,
+    size_t * extra_size, uint32_t * localWorkSizeZ, uint32_t * localWorkSizeX, uint32_t * globalWorkSizeX,
+    hipStream_t stream, uint32_t * globalWorkSizeZ, uint32_t * globalWorkSizeY, hipFunction_t * f,
+    size_t total_extra_size, char *all_extra)
+{
+    hipError_t ret;
+    ret =
+        __do_c_hipHccModuleLaunchMultiKernel(numKernels, f, globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ,
+        localWorkSizeX, localWorkSizeY, localWorkSizeZ, sharedMemBytes, stream, all_extra, total_extra_size,
+        extra_size);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
 static hsa_status_t
 __wrapper_nw_hsa_system_major_extension_supported(uint16_t extension, uint16_t version_major, uint16_t * version_minor,
     _Bool * result)
@@ -2766,6 +2787,191 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list___do_c_hipHccModuleLaunchKernel);    /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel = g_ptr_array_new_full(0, free);
+        struct hip___do_c_hip_hcc_module_launch_multi_kernel_call *__call =
+            (struct hip___do_c_hip_hcc_module_launch_multi_kernel_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip___do_c_hip_hcc_module_launch_multi_kernel_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: int numKernels */
+        int numKernels;
+        numKernels = __call->numKernels;
+        numKernels = __call->numKernels;
+
+        /* Input: size_t * sharedMemBytes */
+        size_t *sharedMemBytes;
+        sharedMemBytes =
+            ((__call->sharedMemBytes) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->sharedMemBytes))) : (__call->sharedMemBytes);
+        if (__call->sharedMemBytes != NULL)
+            sharedMemBytes =
+                ((__call->sharedMemBytes) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->sharedMemBytes))) : (__call->sharedMemBytes);
+        else
+            sharedMemBytes = NULL;
+
+        /* Input: uint32_t * localWorkSizeY */
+        uint32_t *localWorkSizeY;
+        localWorkSizeY =
+            ((__call->localWorkSizeY) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->localWorkSizeY))) : (__call->localWorkSizeY);
+        if (__call->localWorkSizeY != NULL)
+            localWorkSizeY =
+                ((__call->localWorkSizeY) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->localWorkSizeY))) : (__call->localWorkSizeY);
+        else
+            localWorkSizeY = NULL;
+
+        /* Input: size_t * extra_size */
+        size_t *extra_size;
+        extra_size =
+            ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->extra_size))) : (__call->extra_size);
+        if (__call->extra_size != NULL)
+            extra_size =
+                ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->extra_size))) : (__call->extra_size);
+        else
+            extra_size = NULL;
+
+        /* Input: uint32_t * localWorkSizeZ */
+        uint32_t *localWorkSizeZ;
+        localWorkSizeZ =
+            ((__call->localWorkSizeZ) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->localWorkSizeZ))) : (__call->localWorkSizeZ);
+        if (__call->localWorkSizeZ != NULL)
+            localWorkSizeZ =
+                ((__call->localWorkSizeZ) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->localWorkSizeZ))) : (__call->localWorkSizeZ);
+        else
+            localWorkSizeZ = NULL;
+
+        /* Input: uint32_t * localWorkSizeX */
+        uint32_t *localWorkSizeX;
+        localWorkSizeX =
+            ((__call->localWorkSizeX) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->localWorkSizeX))) : (__call->localWorkSizeX);
+        if (__call->localWorkSizeX != NULL)
+            localWorkSizeX =
+                ((__call->localWorkSizeX) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->localWorkSizeX))) : (__call->localWorkSizeX);
+        else
+            localWorkSizeX = NULL;
+
+        /* Input: uint32_t * globalWorkSizeX */
+        uint32_t *globalWorkSizeX;
+        globalWorkSizeX =
+            ((__call->globalWorkSizeX) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->globalWorkSizeX))) : (__call->globalWorkSizeX);
+        if (__call->globalWorkSizeX != NULL)
+            globalWorkSizeX =
+                ((__call->globalWorkSizeX) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->globalWorkSizeX))) : (__call->globalWorkSizeX);
+        else
+            globalWorkSizeX = NULL;
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
+        /* Input: uint32_t * globalWorkSizeZ */
+        uint32_t *globalWorkSizeZ;
+        globalWorkSizeZ =
+            ((__call->globalWorkSizeZ) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->globalWorkSizeZ))) : (__call->globalWorkSizeZ);
+        if (__call->globalWorkSizeZ != NULL)
+            globalWorkSizeZ =
+                ((__call->globalWorkSizeZ) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->globalWorkSizeZ))) : (__call->globalWorkSizeZ);
+        else
+            globalWorkSizeZ = NULL;
+
+        /* Input: uint32_t * globalWorkSizeY */
+        uint32_t *globalWorkSizeY;
+        globalWorkSizeY =
+            ((__call->globalWorkSizeY) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->globalWorkSizeY))) : (__call->globalWorkSizeY);
+        if (__call->globalWorkSizeY != NULL)
+            globalWorkSizeY =
+                ((__call->globalWorkSizeY) != (NULL)) ? (((uint32_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->globalWorkSizeY))) : (__call->globalWorkSizeY);
+        else
+            globalWorkSizeY = NULL;
+
+        /* Input: hipFunction_t * f */
+        hipFunction_t *f;
+        f = ((__call->f) != (NULL)) ? (((hipFunction_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->f))) : (__call->f);
+        if (__call->f != NULL)
+            f = ((__call->f) != (NULL)) ? (((hipFunction_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->f))) : (__call->f);
+        else
+            f = NULL;
+
+        /* Input: size_t total_extra_size */
+        size_t total_extra_size;
+        total_extra_size = __call->total_extra_size;
+        total_extra_size = __call->total_extra_size;
+
+        /* Input: char * all_extra */
+        char *all_extra;
+        all_extra =
+            ((__call->all_extra) != (NULL)) ? (((char *)command_channel_get_buffer(__chan, __cmd,
+                    __call->all_extra))) : (__call->all_extra);
+        if (__call->all_extra != NULL)
+            all_extra =
+                ((__call->all_extra) != (NULL)) ? (((char *)command_channel_get_buffer(__chan, __cmd,
+                        __call->all_extra))) : (__call->all_extra);
+        else
+            all_extra = NULL;
+
+        /* Perform Call */
+        hipError_t ret;
+        ret =
+            __wrapper___do_c_hipHccModuleLaunchMultiKernel(numKernels, sharedMemBytes, localWorkSizeY, extra_size,
+            localWorkSizeZ, localWorkSizeX, globalWorkSizeX, stream, globalWorkSizeZ, globalWorkSizeY, f,
+            total_extra_size, all_extra);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+        }
+        struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret *__ret =
+            (struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel);       /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;

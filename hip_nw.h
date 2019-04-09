@@ -28,7 +28,8 @@ enum hip_functions {
         RET_HIP_HIP_INIT, CALL_HIP_HIP_CTX_GET_CURRENT, RET_HIP_HIP_CTX_GET_CURRENT, CALL_HIP_NW_HIP_STREAM_SYNCHRONIZE,
         RET_HIP_NW_HIP_STREAM_SYNCHRONIZE, CALL_HIP___DO_C_HIP_GET_DEVICE_PROPERTIES,
         RET_HIP___DO_C_HIP_GET_DEVICE_PROPERTIES, CALL_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_KERNEL,
-        RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_KERNEL, CALL_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED,
+        RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_KERNEL, CALL_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL,
+        RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL, CALL_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED,
         RET_HIP_NW_HSA_SYSTEM_MAJOR_EXTENSION_SUPPORTED, CALL_HIP_NW_HSA_EXECUTABLE_CREATE_ALT,
         RET_HIP_NW_HSA_EXECUTABLE_CREATE_ALT, CALL_HIP_NW_HSA_ISA_FROM_NAME, RET_HIP_NW_HSA_ISA_FROM_NAME,
         CALL_HIP_HIP_PEEK_AT_LAST_ERROR, RET_HIP_HIP_PEEK_AT_LAST_ERROR, CALL_HIP_NW_HIP_DEVICE_GET_ATTRIBUTE,
@@ -571,6 +572,50 @@ struct hip___do_c_hip_hcc_module_launch_kernel_call_record {
     hipEvent_t start;
     char *extra;
     hipEvent_t stop;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip___do_c_hip_hcc_module_launch_multi_kernel_call {
+    struct command_base base;
+    intptr_t __call_id;
+    int numKernels;
+    size_t *sharedMemBytes;
+    uint32_t *localWorkSizeY;
+    size_t *extra_size;
+    uint32_t *localWorkSizeZ;
+    uint32_t *localWorkSizeX;
+    uint32_t *globalWorkSizeX;
+    hipStream_t stream;
+    uint32_t *globalWorkSizeZ;
+    uint32_t *globalWorkSizeY;
+    hipFunction_t *f;
+    size_t total_extra_size;
+    char *all_extra;
+};
+
+struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record {
+    int numKernels;
+    size_t *sharedMemBytes;
+    uint32_t *localWorkSizeY;
+    size_t *extra_size;
+    uint32_t *localWorkSizeZ;
+    uint32_t *localWorkSizeX;
+    uint32_t *globalWorkSizeX;
+    hipStream_t stream;
+    uint32_t *globalWorkSizeZ;
+    uint32_t *globalWorkSizeY;
+    hipFunction_t *f;
+    size_t total_extra_size;
+    char *all_extra;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;
