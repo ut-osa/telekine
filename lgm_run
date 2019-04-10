@@ -5,15 +5,20 @@ import os
 import click
 import subprocess as sp
 import time
+import signal
 import atexit
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 manager_def = os.path.join(script_dir, "manager_tcp")
 manager_proc = None
+login = None
+ava_ip = 'localhost'
+
 
 def clean_up():
     if manager_proc:
-        manager_proc.kill()
+        manager_proc.send_signal(signal.SIGINT)
+        os.system('ssh {} killall -9 worker manager_tcp &>/dev/null'.format(login))
 atexit.register(clean_up)
 
 def run_test(test_cmd):
@@ -32,29 +37,20 @@ def ava_env_client():
     new_env['LD_PRELOAD'] = ':'.join([shim, guest_lib])
     new_env['AVA_LOCAL'] = '1'
     new_env['HCC_LAZYINIT'] = '1'
+    new_env['AVA_IP'] = ava_ip
     return new_env
-
-def ensure_ava_server(server):
-    client_commit = sp.run(['git', '-C', script_dir, 'rev-parse', 'HEAD'],
-                    stdout=sp.PIPE).stdout.decode('ascii').strip()
-    server_split = server.split(':')
-    if (len(server_split) > 1):
-        manaer = ['ssh', server_split[0], server_split[1]]
-    else:
-        manager = [server_split[0]]
-    manager_proc = sp.Popen(manager)
-    time.sleep(1)
 
 @click.command()
 @click.argument('run-type', type=click.Choice(['baseline','ava']))
 @click.argument('test-cmd', nargs=-1)
 @click.option('--server', default=manager_def)
 def main(run_type, test_cmd, server):
+    global ava_ip
     if len(test_cmd) == 0:
         print("no command given exiting!")
         sys.exit(1)
-    if (run_type == 'ava'):
-        ensure_ava_server(server)
+    if server:
+        ava_ip = server
     sys.exit(run_test(test_cmd))
 
 if __name__ == '__main__':
