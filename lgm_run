@@ -38,6 +38,8 @@ extra_client_env = {
     'AVA_LOCAL'   : '1',
     'HCC_LAZYINIT': '1',
     'HIP_ENABLE_COMMAND_SCHEDULER' : '0',
+    'LGM_MEMCPY_FIX_SIZE' : '0',
+    'LGM_MEMCPY_ENABLE_ENCRYPTION' : '0',
 }
 
 def ava_env_client():
@@ -59,7 +61,10 @@ click_option = functools.partial(click.option, show_default=True)
 @click_option('--gpu-op-batch-size', default=64, callback=check_ava)
 @click_option('--gpu-op-batching/--no-gpu-op-batching', default=False,
               callback=check_ava)
-def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size):
+@click_option('--hip-memcpy-fixed-size', is_flag=True, callback=check_ava)
+@click_option('--hip-memcpy-encrypted', is_flag=True, callback=check_ava)
+def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size, hip_memcpy_fixed_size,
+    hip_memcpy_encrypted):
     global ava_ip
     if len(test_cmd) == 0:
         print("no command given exiting!")
@@ -69,6 +74,12 @@ def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size):
     if gpu_op_batching:
         extra_client_env["HIP_ENABLE_COMMAND_SCHEDULER"] = "1"
         extra_client_env["HIP_COMMAND_SCHEDULER_BATCH_SIZE"] = str(gpu_op_batch_size)
+    if hip_memcpy_fixed_size:
+      print("FIX size on")
+      extra_client_env["LGM_MEMCPY_FIX_SIZE"] = "1"
+    if hip_memcpy_encrypted:
+      print("Encryption on")
+      extra_client_env["LGM_MEMCPY_ENABLE_ENCRYPTION"] = "1"
     sys.exit(run_test(test_cmd))
 
 if __name__ == '__main__':
