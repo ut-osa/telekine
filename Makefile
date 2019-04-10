@@ -35,7 +35,7 @@ CXXFLAGS = -g $(CFLAGS) -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecate
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) worker libguestlib.so guestshim.so
+all: $(EXECUTABLE) worker libguestlib.so guestshim.so manager
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
@@ -80,5 +80,6 @@ libcrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
 	$(HIPCC) $(includes) -shared -fPIC crypto/aes_gcm.cpp -o $@ -lsodium -ldl
 
 clean:
-	rm -rf hip_nw *.o *.so manager_tcp
+	rm -rf hip_nw *.o *.so manager_tcp MatrixTranspose
+	$(MAKE) -C nw/worker clean
 .PHONY: clean
