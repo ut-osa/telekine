@@ -48,7 +48,7 @@ def ava_env_client():
 @click.command()
 @click.argument('run-type', type=click.Choice(['baseline','ava']))
 @click.argument('test-cmd', nargs=-1)
-@click.option('--server', default=manager_def)
+@click.option('--server', default="localhost")
 @click.option('--gpu-op-batch-size', default=64)
 @click.option('--gpu-op-batching/--no-gpu-op-batching', default=False)
 def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size):
