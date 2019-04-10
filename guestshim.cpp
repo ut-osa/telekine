@@ -232,11 +232,13 @@ extern "C" hipError_t
 hipCtxGetDevice(hipDevice_t* device)
 {
     if (current_ctx_device == -1) {
-        *device = current_ctx_device;
-        return hipSuccess;
-    } else {
-        return nw_hipCtxGetDevice(&current_ctx_device);
+        hipError_t status = nw_hipCtxGetDevice(&current_ctx_device);
+        if (status != hipSuccess) {
+            return status;
+        }
     }
+    *device = current_ctx_device;
+    return hipSuccess;
 }
 
 extern "C" hipError_t
