@@ -4,6 +4,8 @@
 #include "hip_cpp_bridge.h"
 #include "crypto/aes_gcm.h"
 
+#include "check_env.h"
+
 #include <algorithm>
 #include <hip/hip_runtime_api.h>
 #include <map>
@@ -17,11 +19,13 @@
 #define MAX_DEVICES 4
 
 static bool memcpy_size_fixed(void) {
-  return getenv("LGM_MEMCPY_FIX_SIZE") != nullptr;
+  static bool ret = CHECK_ENV("LGM_MEMCPY_FIX_SIZE");
+  return ret;
 }
 
 static bool memcpy_encryption_enabled(void) {
-  return getenv("LGM_MEMCPY_ENABLE_ENCRYPTION") != nullptr;
+  static bool ret = CHECK_ENV("LGM_MEMCPY_ENABLE_ENCRYPTION");
+  return ret;
 }
 
 // AES Encryption State //
