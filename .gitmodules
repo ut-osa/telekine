@@ -1,3 +1,0 @@
-[submodule "HIP-encryptedMemcpy"]
-	path = HIP-encryptedMemcpy
-	url = ../HIP-encryptedMemcpy
