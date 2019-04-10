@@ -164,7 +164,7 @@ void CommandScheduler::ProcessThread() {
 CommandScheduler* CommandScheduler::GetForStream(hipStream_t stream) {
     std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
     if (command_scheduler_map_.count(stream) > 0) {
-        return command_scheduler_map_[stream];
+        return command_scheduler_map_.at(stream);
     } else {
         int batch_size = 64;
         char* s = getenv("HIP_COMMAND_SCHEDULER_BATCH_SIZE");
