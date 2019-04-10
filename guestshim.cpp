@@ -181,6 +181,15 @@ CommandScheduler* CommandScheduler::GetForStream(hipStream_t stream) {
 std::map<hipStream_t, CommandScheduler*> CommandScheduler::command_scheduler_map_{};
 std::mutex CommandScheduler::command_scheduler_map_mu_{};
 
+int command_scheduler_enabled() {
+    const char* envvar_name = "HIP_ENABLE_COMMAND_SCHEDULER";
+    if (getenv(envvar_name) == nullptr) {
+        return 0;
+    } else {
+        return atoi(getenv(envvar_name));
+    }
+}
+
 hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                     uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
                                     uint32_t localWorkSizeX, uint32_t localWorkSizeY,
@@ -194,7 +203,8 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
    assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
    assert(extra[4] == HIP_LAUNCH_PARAM_END);
 
-   if (startEvent == NULL && stopEvent == NULL && kernelParams == NULL) {
+   if (command_scheduler_enabled()
+       && startEvent == NULL && stopEvent == NULL && kernelParams == NULL) {
        CommandScheduler::GetForStream(hStream)->AddKernelLaunch(
            f, globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ,
            localWorkSizeX, localWorkSizeY, localWorkSizeZ,
@@ -214,7 +224,7 @@ hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
     // fprintf(stderr, "hipMemcpyAsync with kind = %d, size = %zu\n", (int)kind, sizeBytes);
-   CommandScheduler::GetForStream(stream)->Wait();
+   if (command_scheduler_enabled()) CommandScheduler::GetForStream(stream)->Wait();
    return nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
 }
 
@@ -251,7 +261,7 @@ extern "C" hipError_t
 hipStreamSynchronize(hipStream_t stream)
 {
     // fprintf(stderr, "hipStreamSynchronize\n");
-    CommandScheduler::GetForStream(stream)->Wait();
+    if (command_scheduler_enabled()) CommandScheduler::GetForStream(stream)->Wait();
     return nw_hipStreamSynchronize(stream);
 }
 
