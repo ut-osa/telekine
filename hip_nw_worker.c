@@ -1371,13 +1371,13 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case CALL_HIP_HIP_MEMCPY:{
+    case CALL_HIP_NW_HIP_MEMCPY:{
         ava_is_in = 1;
         ava_is_out = 0;
         GPtrArray *__ava_alloc_list_hipMemcpy = g_ptr_array_new_full(0, free);
-        struct hip_hip_memcpy_call *__call = (struct hip_hip_memcpy_call *)__cmd;
+        struct hip_nw_hip_memcpy_call *__call = (struct hip_nw_hip_memcpy_call *)__cmd;
         assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_hip_memcpy_call));
+        assert(__call->base.command_size == sizeof(struct hip_nw_hip_memcpy_call));
 #ifdef AVA_RECORD_REPLAY
 
 #endif
@@ -1481,11 +1481,11 @@ __handle_command_hip(struct command_base *__cmd)
                     }
                 }
         }}
-        struct hip_hip_memcpy_ret *__ret =
-            (struct hip_hip_memcpy_ret *)command_channel_new_command(__chan, sizeof(struct hip_hip_memcpy_ret),
+        struct hip_nw_hip_memcpy_ret *__ret =
+            (struct hip_nw_hip_memcpy_ret *)command_channel_new_command(__chan, sizeof(struct hip_nw_hip_memcpy_ret),
             __total_buffer_size);
         __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_HIP_MEMCPY;
+        __ret->base.command_id = RET_HIP_NW_HIP_MEMCPY;
         __ret->__call_id = __call->__call_id;
 
         /* Output: hipError_t ret */

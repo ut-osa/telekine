@@ -64,6 +64,9 @@ nw_hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind ki
                hipStream_t stream);
 
 hipError_t
+nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind);
+
+hipError_t
 nw_hipCtxGetDevice(hipDevice_t* device);
 
 hipError_t

@@ -243,6 +243,13 @@ hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
 }
 
 extern "C" hipError_t
+hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
+{
+   if (command_scheduler_enabled()) CommandScheduler::GetForStream(nullptr)->Wait();
+   return nw_hipMemcpy(dst, src, sizeBytes, kind);
+}
+
+extern "C" hipError_t
 hipCtxGetDevice(hipDevice_t* device)
 {
     if (current_ctx_device == -1) {

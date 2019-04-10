@@ -35,6 +35,12 @@ nw_hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind ki
    return hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
 }
 
+hipError_t
+nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
+{
+   return hipMemcpy(dst, src, sizeBytes, kind);
+}
+
 extern "C" hipError_t
 nw_hipCtxGetDevice(hipDevice_t* device)
 {

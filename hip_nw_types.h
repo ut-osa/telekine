@@ -56,8 +56,19 @@ size_t __do_c_get_kerenel_symbols(
       size_t symbols_len);
 
 hipError_t
+__do_c_hipHccModuleLaunchMultiKernel(
+      int numKernels, hipFunction_t* f,
+      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
+      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
+      size_t* sharedMemBytes, hipStream_t stream,
+      char* all_extra, size_t total_extra_size, size_t* extra_size);
+
+hipError_t
 nw_hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream);
+
+hipError_t
+nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind);
 
 hipError_t
 nw_hipCtxGetDevice(hipDevice_t* device);

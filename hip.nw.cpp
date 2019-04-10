@@ -61,7 +61,7 @@ hipMemcpyDtoD(hipDeviceptr_t dst, hipDeviceptr_t src, size_t sizeBytes)
 }
 
 hipError_t
-hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
+nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
 {
    ava_argument(dst) {
       ava_depends_on(kind);
