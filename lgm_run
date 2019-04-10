@@ -7,6 +7,7 @@ import subprocess as sp
 import time
 import signal
 import atexit
+import functools
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 manager_def = os.path.join(script_dir, "manager_tcp")
@@ -45,12 +46,19 @@ def ava_env_client():
     new_env.update(extra_client_env)
     return new_env
 
+def check_ava(ctx, param, value):
+    if ctx.params['run_type'] != 'ava':
+        ctx.fail("option \"--{}\" is only valid for an AVA run".format(param.human_readable_name))
+
+
+click_option = functools.partial(click.option, show_default=True)
 @click.command()
-@click.argument('run-type', type=click.Choice(['baseline','ava']))
+@click.argument('run-type', is_eager=True, type=click.Choice(['baseline','ava']))
 @click.argument('test-cmd', nargs=-1)
-@click.option('--server', default="localhost")
-@click.option('--gpu-op-batch-size', default=64)
-@click.option('--gpu-op-batching/--no-gpu-op-batching', default=False)
+@click_option('--server', default="localhost", callback=check_ava)
+@click_option('--gpu-op-batch-size', default=64, callback=check_ava)
+@click_option('--gpu-op-batching/--no-gpu-op-batching', default=False,
+              callback=check_ava)
 def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size):
     global ava_ip
     if len(test_cmd) == 0:
