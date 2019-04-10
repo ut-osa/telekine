@@ -214,6 +214,7 @@ hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
     // fprintf(stderr, "hipMemcpyAsync with kind = %d, size = %zu\n", (int)kind, sizeBytes);
+   CommandScheduler::GetForStream(stream)->Wait();
    return nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
 }
 
