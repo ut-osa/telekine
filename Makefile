@@ -36,7 +36,6 @@ CXXFLAGS = -g $(CFLAGS) -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecate
 CXX=$(HIPCC)
 
 all: $(EXECUTABLE) worker libguestlib.so guestshim.so
-#crypto_guestshim.so crypto_impl.so
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
@@ -72,20 +71,13 @@ manager:
 	$(MAKE) -C nw/worker && ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
-guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so
+guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so lgm_memcpy.hpp libcrypto.so
 	g++ -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
 	   -Wl,--no-allow-shlib-undefined \
-		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread 
+		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread -lsodium -lcrypto
 
-crypto_impl.so: HIP-encryptedMemcpy/crypto/aes_gcm.o
-	$(HIPCC) -shared $^ -o $@ -lsodium -ldl
-
-crypto_guestshim.so: HIP-encryptedMemcpy/hip_wrapper.o\
-							guestshim.o program_state.o code_object_bundle.o libguestlib.so
-	g++ -fPIC -shared $(includes) -o $@ HIP-encryptedMemcpy/hip_wrapper.o \
-	   guestshim.o program_state.o code_object_bundle.o \
-		-Wl,-rpath=$(PWD) -L$(PWD) -lguestlib
-
+libcrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
+	$(HIPCC) $(includes) -shared -fPIC crypto/aes_gcm.cpp -o $@ -lsodium -ldl
 
 clean:
 	rm -rf hip_nw *.o *.so manager_tcp

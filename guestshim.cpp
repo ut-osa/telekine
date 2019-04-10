@@ -25,6 +25,7 @@
 #include <iostream>
 
 #include "./command_scheduler.h"
+#include "lgm_memcpy.hpp"
 
 #include <chrono>
 
@@ -219,27 +220,13 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
    }
 }
 
-#define FIXED_MEMCPY_SIZE_B (1048576ul) // 1 MB
-#define SPLIT_MEMCPY 1
-
 extern "C" hipError_t
 hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
     // fprintf(stderr, "hipMemcpyAsync with kind = %d, size = %zu\n", (int)kind, sizeBytes);
    if (command_scheduler_enabled()) CommandScheduler::GetForStream(stream)->Wait();
-   hipError_t ret;
-#ifdef SPLIT_MEMCPY
-   for (size_t i = 0; i < sizeBytes; i+= FIXED_MEMCPY_SIZE_B) {
-      size_t memcpy_size = std::min(sizeBytes - i, FIXED_MEMCPY_SIZE_B);
-      ret = nw_hipMemcpyAsync(static_cast<void*>(static_cast<char*>(dst) + i),
-         static_cast<const void*>(static_cast<const char*>(src) + i), memcpy_size, kind, stream);
-      if (ret != hipSuccess) return ret;
-   }
-#else
-   ret = nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
-#endif
-   return ret;
+   return lgm_memcpy(dst, src, sizeBytes, kind, stream);
 }
 
 extern "C" hipError_t
