@@ -10,11 +10,10 @@
 #include <stdlib.h>
 
 using std::string;
-struct ihipModuleSymbol_t{
-   uint64_t _object;             // The kernel object.
-   uint32_t _groupSegmentSize;
-   uint32_t _privateSegmentSize;
-   string   _name;       // TODO - review for performance cost.  Name is just used for debug.
+struct ihipModuleSymbol_t {
+    uint64_t _object{};  // The kernel object.
+    amd_kernel_code_t const* _header{};
+    string _name;  // TODO - review for performance cost.  Name is just used for debug.
 };
 
 
@@ -278,17 +277,66 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                       hipStream_t stream, void** kernelParams, char* _extra,
                       size_t extra_size, hipEvent_t start, hipEvent_t stop)
 {
-   void* new_extra[5] = {
-      HIP_LAUNCH_PARAM_BUFFER_POINTER, _extra,
-      HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size,
-      HIP_LAUNCH_PARAM_END};
-
    assert(kernelParams == nullptr);
+   /*
+     Kernel argument preparation.
+   */
+   grid_launch_parm lp;
+   lp.dynamic_group_mem_bytes =
+       sharedMemBytes;  // TODO - this should be part of preLaunchKernel.
+   stream = ihipPreLaunchKernel(
+       stream, dim3(globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ),
+       dim3(localWorkSizeX, localWorkSizeY, localWorkSizeZ), &lp, f->_name.c_str());
 
-   return hipHccModuleLaunchKernel(f, globalWorkSizeX,
-                                globalWorkSizeY, globalWorkSizeZ, localWorkSizeX,
-                                localWorkSizeY, localWorkSizeZ, sharedMemBytes, stream,
-                                kernelParams, new_extra, start, stop);
+
+   hsa_kernel_dispatch_packet_t aql;
+
+   memset(&aql, 0, sizeof(aql));
+
+   // aql.completion_signal._handle = 0;
+   // aql.kernarg_address = 0;
+
+   aql.workgroup_size_x = localWorkSizeX;
+   aql.workgroup_size_y = localWorkSizeY;
+   aql.workgroup_size_z = localWorkSizeZ;
+   aql.grid_size_x = globalWorkSizeX;
+   aql.grid_size_y = globalWorkSizeY;
+   aql.grid_size_z = globalWorkSizeZ;
+   aql.group_segment_size = f->_header->workgroup_group_segment_byte_size + sharedMemBytes;
+   aql.private_segment_size = f->_header->workitem_private_segment_byte_size;
+   aql.kernel_object = f->_object;
+   aql.setup = 3 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
+   aql.header =
+       (HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE);
+   aql.header |= (1 << HSA_PACKET_HEADER_BARRIER);
+
+   if (HCC_OPT_FLUSH) {
+       aql.header |= (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
+                     (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
+   } else {
+       aql.header |= (HSA_FENCE_SCOPE_SYSTEM << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
+                     (HSA_FENCE_SCOPE_SYSTEM << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
+   };
+
+
+   hc::completion_future cf;
+
+   lp.av->dispatch_hsa_kernel(&aql, _extra, extra_size,
+                              (start || stop) ? &cf : nullptr,
+                              f->_name.c_str()
+   );
+
+   if (start) {
+       start->attachToCompletionFuture(&cf, stream, hipEventTypeStartCommand);
+   }
+   if (stop) {
+       stop->attachToCompletionFuture(&cf, stream, hipEventTypeStopCommand);
+   }
+
+
+   ihipPostLaunchKernel(f->_name.c_str(), stream, lp);
+
+   return hipSuccess;
 }
 
 extern "C" hipError_t
