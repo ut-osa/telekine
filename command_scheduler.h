@@ -14,8 +14,7 @@ class CommandScheduler {
 public:
     CommandScheduler(hipStream_t stream, int batch_size);
 
-    void AddKernelLaunch(
-        hipFunction_t f, hsa_kernel_dispatch_packet_t *aql, void** extra);
+    void AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** extra);
 
     void AddMemcpy(
         void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind);
@@ -28,7 +27,6 @@ private:
     void ProcessThread();
 
     struct KernelLaunchParam {
-        hipFunction_t f;
         hsa_kernel_dispatch_packet_t aql;
         size_t kernArgSize;
         void* kernArg;

@@ -33,6 +33,7 @@ using namespace std;
 using namespace hc;
 
 #define MAX_AGENTS 16
+#define FIXED_EXTRA_SIZE 256
 
 static unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
 pthread_mutex_t stream_agent_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -46,12 +47,11 @@ CommandScheduler::CommandScheduler(hipStream_t stream, int batch_size)
       process_thread_(new std::thread(&CommandScheduler::ProcessThread, this)) {}
 
 void CommandScheduler::AddKernelLaunch(
-        hipFunction_t f, hsa_kernel_dispatch_packet_t *aql, void** extra) {
+        hsa_kernel_dispatch_packet_t *aql, void** extra) {
     {
         std::lock_guard<std::mutex> lk2(mu2_);
         std::lock_guard<std::mutex> lk1(mu1_);
         KernelLaunchParam param;
-        param.f = f;
         param.aql = *aql;
 
         size_t kern_arg_size = *(size_t*)(extra[3]);
@@ -200,10 +200,14 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
    assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
    assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
    assert(extra[4] == HIP_LAUNCH_PARAM_END);
+   assert(extra_size < FIXED_EXTRA_SIZE);
 
-   hsa_kernel_dispatch_packet_t aql;
+   hsa_kernel_dispatch_packet_t aql = {0};
+   uint8_t fixed_size_extra[FIXED_EXTRA_SIZE] = {0};
 
-   memset(&aql, 0, sizeof(aql));
+   memcpy(fixed_size_extra, extra[1], extra_size);
+   extra_size = FIXED_EXTRA_SIZE;
+
    const struct nw_kern_info *kern_info = get_kernel_info(f);
 
    aql.workgroup_size_x = localWorkSizeX;
@@ -225,12 +229,14 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
 
    if (command_scheduler_enabled()
        && startEvent == NULL && stopEvent == NULL && kernelParams == NULL) {
-       CommandScheduler::GetForStream(hStream)->AddKernelLaunch(
-           f, &aql, extra);
+       void *new_extra[5] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, fixed_size_extra,
+                             HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size,
+                             HIP_LAUNCH_PARAM_END};
+       CommandScheduler::GetForStream(hStream)->AddKernelLaunch(&aql, new_extra);
         return hipSuccess;
    } else {
        return __do_c_hipHccModuleLaunchKernel(&aql, hStream, kernelParams,
-           (char *)(extra[1]), extra_size, startEvent, stopEvent);
+           (char *)(fixed_size_extra), FIXED_EXTRA_SIZE, startEvent, stopEvent);
    }
 }
 
