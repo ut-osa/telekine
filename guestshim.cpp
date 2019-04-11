@@ -46,21 +46,13 @@ CommandScheduler::CommandScheduler(hipStream_t stream, int batch_size)
       process_thread_(new std::thread(&CommandScheduler::ProcessThread, this)) {}
 
 void CommandScheduler::AddKernelLaunch(
-        hipFunction_t f, uint32_t globalWorkSizeX, uint32_t globalWorkSizeY,
-        uint32_t globalWorkSizeZ, uint32_t localWorkSizeX, uint32_t localWorkSizeY,
-        uint32_t localWorkSizeZ, size_t sharedMemBytes, void** extra) {
+        hipFunction_t f, hsa_kernel_dispatch_packet_t *aql, void** extra) {
     {
         std::lock_guard<std::mutex> lk2(mu2_);
         std::lock_guard<std::mutex> lk1(mu1_);
         KernelLaunchParam param;
         param.f = f;
-        param.globalWorkSizeX = globalWorkSizeX;
-        param.globalWorkSizeY = globalWorkSizeY;
-        param.globalWorkSizeZ = globalWorkSizeZ;
-        param.localWorkSizeX = localWorkSizeX;
-        param.localWorkSizeY = localWorkSizeY;
-        param.localWorkSizeZ = localWorkSizeZ;
-        param.sharedMemBytes = sharedMemBytes;
+        param.aql = *aql;
 
         size_t kern_arg_size = *(size_t*)(extra[3]);
         void* kern_arg = extra[1];
@@ -111,26 +103,12 @@ void CommandScheduler::ProcessThread() {
 
         // fprintf(stderr, "Sending batch of %d\n", (int)params.size());
 
-        std::vector<hipFunction_t> f;
-        std::vector<uint32_t> globalWorkSizeX;
-        std::vector<uint32_t> globalWorkSizeY;
-        std::vector<uint32_t> globalWorkSizeZ;
-        std::vector<uint32_t> localWorkSizeX;
-        std::vector<uint32_t> localWorkSizeY;
-        std::vector<uint32_t> localWorkSizeZ;
-        std::vector<size_t> sharedMemBytes;
+        std::vector<hsa_kernel_dispatch_packet_t> aql;
         std::vector<size_t> extra_size;
 
         size_t total_extra_size = 0;
         for (int i = 0; i < params.size(); i++) {
-            f.push_back(params[i].f);
-            globalWorkSizeX.push_back(params[i].globalWorkSizeX);
-            globalWorkSizeY.push_back(params[i].globalWorkSizeY);
-            globalWorkSizeZ.push_back(params[i].globalWorkSizeZ);
-            localWorkSizeX.push_back(params[i].localWorkSizeX);
-            localWorkSizeY.push_back(params[i].localWorkSizeY);
-            localWorkSizeZ.push_back(params[i].localWorkSizeZ);
-            sharedMemBytes.push_back(params[i].sharedMemBytes);
+            aql.emplace_back(params[i].aql);
             extra_size.push_back(params[i].kernArgSize);
             total_extra_size += params[i].kernArgSize;
         }
@@ -143,10 +121,8 @@ void CommandScheduler::ProcessThread() {
         }
 
         __do_c_hipHccModuleLaunchMultiKernel(
-            params.size(), f.data(),
-            globalWorkSizeX.data(), globalWorkSizeY.data(), globalWorkSizeZ.data(),
-            localWorkSizeX.data(), localWorkSizeY.data(), localWorkSizeZ.data(),
-            sharedMemBytes.data(), stream_,
+            params.size(),
+            aql.data(), stream_,
             all_extra, total_extra_size, extra_size.data());
 
         free(all_extra);
@@ -191,6 +167,27 @@ int command_scheduler_enabled() {
     }
 }
 
+const struct nw_kern_info *get_kernel_info(hipFunction_t f)
+{
+   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+   static unordered_map<hipFunction_t, struct nw_kern_info> cache;
+   const struct nw_kern_info *ret;
+
+   pthread_mutex_lock(&lock);
+   auto it0 = cache.find(f);
+   if (it0 == cache.end()) {
+      struct nw_kern_info *info = &cache[f];
+      if (nw_lookup_kern_info(f, info) != hipSuccess)
+         assert(0 && "failed to do lookup\n");
+      ret = info;
+   } else {
+      ret = &it0->second;
+   }
+   pthread_mutex_unlock(&lock);
+
+   return ret;
+}
+
 hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                     uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
                                     uint32_t localWorkSizeX, uint32_t localWorkSizeY,
@@ -204,18 +201,35 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
    assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
    assert(extra[4] == HIP_LAUNCH_PARAM_END);
 
+   hsa_kernel_dispatch_packet_t aql;
+
+   memset(&aql, 0, sizeof(aql));
+   const struct nw_kern_info *kern_info = get_kernel_info(f);
+
+   aql.workgroup_size_x = localWorkSizeX;
+   aql.workgroup_size_y = localWorkSizeY;
+   aql.workgroup_size_z = localWorkSizeZ;
+   aql.grid_size_x = globalWorkSizeX;
+   aql.grid_size_y = globalWorkSizeY;
+   aql.grid_size_z = globalWorkSizeZ;
+   aql.group_segment_size = sharedMemBytes + kern_info->workgroup_group_segment_byte_size;
+   aql.private_segment_size = kern_info->workitem_private_segment_byte_size;
+   aql.kernel_object = kern_info->_object;
+   aql.setup = 3 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
+   aql.header =
+       (HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE);
+   aql.header |= (1 << HSA_PACKET_HEADER_BARRIER);
+
+   aql.header |= (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
+                 (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
+
    if (command_scheduler_enabled()
        && startEvent == NULL && stopEvent == NULL && kernelParams == NULL) {
        CommandScheduler::GetForStream(hStream)->AddKernelLaunch(
-           f, globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ,
-           localWorkSizeX, localWorkSizeY, localWorkSizeZ,
-           sharedMemBytes, extra);
+           f, &aql, extra);
         return hipSuccess;
    } else {
-       return __do_c_hipHccModuleLaunchKernel(
-           f, globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ,
-           localWorkSizeX, localWorkSizeY, localWorkSizeZ,
-           sharedMemBytes, hStream, kernelParams,
+       return __do_c_hipHccModuleLaunchKernel(&aql, hStream, kernelParams,
            (char *)(extra[1]), extra_size, startEvent, stopEvent);
    }
 }

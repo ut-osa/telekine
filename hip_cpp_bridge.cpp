@@ -270,10 +270,7 @@ __do_c_get_kerenel_symbols(
 }
 
 extern "C" hipError_t
-__do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
-                      uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
-                      uint32_t localWorkSizeX, uint32_t localWorkSizeY,
-                      uint32_t localWorkSizeZ, size_t sharedMemBytes,
+__do_c_hipHccModuleLaunchKernel(hsa_kernel_dispatch_packet_t *aql,
                       hipStream_t stream, void** kernelParams, char* _extra,
                       size_t extra_size, hipEvent_t start, hipEvent_t stop)
 {
@@ -281,50 +278,13 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
    /*
      Kernel argument preparation.
    */
-   grid_launch_parm lp;
-   lp.dynamic_group_mem_bytes =
-       sharedMemBytes;  // TODO - this should be part of preLaunchKernel.
-   stream = ihipPreLaunchKernel(
-       stream, dim3(globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ),
-       dim3(localWorkSizeX, localWorkSizeY, localWorkSizeZ), &lp, f->_name.c_str());
-
-
-   hsa_kernel_dispatch_packet_t aql;
-
-   memset(&aql, 0, sizeof(aql));
-
-   // aql.completion_signal._handle = 0;
-   // aql.kernarg_address = 0;
-
-   aql.workgroup_size_x = localWorkSizeX;
-   aql.workgroup_size_y = localWorkSizeY;
-   aql.workgroup_size_z = localWorkSizeZ;
-   aql.grid_size_x = globalWorkSizeX;
-   aql.grid_size_y = globalWorkSizeY;
-   aql.grid_size_z = globalWorkSizeZ;
-   aql.group_segment_size = f->_header->workgroup_group_segment_byte_size + sharedMemBytes;
-   aql.private_segment_size = f->_header->workitem_private_segment_byte_size;
-   aql.kernel_object = f->_object;
-   aql.setup = 3 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
-   aql.header =
-       (HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE);
-   aql.header |= (1 << HSA_PACKET_HEADER_BARRIER);
-
-   if (HCC_OPT_FLUSH) {
-       aql.header |= (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
-                     (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
-   } else {
-       aql.header |= (HSA_FENCE_SCOPE_SYSTEM << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
-                     (HSA_FENCE_SCOPE_SYSTEM << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
-   };
-
+   stream = ihipSyncAndResolveStream(stream);
 
    hc::completion_future cf;
+   auto av = &stream->lockopen_preKernelCommand()->_av;
 
-   lp.av->dispatch_hsa_kernel(&aql, _extra, extra_size,
-                              (start || stop) ? &cf : nullptr,
-                              f->_name.c_str()
-   );
+   av->dispatch_hsa_kernel(aql, _extra, extra_size,
+                           (start || stop) ? &cf : nullptr, "");
 
    if (start) {
        start->attachToCompletionFuture(&cf, stream, hipEventTypeStartCommand);
@@ -333,18 +293,14 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
        stop->attachToCompletionFuture(&cf, stream, hipEventTypeStopCommand);
    }
 
-
-   ihipPostLaunchKernel(f->_name.c_str(), stream, lp);
+   stream->lockclose_postKernelCommand("", av);
 
    return hipSuccess;
 }
 
 extern "C" hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(
-      int numKernels, hipFunction_t* f,
-      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
-      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
-      size_t* sharedMemBytes, hipStream_t stream,
+      int numKernels, hsa_kernel_dispatch_packet_t *aql, hipStream_t stream,
       char* all_extra, size_t total_extra_size, size_t* extra_size) {
    // if (numKernels == 1) {
    //    fprintf(stderr, "Launching a batch of size 1\n");
@@ -355,10 +311,8 @@ __do_c_hipHccModuleLaunchMultiKernel(
          HIP_LAUNCH_PARAM_BUFFER_POINTER, extra,
          HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size[i],
          HIP_LAUNCH_PARAM_END};
-      hipError_t status = hipHccModuleLaunchKernel(
-         f[i], globalWorkSizeX[i], globalWorkSizeY[i], globalWorkSizeZ[i],
-         localWorkSizeX[i], localWorkSizeY[i], localWorkSizeZ[i], sharedMemBytes[i],
-         stream, nullptr, new_extra, nullptr, nullptr);
+      hipError_t status = __do_c_hipHccModuleLaunchKernel(
+         aql+i, stream, nullptr, extra, extra_size[i], nullptr, nullptr);
       if (status != hipSuccess) {
          return status;
       }
@@ -366,39 +320,6 @@ __do_c_hipHccModuleLaunchMultiKernel(
    }
    return hipSuccess;
 }
-
-extern "C" hipError_t
-__do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
-                      unsigned int gridDimY, unsigned int gridDimZ,
-                      unsigned int blockDimX, unsigned int blockDimY,
-                      unsigned int blockDimZ, unsigned int sharedMemBytes,
-                      hipStream_t stream, void** kernelParams, char *_extra,
-                      size_t extra_size)
-{
-   void* new_extra[5] = {
-      HIP_LAUNCH_PARAM_BUFFER_POINTER, _extra,
-      HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size,
-      HIP_LAUNCH_PARAM_END};
-
-   assert(kernelParams == nullptr);
-
-   return hipModuleLaunchKernel(*f, gridDimX,
-                                gridDimY, gridDimZ, blockDimX,
-                                blockDimY, blockDimZ, sharedMemBytes, stream,
-                                kernelParams, new_extra);
-}
-
-// hipError_t
-// __do_c_hipHccModuleLaunchMultiKernel(
-//       int numKernels, hipFunction_t* f,
-//       uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
-//       uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
-//       size_t* sharedMemBytes, hipStream_t stream,
-//       char* all_extra, size_t total_extra_size, size_t* extra_size)
-// {
-//    assert(0 && "TODO");
-//    return hipSuccess;
-// }
 
 extern "C"
 hsa_status_t HSA_API nw_hsa_executable_create_alt(
@@ -448,4 +369,13 @@ hsa_status_t HSA_API nw_hsa_isa_from_name(
     hsa_isa_t *isa)
 {
    return hsa_isa_from_name(name, isa);
+}
+
+hipError_t
+nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info *info)
+{
+   info->_object = f->_object;
+   info->workgroup_group_segment_byte_size = f->_header->workgroup_group_segment_byte_size;
+   info->workitem_private_segment_byte_size = f->_header->workitem_private_segment_byte_size;
+   return hipSuccess;
 }

@@ -15,9 +15,7 @@ public:
     CommandScheduler(hipStream_t stream, int batch_size);
 
     void AddKernelLaunch(
-        hipFunction_t f, uint32_t globalWorkSizeX, uint32_t globalWorkSizeY,
-        uint32_t globalWorkSizeZ, uint32_t localWorkSizeX, uint32_t localWorkSizeY,
-        uint32_t localWorkSizeZ, size_t sharedMemBytes, void** extra);
+        hipFunction_t f, hsa_kernel_dispatch_packet_t *aql, void** extra);
 
     void AddMemcpy(
         void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind);
@@ -31,13 +29,11 @@ private:
 
     struct KernelLaunchParam {
         hipFunction_t f;
-        uint32_t globalWorkSizeX, globalWorkSizeY, globalWorkSizeZ;
-        uint32_t localWorkSizeX, localWorkSizeY, localWorkSizeZ;
-        size_t sharedMemBytes;
+        hsa_kernel_dispatch_packet_t aql;
         size_t kernArgSize;
         void* kernArg;
     };
-    
+
     std::deque<KernelLaunchParam> pending_kernel_launches_;
     std::atomic<bool> waiting_;
     std::mutex mu1_;

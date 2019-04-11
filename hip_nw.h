@@ -46,7 +46,8 @@ enum hip_functions {
         RET_HIP___DO_C_LOAD_EXECUTABLE, CALL_HIP___DO_C_GET_AGENTS, RET_HIP___DO_C_GET_AGENTS, CALL_HIP___DO_C_GET_ISAS,
         RET_HIP___DO_C_GET_ISAS, CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS,
         CALL_HIP___DO_C_QUERY_HOST_ADDRESS, RET_HIP___DO_C_QUERY_HOST_ADDRESS, CALL_HIP___DO_C_GET_KERNEL_DESCRIPTOR,
-        RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR, CALL_HIP_NW_HIP_CTX_GET_DEVICE, RET_HIP_NW_HIP_CTX_GET_DEVICE
+        RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR, CALL_HIP_NW_HIP_CTX_GET_DEVICE, RET_HIP_NW_HIP_CTX_GET_DEVICE,
+        CALL_HIP_NW_LOOKUP_KERN_INFO, RET_HIP_NW_LOOKUP_KERN_INFO
 };
 
 #include "hip_nw_utility_types.h"
@@ -534,14 +535,7 @@ struct hip___do_c_hip_get_device_properties_call_record {
 struct hip___do_c_hip_hcc_module_launch_kernel_call {
     struct command_base base;
     intptr_t __call_id;
-    hipFunction_t f;
-    uint32_t globalWorkSizeX;
-    uint32_t globalWorkSizeY;
-    uint32_t globalWorkSizeZ;
-    uint32_t localWorkSizeX;
-    uint32_t localWorkSizeY;
-    uint32_t localWorkSizeZ;
-    size_t sharedMemBytes;
+    hsa_kernel_dispatch_packet_t *aql;
     hipStream_t stream;
     void **kernelParams;
     size_t extra_size;
@@ -558,14 +552,7 @@ struct hip___do_c_hip_hcc_module_launch_kernel_ret {
 };
 
 struct hip___do_c_hip_hcc_module_launch_kernel_call_record {
-    hipFunction_t f;
-    uint32_t globalWorkSizeX;
-    uint32_t globalWorkSizeY;
-    uint32_t globalWorkSizeZ;
-    uint32_t localWorkSizeX;
-    uint32_t localWorkSizeY;
-    uint32_t localWorkSizeZ;
-    size_t sharedMemBytes;
+    hsa_kernel_dispatch_packet_t *aql;
     hipStream_t stream;
     void **kernelParams;
     size_t extra_size;
@@ -581,16 +568,9 @@ struct hip___do_c_hip_hcc_module_launch_multi_kernel_call {
     struct command_base base;
     intptr_t __call_id;
     int numKernels;
-    size_t *sharedMemBytes;
-    uint32_t *localWorkSizeY;
     size_t *extra_size;
-    uint32_t *localWorkSizeZ;
-    uint32_t *localWorkSizeX;
-    uint32_t *globalWorkSizeX;
+    hsa_kernel_dispatch_packet_t *aql;
     hipStream_t stream;
-    uint32_t *globalWorkSizeZ;
-    uint32_t *globalWorkSizeY;
-    hipFunction_t *f;
     size_t total_extra_size;
     char *all_extra;
 };
@@ -604,16 +584,9 @@ struct hip___do_c_hip_hcc_module_launch_multi_kernel_ret {
 
 struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record {
     int numKernels;
-    size_t *sharedMemBytes;
-    uint32_t *localWorkSizeY;
     size_t *extra_size;
-    uint32_t *localWorkSizeZ;
-    uint32_t *localWorkSizeX;
-    uint32_t *globalWorkSizeX;
+    hsa_kernel_dispatch_packet_t *aql;
     hipStream_t stream;
-    uint32_t *globalWorkSizeZ;
-    uint32_t *globalWorkSizeY;
-    hipFunction_t *f;
     size_t total_extra_size;
     char *all_extra;
     hipError_t ret;
@@ -1227,6 +1200,28 @@ struct hip_nw_hip_ctx_get_device_ret {
 
 struct hip_nw_hip_ctx_get_device_call_record {
     hipDevice_t *device;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_nw_lookup_kern_info_call {
+    struct command_base base;
+    intptr_t __call_id;
+    hipFunction_t f;
+    struct nw_kern_info *info;
+};
+
+struct hip_nw_lookup_kern_info_ret {
+    struct command_base base;
+    intptr_t __call_id;
+    struct nw_kern_info *info;
+    hipError_t ret;
+};
+
+struct hip_nw_lookup_kern_info_call_record {
+    hipFunction_t f;
+    struct nw_kern_info *info;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;

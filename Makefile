@@ -17,7 +17,7 @@ GEN_CFLAGS += -g -fmax-errors=10 `pkg-config --cflags glib-2.0` -pthread \
 	-lrt -ldl -D_GNU_SOURCE -Wall -Wno-unused-but-set-variable \
 	-Wno-unused-variable -Wno-unused-function -Wno-discarded-qualifiers \
 	-Wno-deprecated-declarations -Wno-deprecated-declarations -Wl,-z,defs \
-	-D__HIP_PLATFORM_HCC__=1 -Wno-enum-compare
+	-D__HIP_PLATFORM_HCC__=1 -Wno-enum-compare -Wno-strict-aliasing
 
 SOURCES = MatrixTranspose.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
@@ -31,7 +31,7 @@ includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include \
 
 clangargs = -D__HIP_PLATFORM_HCC__=1
 
-CXXFLAGS = -g $(CFLAGS) -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecated-declarations \
+CXXFLAGS = -g $(CFLAGS) -O3 -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
@@ -53,10 +53,10 @@ GUESTLIB_SOURCES = hip_nw_guestlib.c $(addprefix nw/guestlib/src/,init.c) \
 													   cmd_channel_socket.c)
 
 worker: $(GENERAL_SOURCES) $(WORKER_SOURCES) hip_cpp_bridge.o
-	$(CC) -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -o $@
+	$(CC) -O3 -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -o $@
 
 libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
-	$(CC) -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -o $@
+	$(CC) -O3 -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -o $@
 
 
 $(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so

@@ -201,7 +201,7 @@ connect_exit:
 
 int send_socket(int sockfd, void *buf, size_t size)
 {
-    ssize_t ret;
+    ssize_t ret = -1;
     while (size > 0) {
         //if ((ret = send(sockfd, buf, size, MSG_DONTWAIT)) <= 0) {
         if ((ret = send(sockfd, buf, size, 0)) <= 0) {
@@ -217,7 +217,7 @@ int send_socket(int sockfd, void *buf, size_t size)
 
 int recv_socket(int sockfd, void *buf, size_t size)
 {
-    ssize_t ret;
+    ssize_t ret = -1;
     while (size > 0) {
         if ((ret = recv(sockfd, buf, size, 0)) <= 0) {
             perror("ERROR receiving from socket");

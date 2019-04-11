@@ -229,15 +229,12 @@ ava_utility size_t hipLaunchKernel_extra_size(void **extra) {
 }
 
 hipError_t
-__do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
-                      uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
-                      uint32_t localWorkSizeX, uint32_t localWorkSizeY,
-                      uint32_t localWorkSizeZ, size_t sharedMemBytes,
+__do_c_hipHccModuleLaunchKernel(hsa_kernel_dispatch_packet_t *aql,
                       hipStream_t stream, void** kernelParams, char* extra,
                       size_t extra_size, hipEvent_t start, hipEvent_t stop)
 {
-   ava_argument(f) {
-         ava_opaque;
+   ava_argument(aql) {
+      ava_in; ava_buffer(1);
    }
     ava_argument(kernelParams) {
         ava_in; ava_buffer(1);
@@ -260,37 +257,11 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
 }
 
 hipError_t
-__do_c_hipHccModuleLaunchMultiKernel(
-      int numKernels, hipFunction_t* f,
-      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
-      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
-      size_t* sharedMemBytes, hipStream_t stream,
-      char* all_extra, size_t total_extra_size, size_t* extra_size) {
-   ava_argument(f) {
-      ava_in; ava_buffer(numKernels);
-      ava_element {
-         ava_opaque;
-      }
-   }
-   ava_argument(globalWorkSizeX) {
-      ava_in; ava_buffer(numKernels);
-   }
-   ava_argument(globalWorkSizeY) {
-      ava_in; ava_buffer(numKernels);
-   }
-   ava_argument(globalWorkSizeZ) {
-      ava_in; ava_buffer(numKernels);
-   }
-   ava_argument(localWorkSizeX) {
-      ava_in; ava_buffer(numKernels);
-   }
-   ava_argument(localWorkSizeY) {
-      ava_in; ava_buffer(numKernels);
-   }
-   ava_argument(localWorkSizeZ) {
-      ava_in; ava_buffer(numKernels);
-   }
-   ava_argument(sharedMemBytes) {
+__do_c_hipHccModuleLaunchMultiKernel(int numKernels,
+                     hsa_kernel_dispatch_packet_t *aql, hipStream_t stream,
+                     char* all_extra, size_t total_extra_size,
+                     size_t* extra_size) {
+   ava_argument(aql) {
       ava_in; ava_buffer(numKernels);
    }
    ava_argument(stream) {
@@ -618,6 +589,17 @@ hipError_t
 nw_hipCtxGetDevice(hipDevice_t* device)
 {
    ava_argument(device) {
+      ava_out; ava_buffer(1);
+   }
+}
+
+hipError_t
+nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info *info)
+{
+   ava_argument(f) {
+      ava_opaque;
+   }
+   ava_argument(info) {
       ava_out; ava_buffer(1);
    }
 }
