@@ -116,6 +116,7 @@ int main(int argc, char *argv[])
       printf("info: copy-out %8.4f MB/Sec\n", MBpSec(Nbytes, ms));
       int device_count;
       CHECK(hipGetDeviceCount(&device_count));
+#if 0
       if (device_count > 1) {
         uint8_t *B_d;
         hipEvent_t e5, e6;
@@ -141,6 +142,7 @@ int main(int argc, char *argv[])
         }
         delete[] B_h;
       }
+#endif
       delete[] A_h;
       delete[] C_h;
       CHECK(hipFree(A_d));
