@@ -107,7 +107,9 @@ void CommandScheduler::ProcessThread() {
                     return pending_commands_.size() > batch_size_ * 0.5;
                 });
             } else {
+                lk1.unlock();
                 quantum_waiter_->WaitNextQuantum();
+                lk1.lock();
             }
             if (pending_commands_.size() == 0) continue;
             if (pending_commands_[0].kind == MEMCPY) {
@@ -168,13 +170,13 @@ CommandScheduler* CommandScheduler::GetForStream(hipStream_t stream) {
         if (s != NULL) {
             batch_size = atoi(s);
         }
-        fprintf(stderr, "Create new CommandScheduler with stream = %p, batch_size = %d\n",
-                (void*)stream, batch_size);
         int fixed_rate_interval_us = -1;
         s = getenv("HIP_COMMAND_SCHEDULER_FR_INTERVAL_US");
         if (s != NULL) {
             fixed_rate_interval_us = atoi(s);
         }
+        fprintf(stderr, "Create new CommandScheduler with stream = %p, batch_size = %d, interval = %d\n",
+                (void*)stream, batch_size, fixed_rate_interval_us);
         CommandScheduler* command_scheduler = new CommandScheduler(
             stream, batch_size, fixed_rate_interval_us);
         command_scheduler_map_[stream] = command_scheduler;
