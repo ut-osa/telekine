@@ -49,11 +49,11 @@ inline constexpr bool operator==(hsa_agent_t x, hsa_agent_t y) { return x.handle
 
 namespace hip_impl {
 class Kernel_descriptor {
+public:
     std::uint64_t kernel_object_{};
     amd_kernel_code_t const* kernel_header_{nullptr};
     std::string name_{};
     amd_kernel_code_t kernel_header_buffer;
-public:
     Kernel_descriptor() = default;
     Kernel_descriptor(std::uint64_t kernel_object, const std::string& name);
     Kernel_descriptor(const Kernel_descriptor&) = default;
