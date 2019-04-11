@@ -13,18 +13,20 @@
 
 #include "quantum_waiter.h"
 
+#define DEFAULT_BATCH_SIZE 64
+#define DEFAULT_FIXED_RATE_INTERVAL_US -1
+
 class CommandScheduler {
 public:
     CommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
 
     void AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** extra);
 
-    void AddMemcpy(
-        void* dst, const void* src, size_t size, hipMemcpyKind kind);
+    void AddMemcpy(void* dst, const void* src, size_t size, hipMemcpyKind kind);
 
     void Wait();
 
-    static CommandScheduler* GetForStream(hipStream_t stream);
+    static std::shared_ptr<CommandScheduler> GetForStream(hipStream_t stream);
 
 private:
     void ProcessThread();
@@ -54,16 +56,15 @@ private:
     };
 
     std::deque<CommandEntry> pending_commands_;
-    std::atomic<bool> waiting_;
-    std::mutex mu1_;
-    std::mutex mu2_;
-    std::condition_variable cv_;
+    std::mutex pending_commands_mutex_;
+    std::condition_variable pending_commands_cv_;
+    std::mutex wait_mutex_;
     int batch_size_;
     hipStream_t stream_;
-    std::unique_ptr<std::thread> process_thread_;
     std::unique_ptr<QuantumWaiter> quantum_waiter_;
+    std::unique_ptr<std::thread> process_thread_;
 
-    static std::map<hipStream_t, CommandScheduler*> command_scheduler_map_;
+    static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
     static std::mutex command_scheduler_map_mu_;
 };
 

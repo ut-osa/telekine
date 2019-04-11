@@ -44,18 +44,14 @@ thread_local hipDevice_t current_ctx_device = -1;
 
 CommandScheduler::CommandScheduler(hipStream_t stream, int batch_size,
                                    int fixed_rate_interval_us)
-    : waiting_(false), batch_size_(batch_size), stream_(stream),
-      process_thread_(new std::thread(&CommandScheduler::ProcessThread, this)) {
-    if (fixed_rate_interval_us != -1) {
-        quantum_waiter_.reset(new QuantumWaiter(fixed_rate_interval_us));
-    }
-}
+    : batch_size_(batch_size), stream_(stream),
+      quantum_waiter_((fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
+              std::unique_ptr<QuantumWaiter>(new QuantumWaiter(fixed_rate_interval_us))),
+      process_thread_(new std::thread(&CommandScheduler::ProcessThread, this)) {}
 
-void CommandScheduler::AddKernelLaunch(
-        hsa_kernel_dispatch_packet_t *aql, void** extra) {
+void CommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** extra) {
     {
-        std::lock_guard<std::mutex> lk2(mu2_);
-        std::lock_guard<std::mutex> lk1(mu1_);
+        std::lock_guard<std::mutex> lk2(wait_mutex_);
         CommandEntry command;
         command.kind = KERNEL_LAUNCH;
         command.kernel_launch_param.aql = *aql;
@@ -64,46 +60,46 @@ void CommandScheduler::AddKernelLaunch(
         command.kernel_launch_param.kernArgSize = kern_arg_size;
         command.kernel_launch_param.kernArg = malloc(kern_arg_size);
         memcpy(command.kernel_launch_param.kernArg, kern_arg, kern_arg_size);
+        std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
         pending_commands_.push_back(command);
     }
-    cv_.notify_all();
+    pending_commands_cv_.notify_all();
 }
 
-void CommandScheduler::AddMemcpy(
-        void* dst, const void* src, size_t size, hipMemcpyKind kind) {
+void CommandScheduler::AddMemcpy(void* dst, const void* src, size_t size, hipMemcpyKind kind) {
     {
-        std::lock_guard<std::mutex> lk2(mu2_);
-        std::lock_guard<std::mutex> lk1(mu1_);
+        std::lock_guard<std::mutex> lk2(wait_mutex_);
         CommandEntry command;
         command.kind = MEMCPY;
         command.memcpy_param.dst = dst;
         command.memcpy_param.src = src;
         command.memcpy_param.kind = kind;
         command.memcpy_param.size = size;
+        std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
         pending_commands_.push_back(command);
     }
-    cv_.notify_all();
+    pending_commands_cv_.notify_all();
 }
 
 void CommandScheduler::Wait() {
-    std::lock_guard<std::mutex> lk2(mu2_);
-    waiting_.store(true);
+    std::lock_guard<std::mutex> lk2(wait_mutex_);
     {
-        std::unique_lock<std::mutex> lk1(mu1_);
-        cv_.wait(lk1, [this] () {
+        std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
+        pending_commands_cv_.wait(lk1, [this] () {
             return pending_commands_.size() == 0;
         });
     }
-    waiting_.store(false);
 }
 
 void CommandScheduler::ProcessThread() {
     while (true) {
         std::vector<KernelLaunchParam> params;
         {
-            std::unique_lock<std::mutex> lk1(mu1_);
-            if (quantum_waiter_ == nullptr) {
-                cv_.wait_for(lk1, std::chrono::milliseconds(10), [this] () {
+            std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
+            if (!quantum_waiter_) {
+                // if we're not fixed-rating the communication, wait 10 ms
+                // or until we have at least half a batch of commands, then continue
+                pending_commands_cv_.wait_for(lk1, std::chrono::milliseconds(10), [this] () {
                     return pending_commands_.size() > batch_size_ * 0.5;
                 });
             } else {
@@ -116,7 +112,7 @@ void CommandScheduler::ProcessThread() {
                 MemcpyParam param = pending_commands_[0].memcpy_param;
                 pending_commands_.pop_front();
                 nw_hipMemcpyAsync(param.dst, param.src, param.size, param.kind, stream_);
-                cv_.notify_all();
+                pending_commands_cv_.notify_all();
                 continue;
             }
             for (int i = 0; i < batch_size_; i++) {
@@ -151,40 +147,34 @@ void CommandScheduler::ProcessThread() {
         free(all_extra);
 
         {
-            std::lock_guard<std::mutex> lk1(mu1_);
+            std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
             for (int i = 0; i < params.size(); i++) {
                 pending_commands_.pop_front();
             }
         }
-        cv_.notify_all();
+        pending_commands_cv_.notify_all();
     }
 }
 
-CommandScheduler* CommandScheduler::GetForStream(hipStream_t stream) {
+std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t stream) {
     std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
-    if (command_scheduler_map_.count(stream) > 0) {
-        return command_scheduler_map_.at(stream);
-    } else {
-        int batch_size = 64;
+    if (!command_scheduler_map_.count(stream)) {
+        int batch_size = DEFAULT_BATCH_SIZE;
         char* s = getenv("HIP_COMMAND_SCHEDULER_BATCH_SIZE");
-        if (s != NULL) {
-            batch_size = atoi(s);
-        }
-        int fixed_rate_interval_us = -1;
+        if (s) batch_size = atoi(s);
+        int fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
         s = getenv("HIP_COMMAND_SCHEDULER_FR_INTERVAL_US");
-        if (s != NULL) {
-            fixed_rate_interval_us = atoi(s);
-        }
-        fprintf(stderr, "Create new CommandScheduler with stream = %p, batch_size = %d, interval = %d\n",
+        if (s) fixed_rate_interval_us = atoi(s);
+        fprintf(stderr, "Create new CommandScheduler with stream = %p, "
+                "batch_size = %d, interval = %d\n",
                 (void*)stream, batch_size, fixed_rate_interval_us);
-        CommandScheduler* command_scheduler = new CommandScheduler(
-            stream, batch_size, fixed_rate_interval_us);
-        command_scheduler_map_[stream] = command_scheduler;
-        return command_scheduler;
+        command_scheduler_map_.emplace(stream,
+                std::make_shared<CommandScheduler>(stream, batch_size, fixed_rate_interval_us));
     }
+    return command_scheduler_map_.at(stream);
 }
 
-std::map<hipStream_t, CommandScheduler*> CommandScheduler::command_scheduler_map_{};
+std::map<hipStream_t, std::shared_ptr<CommandScheduler>> CommandScheduler::command_scheduler_map_{};
 std::mutex CommandScheduler::command_scheduler_map_mu_{};
 
 int command_scheduler_enabled() {
