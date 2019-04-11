@@ -226,14 +226,14 @@ hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
 {
     // fprintf(stderr, "hipMemcpyAsync with kind = %d, size = %zu\n", (int)kind, sizeBytes);
    if (command_scheduler_enabled()) CommandScheduler::GetForStream(stream)->Wait();
-   return lgmMemcpyAsync(dst, src, sizeBytes, kind, stream);
+   return lgm_memcpy(dst, src, sizeBytes, kind, stream);
 }
 
 extern "C" hipError_t
 hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
 {
    if (command_scheduler_enabled()) CommandScheduler::GetForStream(nullptr)->Wait();
-   return lgmMemcpy(dst, src, sizeBytes, kind);
+   return nw_hipMemcpy(dst, src, sizeBytes, kind);
 }
 
 extern "C" hipError_t

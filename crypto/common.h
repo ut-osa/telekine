@@ -3,11 +3,11 @@
 
 #include <hip/hip_runtime.h>
 
-#define AES_KEYLEN 32u
-#define AES_ROUNDKEYLEN 240u
-#define AES_BLOCKLEN 16u
-#define AES_MACLEN 12u
-#define AES_GCM_STEP 256u
+#define AES_KEYLEN 32
+#define AES_ROUNDKEYLEN 240
+#define AES_BLOCKLEN 16
+#define AES_MACLEN 12
+#define AES_GCM_STEP 256
 
 constexpr int kBaseThreadBits = 8;
 constexpr int kBaseThreadNum  = 1 << kBaseThreadBits;
