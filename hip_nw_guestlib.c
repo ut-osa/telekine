@@ -1071,29 +1071,8 @@ __handle_command_hip(struct command_base *__cmd)
 
         {
 
-            hipFunction_t f;
-            f = __local->f;
-
-            uint32_t globalWorkSizeX;
-            globalWorkSizeX = __local->globalWorkSizeX;
-
-            uint32_t globalWorkSizeY;
-            globalWorkSizeY = __local->globalWorkSizeY;
-
-            uint32_t globalWorkSizeZ;
-            globalWorkSizeZ = __local->globalWorkSizeZ;
-
-            uint32_t localWorkSizeX;
-            localWorkSizeX = __local->localWorkSizeX;
-
-            uint32_t localWorkSizeY;
-            localWorkSizeY = __local->localWorkSizeY;
-
-            uint32_t localWorkSizeZ;
-            localWorkSizeZ = __local->localWorkSizeZ;
-
-            size_t sharedMemBytes;
-            sharedMemBytes = __local->sharedMemBytes;
+            hsa_kernel_dispatch_packet_t *aql;
+            aql = __local->aql;
 
             hipStream_t stream;
             stream = __local->stream;
@@ -1143,35 +1122,14 @@ __handle_command_hip(struct command_base *__cmd)
             int numKernels;
             numKernels = __local->numKernels;
 
-            size_t *sharedMemBytes;
-            sharedMemBytes = __local->sharedMemBytes;
-
-            uint32_t *localWorkSizeY;
-            localWorkSizeY = __local->localWorkSizeY;
-
             size_t *extra_size;
             extra_size = __local->extra_size;
 
-            uint32_t *localWorkSizeZ;
-            localWorkSizeZ = __local->localWorkSizeZ;
-
-            uint32_t *localWorkSizeX;
-            localWorkSizeX = __local->localWorkSizeX;
-
-            uint32_t *globalWorkSizeX;
-            globalWorkSizeX = __local->globalWorkSizeX;
+            hsa_kernel_dispatch_packet_t *aql;
+            aql = __local->aql;
 
             hipStream_t stream;
             stream = __local->stream;
-
-            uint32_t *globalWorkSizeZ;
-            globalWorkSizeZ = __local->globalWorkSizeZ;
-
-            uint32_t *globalWorkSizeY;
-            globalWorkSizeY = __local->globalWorkSizeY;
-
-            hipFunction_t *f;
-            f = __local->f;
 
             size_t total_extra_size;
             total_extra_size = __local->total_extra_size;
@@ -2302,6 +2260,73 @@ __handle_command_hip(struct command_base *__cmd)
                 memcpy(__local->device,
                     ((__ret->device) != (NULL)) ? (((hipDevice_t *) command_channel_get_buffer(__chan, __cmd,
                                 __ret->device))) : (__ret->device), (1) * sizeof(hipDevice_t));
+            }
+
+            /* Output: hipError_t ret */
+            __local->ret = __ret->ret;
+
+        }
+
+        if (__local->__handler_deallocate) {
+            free(__local);
+        }
+        __local->__call_complete = 1;
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case RET_HIP_NW_LOOKUP_KERN_INFO:{
+        ava_is_in = 0;
+        ava_is_out = 1;
+        struct hip_nw_lookup_kern_info_ret *__ret = (struct hip_nw_lookup_kern_info_ret *)__cmd;
+        assert(__ret->base.api_id == HIP_API);
+        assert(__ret->base.command_size == sizeof(struct hip_nw_lookup_kern_info_ret));
+        struct hip_nw_lookup_kern_info_call_record *__local =
+            (struct hip_nw_lookup_kern_info_call_record *)ava_remove_call(__ret->__call_id);
+
+        {
+
+            hipFunction_t f;
+            f = __local->f;
+
+            struct nw_kern_info *info;
+            info = __local->info;
+
+            hipError_t ret;
+            ret = __ret->ret;
+
+            /* Output: struct nw_kern_info * info */
+            if (__local->info != NULL && __ret->info != NULL) {
+                struct nw_kern_info *__tmp_info_0;
+                __tmp_info_0 =
+                    ((__ret->info) != (NULL)) ? (((struct nw_kern_info *)command_channel_get_buffer(__chan, __cmd,
+                            __ret->info))) : (__ret->info);
+                const size_t __info_size_0 = (1);
+                const size_t __info_index_0 = 0;
+                const size_t ava_index = 0;
+
+                struct nw_kern_info *__info_a_0;
+                __info_a_0 = (__local->info) + __info_index_0;
+
+                struct nw_kern_info *__info_b_0;
+                __info_b_0 = (__tmp_info_0) + __info_index_0;
+
+                struct nw_kern_info *ava_self;
+                ava_self = &*__info_a_0;
+                uint64_t *__info_a_1__object;
+                __info_a_1__object = &(*__info_a_0)._object;
+                uint64_t *__info_b_1__object;
+                __info_b_1__object = &(*__info_b_0)._object;
+                *__info_a_1__object = *__info_b_1__object;
+                uint64_t *__info_a_1_workgroup_group_segment_byte_size;
+                __info_a_1_workgroup_group_segment_byte_size = &(*__info_a_0).workgroup_group_segment_byte_size;
+                uint64_t *__info_b_1_workgroup_group_segment_byte_size;
+                __info_b_1_workgroup_group_segment_byte_size = &(*__info_b_0).workgroup_group_segment_byte_size;
+                *__info_a_1_workgroup_group_segment_byte_size = *__info_b_1_workgroup_group_segment_byte_size;
+                uint64_t *__info_a_1_workitem_private_segment_byte_size;
+                __info_a_1_workitem_private_segment_byte_size = &(*__info_a_0).workitem_private_segment_byte_size;
+                uint64_t *__info_b_1_workitem_private_segment_byte_size;
+                __info_b_1_workitem_private_segment_byte_size = &(*__info_b_0).workitem_private_segment_byte_size;
+                *__info_a_1_workitem_private_segment_byte_size = *__info_b_1_workitem_private_segment_byte_size;
             }
 
             /* Output: hipError_t ret */
@@ -3569,10 +3594,8 @@ __do_c_hipGetDeviceProperties(char *prop, int deviceId)
 }
 
 EXPORTED hipError_t
-__do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint32_t globalWorkSizeY,
-    uint32_t globalWorkSizeZ, uint32_t localWorkSizeX, uint32_t localWorkSizeY, uint32_t localWorkSizeZ,
-    size_t sharedMemBytes, hipStream_t stream, void **kernelParams, char *extra, size_t extra_size, hipEvent_t start,
-    hipEvent_t stop)
+__do_c_hipHccModuleLaunchKernel(hsa_kernel_dispatch_packet_t * aql, hipStream_t stream, void **kernelParams,
+    char *extra, size_t extra_size, hipEvent_t start, hipEvent_t stop)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
@@ -3580,6 +3603,25 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
     GPtrArray *__ava_alloc_list___do_c_hipHccModuleLaunchKernel = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
+        /* Size: hsa_kernel_dispatch_packet_t * aql */
+        if ((aql) != (NULL)) {
+            const size_t __aql_size_0 = (1);
+            const size_t __aql_index_0 = 0;
+            const size_t ava_index = 0;
+
+            hsa_kernel_dispatch_packet_t *__aql_a_0;
+            __aql_a_0 = (aql) + __aql_index_0;
+
+            hsa_kernel_dispatch_packet_t *ava_self;
+            ava_self = &*__aql_a_0;
+            void **__aql_a_1_kernarg_address;
+            __aql_a_1_kernarg_address = &(*__aql_a_0).kernarg_address;
+            if ((*__aql_a_1_kernarg_address) != (NULL)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(void));
+            }
+            __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(hsa_kernel_dispatch_packet_t));
+        }
+
         /* Size: void ** kernelParams */
         if ((kernelParams) != (NULL)) {
             __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(void *));
@@ -3601,22 +3643,27 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
 
     {
 
-        /* Input: hipFunction_t f */
-        __cmd->f = f;
-        /* Input: uint32_t globalWorkSizeX */
-        __cmd->globalWorkSizeX = globalWorkSizeX;
-        /* Input: uint32_t globalWorkSizeY */
-        __cmd->globalWorkSizeY = globalWorkSizeY;
-        /* Input: uint32_t globalWorkSizeZ */
-        __cmd->globalWorkSizeZ = globalWorkSizeZ;
-        /* Input: uint32_t localWorkSizeX */
-        __cmd->localWorkSizeX = localWorkSizeX;
-        /* Input: uint32_t localWorkSizeY */
-        __cmd->localWorkSizeY = localWorkSizeY;
-        /* Input: uint32_t localWorkSizeZ */
-        __cmd->localWorkSizeZ = localWorkSizeZ;
-        /* Input: size_t sharedMemBytes */
-        __cmd->sharedMemBytes = sharedMemBytes;
+        /* Input: hsa_kernel_dispatch_packet_t * aql */
+        if ((aql) != (NULL)) {
+            hsa_kernel_dispatch_packet_t *__tmp_aql_0;
+            __tmp_aql_0 = (hsa_kernel_dispatch_packet_t *) calloc(1, (1) * sizeof(hsa_kernel_dispatch_packet_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchKernel, __tmp_aql_0);
+            const size_t __aql_size_0 = (1);
+            const size_t __aql_index_0 = 0;
+            const size_t ava_index = 0;
+
+            hsa_kernel_dispatch_packet_t *__aql_a_0;
+            __aql_a_0 = (aql) + __aql_index_0;
+
+            hsa_kernel_dispatch_packet_t *__aql_b_0;
+            __aql_b_0 = (__tmp_aql_0) + __aql_index_0;
+            memcpy(__aql_b_0, __aql_a_0, sizeof(hsa_kernel_dispatch_packet_t));
+            __cmd->aql =
+                (hsa_kernel_dispatch_packet_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd,
+                __tmp_aql_0, (1) * sizeof(hsa_kernel_dispatch_packet_t));
+        } else {
+            __cmd->aql = NULL;
+        }
         /* Input: hipStream_t stream */
         __cmd->stream = stream;
         /* Input: void ** kernelParams */
@@ -3647,21 +3694,7 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
         (struct hip___do_c_hip_hcc_module_launch_kernel_call_record *)calloc(1,
         sizeof(struct hip___do_c_hip_hcc_module_launch_kernel_call_record));
 
-    __call_record->f = f;
-
-    __call_record->globalWorkSizeX = globalWorkSizeX;
-
-    __call_record->globalWorkSizeY = globalWorkSizeY;
-
-    __call_record->globalWorkSizeZ = globalWorkSizeZ;
-
-    __call_record->localWorkSizeX = localWorkSizeX;
-
-    __call_record->localWorkSizeY = localWorkSizeY;
-
-    __call_record->localWorkSizeZ = localWorkSizeZ;
-
-    __call_record->sharedMemBytes = sharedMemBytes;
+    __call_record->aql = aql;
 
     __call_record->stream = stream;
 
@@ -3669,9 +3702,9 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
 
     __call_record->extra_size = extra_size;
 
-    __call_record->extra = extra;
-
     __call_record->start = start;
+
+    __call_record->extra = extra;
 
     __call_record->stop = stop;
 
@@ -3692,10 +3725,8 @@ __do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, uint3
 }
 
 EXPORTED hipError_t
-__do_c_hipHccModuleLaunchMultiKernel(int numKernels, hipFunction_t * f, uint32_t * globalWorkSizeX,
-    uint32_t * globalWorkSizeY, uint32_t * globalWorkSizeZ, uint32_t * localWorkSizeX, uint32_t * localWorkSizeY,
-    uint32_t * localWorkSizeZ, size_t * sharedMemBytes, hipStream_t stream, char *all_extra, size_t total_extra_size,
-    size_t * extra_size)
+__do_c_hipHccModuleLaunchMultiKernel(int numKernels, hsa_kernel_dispatch_packet_t * aql, hipStream_t stream,
+    char *all_extra, size_t total_extra_size, size_t * extra_size)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
@@ -3703,49 +3734,29 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hipFunction_t * f, uint32_t
     GPtrArray *__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
-        /* Size: size_t * sharedMemBytes */
-        if ((sharedMemBytes) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(size_t));
-        }
+        /* Size: hsa_kernel_dispatch_packet_t * aql */
+        if ((aql) != (NULL) && (numKernels) > (0)) {
+            const size_t __aql_size_0 = (numKernels);
+            for (size_t __aql_index_0 = 0; __aql_index_0 < __aql_size_0; __aql_index_0++) {
+                const size_t ava_index = __aql_index_0;
 
-        /* Size: uint32_t * localWorkSizeY */
-        if ((localWorkSizeY) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
+                hsa_kernel_dispatch_packet_t *__aql_a_0;
+                __aql_a_0 = (aql) + __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *ava_self;
+                ava_self = &*__aql_a_0;
+                void **__aql_a_1_kernarg_address;
+                __aql_a_1_kernarg_address = &(*__aql_a_0).kernarg_address;
+                if ((*__aql_a_1_kernarg_address) != (NULL)) {
+                    __total_buffer_size += command_channel_buffer_size(__chan, (1) * sizeof(void));
+                }
+            } __total_buffer_size +=
+                command_channel_buffer_size(__chan, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
         }
 
         /* Size: size_t * extra_size */
         if ((extra_size) != (NULL) && (numKernels) > (0)) {
             __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(size_t));
-        }
-
-        /* Size: uint32_t * localWorkSizeZ */
-        if ((localWorkSizeZ) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
-        }
-
-        /* Size: uint32_t * localWorkSizeX */
-        if ((localWorkSizeX) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
-        }
-
-        /* Size: uint32_t * globalWorkSizeX */
-        if ((globalWorkSizeX) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
-        }
-
-        /* Size: uint32_t * globalWorkSizeZ */
-        if ((globalWorkSizeZ) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
-        }
-
-        /* Size: uint32_t * globalWorkSizeY */
-        if ((globalWorkSizeY) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(uint32_t));
-        }
-
-        /* Size: hipFunction_t * f */
-        if ((f) != (NULL) && (numKernels) > (0)) {
-            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(hipFunction_t));
         }
 
         /* Size: char * all_extra */
@@ -3766,69 +3777,28 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hipFunction_t * f, uint32_t
 
         /* Input: int numKernels */
         __cmd->numKernels = numKernels;
-        /* Input: hipFunction_t * f */
-        if ((f) != (NULL) && (numKernels) > (0)) {
-            __cmd->f =
-                (hipFunction_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, f,
-                (numKernels) * sizeof(hipFunction_t));
+        /* Input: hsa_kernel_dispatch_packet_t * aql */
+        if ((aql) != (NULL) && (numKernels) > (0)) {
+            hsa_kernel_dispatch_packet_t *__tmp_aql_0;
+            __tmp_aql_0 =
+                (hsa_kernel_dispatch_packet_t *) calloc(1, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel, __tmp_aql_0);
+            const size_t __aql_size_0 = (numKernels);
+            for (size_t __aql_index_0 = 0; __aql_index_0 < __aql_size_0; __aql_index_0++) {
+                const size_t ava_index = __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_a_0;
+                __aql_a_0 = (aql) + __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_b_0;
+                __aql_b_0 = (__tmp_aql_0) + __aql_index_0;
+                memcpy(__aql_b_0, __aql_a_0, sizeof(hsa_kernel_dispatch_packet_t));
+            }
+            __cmd->aql =
+                (hsa_kernel_dispatch_packet_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd,
+                __tmp_aql_0, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
         } else {
-            __cmd->f = NULL;
-        }
-        /* Input: uint32_t * globalWorkSizeX */
-        if ((globalWorkSizeX) != (NULL) && (numKernels) > (0)) {
-            __cmd->globalWorkSizeX =
-                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, globalWorkSizeX,
-                (numKernels) * sizeof(uint32_t));
-        } else {
-            __cmd->globalWorkSizeX = NULL;
-        }
-        /* Input: uint32_t * globalWorkSizeY */
-        if ((globalWorkSizeY) != (NULL) && (numKernels) > (0)) {
-            __cmd->globalWorkSizeY =
-                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, globalWorkSizeY,
-                (numKernels) * sizeof(uint32_t));
-        } else {
-            __cmd->globalWorkSizeY = NULL;
-        }
-        /* Input: uint32_t * globalWorkSizeZ */
-        if ((globalWorkSizeZ) != (NULL) && (numKernels) > (0)) {
-            __cmd->globalWorkSizeZ =
-                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, globalWorkSizeZ,
-                (numKernels) * sizeof(uint32_t));
-        } else {
-            __cmd->globalWorkSizeZ = NULL;
-        }
-        /* Input: uint32_t * localWorkSizeX */
-        if ((localWorkSizeX) != (NULL) && (numKernels) > (0)) {
-            __cmd->localWorkSizeX =
-                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, localWorkSizeX,
-                (numKernels) * sizeof(uint32_t));
-        } else {
-            __cmd->localWorkSizeX = NULL;
-        }
-        /* Input: uint32_t * localWorkSizeY */
-        if ((localWorkSizeY) != (NULL) && (numKernels) > (0)) {
-            __cmd->localWorkSizeY =
-                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, localWorkSizeY,
-                (numKernels) * sizeof(uint32_t));
-        } else {
-            __cmd->localWorkSizeY = NULL;
-        }
-        /* Input: uint32_t * localWorkSizeZ */
-        if ((localWorkSizeZ) != (NULL) && (numKernels) > (0)) {
-            __cmd->localWorkSizeZ =
-                (uint32_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, localWorkSizeZ,
-                (numKernels) * sizeof(uint32_t));
-        } else {
-            __cmd->localWorkSizeZ = NULL;
-        }
-        /* Input: size_t * sharedMemBytes */
-        if ((sharedMemBytes) != (NULL) && (numKernels) > (0)) {
-            __cmd->sharedMemBytes =
-                (size_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, sharedMemBytes,
-                (numKernels) * sizeof(size_t));
-        } else {
-            __cmd->sharedMemBytes = NULL;
+            __cmd->aql = NULL;
         }
         /* Input: hipStream_t stream */
         __cmd->stream = stream;
@@ -3858,25 +3828,11 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hipFunction_t * f, uint32_t
 
     __call_record->numKernels = numKernels;
 
-    __call_record->sharedMemBytes = sharedMemBytes;
-
-    __call_record->localWorkSizeY = localWorkSizeY;
-
-    __call_record->extra_size = extra_size;
-
-    __call_record->localWorkSizeZ = localWorkSizeZ;
-
-    __call_record->localWorkSizeX = localWorkSizeX;
-
-    __call_record->globalWorkSizeX = globalWorkSizeX;
+    __call_record->aql = aql;
 
     __call_record->stream = stream;
 
-    __call_record->globalWorkSizeZ = globalWorkSizeZ;
-
-    __call_record->globalWorkSizeY = globalWorkSizeY;
-
-    __call_record->f = f;
+    __call_record->extra_size = extra_size;
 
     __call_record->total_extra_size = total_extra_size;
 
@@ -5615,6 +5571,60 @@ nw_hipCtxGetDevice(hipDevice_t * device)
     command_channel_send_command(__chan, (struct command_base *)__cmd);
 
     g_ptr_array_unref(__ava_alloc_list_nw_hipCtxGetDevice);     /* Deallocate all memory in the alloc list */
+
+    handle_commands_until(HIP_API, __call_record->__call_complete);
+    hipError_t ret;
+    ret = __call_record->ret;
+    free(__call_record);
+    command_channel_free_command(__chan, (struct command_base *)__cmd);
+    return ret;
+}
+
+EXPORTED hipError_t
+nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info * info)
+{
+    const int ava_is_in = 1,
+        ava_is_out = 0;
+    pthread_once(&guestlib_init, init_hip_guestlib);
+    GPtrArray *__ava_alloc_list_nw_lookup_kern_info = g_ptr_array_new_full(0, free);
+
+    size_t __total_buffer_size = 0; {
+    }
+    struct hip_nw_lookup_kern_info_call *__cmd =
+        (struct hip_nw_lookup_kern_info_call *)command_channel_new_command(__chan,
+        sizeof(struct hip_nw_lookup_kern_info_call), __total_buffer_size);
+    __cmd->base.api_id = HIP_API;
+    __cmd->base.command_id = CALL_HIP_NW_LOOKUP_KERN_INFO;
+
+    intptr_t __call_id = ava_get_call_id();
+    __cmd->__call_id = __call_id;
+
+    {
+
+        /* Input: hipFunction_t f */
+        __cmd->f = f;
+        /* Input: struct nw_kern_info * info */
+        if ((info) != (NULL)) {
+            __cmd->info = HAS_OUT_BUFFER_SENTINEL;
+        } else {
+            __cmd->info = NULL;
+        }
+    }
+
+    struct hip_nw_lookup_kern_info_call_record *__call_record =
+        (struct hip_nw_lookup_kern_info_call_record *)calloc(1, sizeof(struct hip_nw_lookup_kern_info_call_record));
+
+    __call_record->f = f;
+
+    __call_record->info = info;
+
+    __call_record->__call_complete = 0;
+    __call_record->__handler_deallocate = 0;
+    ava_add_call(__call_id, __call_record);
+
+    command_channel_send_command(__chan, (struct command_base *)__cmd);
+
+    g_ptr_array_unref(__ava_alloc_list_nw_lookup_kern_info);    /* Deallocate all memory in the alloc list */
 
     handle_commands_until(HIP_API, __call_record->__call_complete);
     hipError_t ret;

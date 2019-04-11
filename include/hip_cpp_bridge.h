@@ -10,6 +10,12 @@
 extern "C" {
 #endif
 
+struct nw_kern_info {
+   uint64_t workgroup_group_segment_byte_size;
+   uint64_t workitem_private_segment_byte_size;
+   uint64_t _object;
+};
+
 struct hipFuncAttributes;
 typedef struct hipFuncAttributes hipFuncAttributes;
 
@@ -53,10 +59,8 @@ size_t __do_c_get_kerenel_symbols(
 
 hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(
-      int numKernels, hipFunction_t* f,
-      uint32_t* globalWorkSizeX, uint32_t* globalWorkSizeY, uint32_t* globalWorkSizeZ,
-      uint32_t* localWorkSizeX, uint32_t* localWorkSizeY, uint32_t* localWorkSizeZ,
-      size_t* sharedMemBytes, hipStream_t stream,
+      int numKernels, hsa_kernel_dispatch_packet_t *aql,
+      hipStream_t stream,
       char* all_extra, size_t total_extra_size, size_t* extra_size);
 
 hipError_t
@@ -91,23 +95,15 @@ hipError_t
 nw_hipStreamDestroy(hipStream_t stream);
 
 hipError_t
-__do_c_hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
-                      uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
-                      uint32_t localWorkSizeX, uint32_t localWorkSizeY,
-                      uint32_t localWorkSizeZ, size_t sharedMemBytes,
+__do_c_hipHccModuleLaunchKernel(hsa_kernel_dispatch_packet_t *aql,
                       hipStream_t stream, void** kernelParams, char* extra,
                       size_t extra_size, hipEvent_t start, hipEvent_t stop);
 
 hipError_t
-__do_c_hipModuleLaunchKernel(hipFunction_t *f, unsigned int gridDimX,
-                      unsigned int gridDimY, unsigned int gridDimZ,
-                      unsigned int blockDimX, unsigned int blockDimY,
-                      unsigned int blockDimZ, unsigned int sharedMemBytes,
-                      hipStream_t stream, void** kernelParams, char* extra,
-                      size_t extra_size);
+__do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol, const char *name, hipFunction_t *f);
 
 hipError_t
-__do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol, const char *name, hipFunction_t *f);
+nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info *info);
 
 #ifdef __cplusplus
 }

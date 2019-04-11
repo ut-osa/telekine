@@ -271,7 +271,10 @@ struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, 
        perror("/tmp/ava_fifo");
        abort();
     }
-    write(fifo_fd, &rdy, sizeof(rdy));
+    if (write(fifo_fd, &rdy, sizeof(rdy)) != sizeof(rdy)) {
+       perror("write fifo");
+       abort();
+    }
     close(fifo_fd);
 
     chan->guestlib_fd = accept(chan->listen_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen);
