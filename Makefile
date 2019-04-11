@@ -35,7 +35,7 @@ CXXFLAGS = -g $(CFLAGS) -O3 -Wno-ignored-attributes -fPIC $(includes) -Wno-depre
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) worker libguestlib.so guestshim.so manager
+all: $(EXECUTABLE) copy worker libguestlib.so guestshim.so manager
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
@@ -59,9 +59,11 @@ libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
 	$(CC) -O3 -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -o $@
 
 
-$(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so
+$(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so libcrypto.so
 	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
 
+copy: copy.o guestshim.so libguestlib.so libcrypto.so
+	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
 
 regen: hip.nw.cpp
 	$(NW_PATH)/nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
@@ -80,6 +82,6 @@ libcrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
 	$(HIPCC) $(includes) -shared -fPIC crypto/aes_gcm.cpp -o $@ -lsodium -ldl
 
 clean:
-	rm -rf hip_nw *.o *.so manager_tcp MatrixTranspose
+	rm -rf hip_nw *.o *.so manager_tcp MatrixTranspose copy
 	$(MAKE) -C nw/worker clean
 .PHONY: clean
