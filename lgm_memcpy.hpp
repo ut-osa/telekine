@@ -1,7 +1,7 @@
 #ifndef LGM_MEMCPY_H
 #define LGM_MEMCPY_H
 
-#include "hip_cpp_bridge.h"
+#include "command_scheduler.h"
 
 #include "check_env.h"
 
@@ -24,7 +24,6 @@ static bool memcpy_encryption_enabled(void) {
   return ret;
 }
 
-#define FIXED_SIZE_B (1048576ul) // 1 MB
 // AES Encryption State //
 template <size_t TRANSFER_UNIT_SIZE>
 struct EncryptionState {
@@ -149,6 +148,7 @@ struct EncryptionState {
   }
 };
 
+#define FIXED_SIZE_B (1048576ul) // 1 MB
 // One encryption state per thread
 static thread_local std::unique_ptr<EncryptionState<FIXED_SIZE_B>> _state;
 // Constructs state on demand
@@ -272,14 +272,15 @@ static hipError_t sendReceiveAsync(void* dst, const void* src, size_t sizeBytes,
   return ret;
 }
 
-template <size_t SIZE, typename F>
-static hipError_t memcpyFixedSizeAsync(F f, void* dst, const void* src, size_t sizeBytes,
+template <size_t SIZE>
+static hipError_t fixedSizeHipMemcpyAsync(void* dst, const void* src, size_t sizeBytes,
     hipMemcpyKind kind, hipStream_t stream) {
   hipError_t ret;
   for (size_t i = 0; i < sizeBytes; i+= SIZE) {
     size_t memcpy_size = std::min(sizeBytes - i, SIZE);
-    ret = f(static_cast<void*>(static_cast<char*>(dst) + i),
-        static_cast<const void*>(static_cast<const char*>(src) + i), memcpy_size, kind, stream);
+    ret = CommandScheduler::GetForStream(nullptr)->AddMemcpyAsync(
+        static_cast<void*>(static_cast<char*>(dst) + i),
+        static_cast<const void*>(static_cast<const char*>(src) + i), memcpy_size, kind);
     if (ret != hipSuccess) break;
   }
   return ret;
@@ -305,14 +306,21 @@ void lgm_register_gpu_ptr(void *ptr) {
   ptrDevice.emplace(ptr, device); // Record map from allocation to device
 }
 
+template <size_t SIZE = FIXED_SIZE_B>
 hipError_t lgmMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
     hipStream_t stream) {
-  if (memcpy_encryption_enabled()) { // either fixed-size encrypted
-    return memcpyFixedSizeAsync<FIXED_SIZE_B>(encryptedMemcpyAsync, dst, src, sizeBytes, kind, stream);
-  } else if (memcpy_size_fixed()) { // or fixed-size
-    return memcpyFixedSizeAsync<FIXED_SIZE_B>(nw_hipMemcpyAsync, dst, src, sizeBytes, kind, stream);
-  } else { // or no fixed-size no encryption
-    return nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+  if (memcpy_size_fixed()) {  // split memcpys into fixed size batches
+    hipError_t ret;
+    for (size_t i = 0; i < sizeBytes; i+= SIZE) {
+      size_t memcpy_size = std::min(sizeBytes - i, SIZE);
+      ret = CommandScheduler::GetForStream(stream)->AddMemcpyAsync(
+          static_cast<void*>(static_cast<char*>(dst) + i),
+          static_cast<const void*>(static_cast<const char*>(src) + i), memcpy_size, kind);
+      if (ret != hipSuccess) break;
+    }
+    return ret;
+  } else {
+    return CommandScheduler::GetForStream(stream)->AddMemcpyAsync(dst, src, sizeBytes, kind);
   }
 }
 

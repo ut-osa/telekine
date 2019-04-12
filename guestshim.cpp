@@ -281,23 +281,16 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
 
 extern "C" hipError_t
 hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
-               hipStream_t stream)
-{
-    assert(false);;;
-    // TODO lgmMemcpyAsync should call this below
-    if (fixed_rate_command_scheduler_enabled()) {
-        CommandScheduler::GetForStream(stream)->AddMemcpyAsync(dst, src, sizeBytes, kind);
-        return hipSuccess;
-    } else {
-        return lgmMemcpyAsync(dst, src, sizeBytes, kind, stream);
-    }
+               hipStream_t stream) {
+    return CommandScheduler::GetForStream(stream)->AddMemcpyAsync(dst, src, sizeBytes, kind);
 }
 
 extern "C" hipError_t
 hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
 {
     CommandScheduler::GetForStream(nullptr)->Wait();
-    return lgmMemcpy(dst, src, sizeBytes, kind);
+    CommandScheduler::GetForStream(nullptr)->AddMemcpyAsync(dst, src, sizeBytes, kind);
+    return CommandScheduler::GetForStream(nullptr)->Wait();
 }
 
 extern "C" hipError_t
