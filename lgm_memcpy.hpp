@@ -317,8 +317,9 @@ hipError_t lgmMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcp
 }
 
 hipError_t lgmMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind) {
-  //HIP_CHECK(
-  lgmMemcpyAsync(dst, src, sizeBytes, kind, nullptr);//);
+  HIP_CHECK(lgmMemcpyAsync(dst, src, sizeBytes, kind, nullptr));
+  // async memcpy on the default stream
+  // then synchronize because this API is blocking from the application's perspective
   return hipStreamSynchronize(nullptr);
 }
 

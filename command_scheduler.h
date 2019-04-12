@@ -18,16 +18,28 @@
 
 class CommandScheduler {
 public:
-    CommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
-
-    void AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** extra);
-
-    void AddMemcpy(void* dst, const void* src, size_t size, hipMemcpyKind kind);
-
-    void Wait();
+    CommandScheduler(hipStream_t stream) : stream_(stream) {}
+    virtual ~CommandScheduler(void) {}
+    virtual hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** kernelParams,
+            void** extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) = 0;
+    virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) = 0;
+    virtual hipError_t Wait(void) = 0;
 
     static std::shared_ptr<CommandScheduler> GetForStream(hipStream_t stream);
+protected:
+    hipStream_t stream_;
+    static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
+    static std::mutex command_scheduler_map_mu_;
+};
 
+class BatchCommandScheduler : public CommandScheduler {
+public:
+    BatchCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
+    ~BatchCommandScheduler(void);
+    hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** kernelParams, void** extra,
+            size_t extra_size, hipEvent_t start, hipEvent_t stop);
+    hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind);
+    hipError_t Wait(void);
 private:
     void ProcessThread();
 
@@ -60,12 +72,17 @@ private:
     std::condition_variable pending_commands_cv_;
     std::mutex wait_mutex_;
     int batch_size_;
-    hipStream_t stream_;
     std::unique_ptr<QuantumWaiter> quantum_waiter_;
+    bool running;
     std::unique_ptr<std::thread> process_thread_;
-
-    static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
-    static std::mutex command_scheduler_map_mu_;
 };
 
+class BaselineCommandScheduler : public CommandScheduler {
+public:
+    BaselineCommandScheduler(hipStream_t stream) : CommandScheduler(stream) {}
+    hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** kernelParams, void** extra,
+            size_t extra_size, hipEvent_t start, hipEvent_t stop);
+    hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind);
+    hipError_t Wait(void);
+};
 #endif

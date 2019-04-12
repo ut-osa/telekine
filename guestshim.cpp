@@ -24,6 +24,7 @@
 
 #include <iostream>
 
+#include "check_env.h"
 #include "./command_scheduler.h"
 #include "lgm_memcpy.hpp"
 
@@ -42,16 +43,84 @@ thread_local int current_device = 0;
 thread_local hipCtx_t current_ctx = nullptr;
 thread_local hipDevice_t current_ctx_device = -1;
 
-CommandScheduler::CommandScheduler(hipStream_t stream, int batch_size,
-                                   int fixed_rate_interval_us)
-    : batch_size_(batch_size), stream_(stream),
-      quantum_waiter_((fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
-              std::unique_ptr<QuantumWaiter>(new QuantumWaiter(fixed_rate_interval_us))),
-      process_thread_(new std::thread(&CommandScheduler::ProcessThread, this)) {}
+static bool fixed_rate_command_scheduler_enabled() {
+    static bool ret = CHECK_ENV("HIP_ENABLE_COMMAND_SCHEDULER");
+    return ret;
+}
 
-void CommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** extra) {
+std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t stream) {
+    std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
+    if (!command_scheduler_map_.count(stream)) {
+        if (fixed_rate_command_scheduler_enabled()) {
+            int batch_size = DEFAULT_BATCH_SIZE;
+            char* s = getenv("HIP_COMMAND_SCHEDULER_BATCH_SIZE");
+            if (s) batch_size = atoi(s);
+            int fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
+            s = getenv("HIP_COMMAND_SCHEDULER_FR_INTERVAL_US");
+            if (s) fixed_rate_interval_us = atoi(s);
+            fprintf(stderr, "Create new CommandScheduler with stream = %p, "
+                    "batch_size = %d, interval = %d\n",
+                    (void*)stream, batch_size, fixed_rate_interval_us);
+            command_scheduler_map_.emplace(stream, std::make_shared<BatchCommandScheduler>(
+                    stream, batch_size, fixed_rate_interval_us));
+        } else {
+            // use BaselineCommandScheduler instead of Batch...
+            command_scheduler_map_.emplace(stream, std::make_shared<BaselineCommandScheduler>(
+                    stream));
+        }
+    }
+    return command_scheduler_map_.at(stream);
+}
+
+std::map<hipStream_t, std::shared_ptr<CommandScheduler>> CommandScheduler::command_scheduler_map_{};
+std::mutex CommandScheduler::command_scheduler_map_mu_{};
+
+
+hipError_t BaselineCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
+        void** kernelParams, void** extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) {
+    return __do_c_hipHccModuleLaunchKernel(aql, this->stream_, kernelParams, (char*) (extra[1]),
+            extra_size, start, stop);
+}
+
+hipError_t BaselineCommandScheduler::AddMemcpyAsync(void* dst, const void* src, size_t size,
+        hipMemcpyKind kind) {
+    return nw_hipMemcpyAsync(dst, src, size, kind, this->stream_);
+};
+
+hipError_t BaselineCommandScheduler::Wait(void) {
+    return nw_hipStreamSynchronize(this->stream_);
+}
+
+BatchCommandScheduler::BatchCommandScheduler(hipStream_t stream, int batch_size,
+        int fixed_rate_interval_us) : CommandScheduler(stream), batch_size_(batch_size),
+    quantum_waiter_((fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
+    std::unique_ptr<QuantumWaiter>(new QuantumWaiter(fixed_rate_interval_us))),
+    running(true),
+    process_thread_(new std::thread(&BatchCommandScheduler::ProcessThread, this)) {
+}
+
+BatchCommandScheduler::~BatchCommandScheduler(void) {
+    running = false;
+    process_thread_->join();
+}
+
+hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
+        void** kernelParams, void** extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) {
+    // the following should be null to work with the fixed rate command scheduler
+    assert(!start && !stop && !kernelParams);
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
+        assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
+        assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
+        assert(extra[4] == HIP_LAUNCH_PARAM_END);
+        assert(extra_size < FIXED_EXTRA_SIZE);
+
+        uint8_t fixed_size_extra[FIXED_EXTRA_SIZE] = {0};
+
+        memcpy(fixed_size_extra, extra[1], extra_size);
+        extra_size = FIXED_EXTRA_SIZE;
+        void *extra[5] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, fixed_size_extra,
+            HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size, HIP_LAUNCH_PARAM_END};
         CommandEntry command;
         command.kind = KERNEL_LAUNCH;
         command.kernel_launch_param.aql = *aql;
@@ -64,9 +133,11 @@ void CommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void**
         pending_commands_.push_back(command);
     }
     pending_commands_cv_.notify_all();
+    return hipSuccess; // TODO more accurate return value
 }
 
-void CommandScheduler::AddMemcpy(void* dst, const void* src, size_t size, hipMemcpyKind kind) {
+hipError_t BatchCommandScheduler::AddMemcpyAsync(void* dst, const void* src, size_t size,
+        hipMemcpyKind kind) {
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
         CommandEntry command;
@@ -79,20 +150,22 @@ void CommandScheduler::AddMemcpy(void* dst, const void* src, size_t size, hipMem
         pending_commands_.push_back(command);
     }
     pending_commands_cv_.notify_all();
+    return hipSuccess; // TODO more accurate return value
 }
 
-void CommandScheduler::Wait() {
+hipError_t BatchCommandScheduler::Wait(void) {
     std::lock_guard<std::mutex> lk2(wait_mutex_);
     {
         std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
         pending_commands_cv_.wait(lk1, [this] () {
-            return pending_commands_.size() == 0;
-        });
+                return pending_commands_.size() == 0;
+                });
     }
+    return hipSuccess; // TODO more accurate return value
 }
 
-void CommandScheduler::ProcessThread() {
-    while (true) {
+void BatchCommandScheduler::ProcessThread() {
+    while (this->running) {
         std::vector<KernelLaunchParam> params;
         {
             std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
@@ -156,55 +229,25 @@ void CommandScheduler::ProcessThread() {
     }
 }
 
-std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t stream) {
-    std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
-    if (!command_scheduler_map_.count(stream)) {
-        int batch_size = DEFAULT_BATCH_SIZE;
-        char* s = getenv("HIP_COMMAND_SCHEDULER_BATCH_SIZE");
-        if (s) batch_size = atoi(s);
-        int fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
-        s = getenv("HIP_COMMAND_SCHEDULER_FR_INTERVAL_US");
-        if (s) fixed_rate_interval_us = atoi(s);
-        fprintf(stderr, "Create new CommandScheduler with stream = %p, "
-                "batch_size = %d, interval = %d\n",
-                (void*)stream, batch_size, fixed_rate_interval_us);
-        command_scheduler_map_.emplace(stream,
-                std::make_shared<CommandScheduler>(stream, batch_size, fixed_rate_interval_us));
-    }
-    return command_scheduler_map_.at(stream);
-}
-
-std::map<hipStream_t, std::shared_ptr<CommandScheduler>> CommandScheduler::command_scheduler_map_{};
-std::mutex CommandScheduler::command_scheduler_map_mu_{};
-
-int command_scheduler_enabled() {
-    const char* envvar_name = "HIP_ENABLE_COMMAND_SCHEDULER";
-    if (getenv(envvar_name) == nullptr) {
-        return 0;
-    } else {
-        return atoi(getenv(envvar_name));
-    }
-}
-
 const struct nw_kern_info *get_kernel_info(hipFunction_t f)
 {
-   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-   static unordered_map<hipFunction_t, struct nw_kern_info> cache;
-   const struct nw_kern_info *ret;
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    static unordered_map<hipFunction_t, struct nw_kern_info> cache;
+    const struct nw_kern_info *ret;
 
-   pthread_mutex_lock(&lock);
-   auto it0 = cache.find(f);
-   if (it0 == cache.end()) {
-      struct nw_kern_info *info = &cache[f];
-      if (nw_lookup_kern_info(f, info) != hipSuccess)
-         assert(0 && "failed to do lookup\n");
-      ret = info;
-   } else {
-      ret = &it0->second;
-   }
-   pthread_mutex_unlock(&lock);
+    pthread_mutex_lock(&lock);
+    auto it0 = cache.find(f);
+    if (it0 == cache.end()) {
+        struct nw_kern_info *info = &cache[f];
+        if (nw_lookup_kern_info(f, info) != hipSuccess)
+            assert(0 && "failed to do lookup\n");
+        ret = info;
+    } else {
+        ret = &it0->second;
+    }
+    pthread_mutex_unlock(&lock);
 
-   return ret;
+    return ret;
 }
 
 hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
@@ -215,67 +258,46 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                     hipEvent_t startEvent,
                                     hipEvent_t stopEvent)
 {
-   size_t extra_size = *(size_t *)extra[3];
-   assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
-   assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
-   assert(extra[4] == HIP_LAUNCH_PARAM_END);
-   assert(extra_size < FIXED_EXTRA_SIZE);
+    hsa_kernel_dispatch_packet_t aql = {0};
+    const struct nw_kern_info *kern_info = get_kernel_info(f);
+    aql.workgroup_size_x = localWorkSizeX;
+    aql.workgroup_size_y = localWorkSizeY;
+    aql.workgroup_size_z = localWorkSizeZ;
+    aql.grid_size_x = globalWorkSizeX;
+    aql.grid_size_y = globalWorkSizeY;
+    aql.grid_size_z = globalWorkSizeZ;
+    aql.group_segment_size = sharedMemBytes + kern_info->workgroup_group_segment_byte_size;
+    aql.private_segment_size = kern_info->workitem_private_segment_byte_size;
+    aql.kernel_object = kern_info->_object;
+    aql.setup = 3 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
+    aql.header = (HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE);
+    aql.header |= (1 << HSA_PACKET_HEADER_BARRIER);
+    aql.header |= (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
+            (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
 
-   hsa_kernel_dispatch_packet_t aql = {0};
-   uint8_t fixed_size_extra[FIXED_EXTRA_SIZE] = {0};
-
-   memcpy(fixed_size_extra, extra[1], extra_size);
-   extra_size = FIXED_EXTRA_SIZE;
-
-   const struct nw_kern_info *kern_info = get_kernel_info(f);
-
-   aql.workgroup_size_x = localWorkSizeX;
-   aql.workgroup_size_y = localWorkSizeY;
-   aql.workgroup_size_z = localWorkSizeZ;
-   aql.grid_size_x = globalWorkSizeX;
-   aql.grid_size_y = globalWorkSizeY;
-   aql.grid_size_z = globalWorkSizeZ;
-   aql.group_segment_size = sharedMemBytes + kern_info->workgroup_group_segment_byte_size;
-   aql.private_segment_size = kern_info->workitem_private_segment_byte_size;
-   aql.kernel_object = kern_info->_object;
-   aql.setup = 3 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
-   aql.header =
-       (HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE);
-   aql.header |= (1 << HSA_PACKET_HEADER_BARRIER);
-
-   aql.header |= (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
-                 (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
-
-   if (command_scheduler_enabled()
-       && startEvent == NULL && stopEvent == NULL && kernelParams == NULL) {
-       void *new_extra[5] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, fixed_size_extra,
-                             HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size,
-                             HIP_LAUNCH_PARAM_END};
-       CommandScheduler::GetForStream(hStream)->AddKernelLaunch(&aql, new_extra);
-        return hipSuccess;
-   } else {
-       return __do_c_hipHccModuleLaunchKernel(&aql, hStream, kernelParams,
-           (char *)(fixed_size_extra), FIXED_EXTRA_SIZE, startEvent, stopEvent);
-   }
+    return CommandScheduler::GetForStream(hStream)->AddKernelLaunch(&aql, kernelParams,
+            extra, *(size_t *)extra[3], startEvent, stopEvent);
 }
 
 extern "C" hipError_t
 hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
-   if (command_scheduler_enabled()) {
-       CommandScheduler::GetForStream(stream)->AddMemcpy(dst, src, sizeBytes, kind);
-       return hipSuccess;
-   } else {
-       return lgmMemcpyAsync(dst, src, sizeBytes, kind, stream);
-   }
+    assert(false);;;
+    // TODO lgmMemcpyAsync should call this below
+    if (fixed_rate_command_scheduler_enabled()) {
+        CommandScheduler::GetForStream(stream)->AddMemcpyAsync(dst, src, sizeBytes, kind);
+        return hipSuccess;
+    } else {
+        return lgmMemcpyAsync(dst, src, sizeBytes, kind, stream);
+    }
 }
 
 extern "C" hipError_t
 hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
 {
-   if (command_scheduler_enabled()) CommandScheduler::GetForStream(nullptr)->Wait();
-   return lgmMemcpy(dst, src, sizeBytes, kind);
+    CommandScheduler::GetForStream(nullptr)->Wait();
+    return lgmMemcpy(dst, src, sizeBytes, kind);
 }
 
 extern "C" hipError_t
@@ -313,8 +335,7 @@ extern "C" hipError_t
 hipStreamSynchronize(hipStream_t stream)
 {
     // fprintf(stderr, "hipStreamSynchronize\n");
-    if (command_scheduler_enabled()) CommandScheduler::GetForStream(stream)->Wait();
-    return nw_hipStreamSynchronize(stream);
+    return CommandScheduler::GetForStream(stream)->Wait();
 }
 
 
