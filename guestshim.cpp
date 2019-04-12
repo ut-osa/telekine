@@ -106,8 +106,11 @@ BatchCommandScheduler::~BatchCommandScheduler(void) {
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
         void** kernelParams, void** extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) {
-    // the following should be null to work with the fixed rate command scheduler
-    assert(!start && !stop && !kernelParams);
+    assert(!kernelParams);
+    if (!start || !stop) {
+       return __do_c_hipHccModuleLaunchKernel(aql, this->stream_, kernelParams, (char*) (extra[1]),
+               extra_size, start, stop);
+    }
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
         assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
