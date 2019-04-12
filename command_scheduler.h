@@ -20,8 +20,8 @@ class CommandScheduler {
 public:
     CommandScheduler(hipStream_t stream) : stream_(stream) {}
     virtual ~CommandScheduler(void) {}
-    virtual hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** kernelParams,
-            void** extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) = 0;
+    virtual hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
+            uint8_t* extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) = 0;
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) = 0;
     virtual hipError_t Wait(void) = 0;
 
@@ -36,10 +36,10 @@ class BatchCommandScheduler : public CommandScheduler {
 public:
     BatchCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
     ~BatchCommandScheduler(void);
-    hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** kernelParams, void** extra,
-            size_t extra_size, hipEvent_t start, hipEvent_t stop);
-    hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind);
-    hipError_t Wait(void);
+    hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, uint8_t *extra,
+            size_t extra_size, hipEvent_t start, hipEvent_t stop) override;
+    hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
+    hipError_t Wait(void) override;
 private:
     void ProcessThread();
 
@@ -80,9 +80,9 @@ private:
 class BaselineCommandScheduler : public CommandScheduler {
 public:
     BaselineCommandScheduler(hipStream_t stream) : CommandScheduler(stream) {}
-    hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, void** kernelParams, void** extra,
-            size_t extra_size, hipEvent_t start, hipEvent_t stop);
-    hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind);
-    hipError_t Wait(void);
+    hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, uint8_t *extra,
+            size_t extra_size, hipEvent_t start, hipEvent_t stop) override;
+    hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
+    hipError_t Wait(void) override;
 };
 #endif

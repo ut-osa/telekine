@@ -77,8 +77,8 @@ std::mutex CommandScheduler::command_scheduler_map_mu_{};
 
 
 hipError_t BaselineCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
-        void** kernelParams, void** extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) {
-    return __do_c_hipHccModuleLaunchKernel(aql, this->stream_, kernelParams, (char*) (extra[1]),
+        uint8_t *extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) {
+    return __do_c_hipHccModuleLaunchKernel(aql, this->stream_, nullptr, (char *)extra,
             extra_size, start, stop);
 }
 
@@ -105,33 +105,19 @@ BatchCommandScheduler::~BatchCommandScheduler(void) {
 }
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
-        void** kernelParams, void** extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) {
-    assert(!kernelParams);
-    if (!start || !stop) {
-       return __do_c_hipHccModuleLaunchKernel(aql, this->stream_, kernelParams, (char*) (extra[1]),
-               extra_size, start, stop);
-    }
+        uint8_t *extra, size_t extra_size, hipEvent_t start, hipEvent_t stop)
+{
+    assert(!start && !stop);
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
-        assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
-        assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
-        assert(extra[4] == HIP_LAUNCH_PARAM_END);
         assert(extra_size < FIXED_EXTRA_SIZE);
 
-        uint8_t fixed_size_extra[FIXED_EXTRA_SIZE] = {0};
-
-        memcpy(fixed_size_extra, extra[1], extra_size);
-        extra_size = FIXED_EXTRA_SIZE;
-        void *extra[5] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, fixed_size_extra,
-            HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size, HIP_LAUNCH_PARAM_END};
         CommandEntry command;
         command.kind = KERNEL_LAUNCH;
         command.kernel_launch_param.aql = *aql;
-        size_t kern_arg_size = *(size_t*)(extra[3]);
-        void* kern_arg = extra[1];
-        command.kernel_launch_param.kernArgSize = kern_arg_size;
-        command.kernel_launch_param.kernArg = malloc(kern_arg_size);
-        memcpy(command.kernel_launch_param.kernArg, kern_arg, kern_arg_size);
+        command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
+        command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
+        memcpy(command.kernel_launch_param.kernArg, extra, extra_size);
         std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
         pending_commands_.push_back(command);
     }
@@ -261,8 +247,16 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                     hipEvent_t startEvent,
                                     hipEvent_t stopEvent)
 {
-    hsa_kernel_dispatch_packet_t aql = {0};
+    assert(kernelParams == nullptr);
+    assert(extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER);
+    assert(extra[2] == HIP_LAUNCH_PARAM_BUFFER_SIZE);
+    assert(extra[4] == HIP_LAUNCH_PARAM_END);
+
     const struct nw_kern_info *kern_info = get_kernel_info(f);
+    hsa_kernel_dispatch_packet_t aql = {0};
+    uint8_t *extra_buf = (uint8_t *)extra[1];
+    size_t extra_size = *(size_t *)extra[3];
+
     aql.workgroup_size_x = localWorkSizeX;
     aql.workgroup_size_y = localWorkSizeY;
     aql.workgroup_size_z = localWorkSizeZ;
@@ -278,8 +272,13 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
     aql.header |= (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE) |
             (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
 
-    return CommandScheduler::GetForStream(hStream)->AddKernelLaunch(&aql, kernelParams,
-            extra, *(size_t *)extra[3], startEvent, stopEvent);
+    if (startEvent || stopEvent) {
+       return __do_c_hipHccModuleLaunchKernel(&aql, hStream, nullptr,
+               (char *)extra_buf, extra_size, startEvent, stopEvent);
+    } else {
+       return CommandScheduler::GetForStream(hStream)->AddKernelLaunch(&aql,
+               extra_buf, extra_size, nullptr, nullptr);
+   }
 }
 
 extern "C" hipError_t
