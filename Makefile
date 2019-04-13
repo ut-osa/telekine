@@ -74,7 +74,7 @@ manager:
 	$(MAKE) -C nw/worker && ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
-guestshim.so: guestshim.o program_state.o code_object_bundle.o
+guestshim.so: guestshim.o program_state.o code_object_bundle.o hip_function_info.o
 	$(HIPCC) -fPIC -shared $(includes) -o $@ $^ \
 	   -Wl,--no-allow-shlib-undefined \
 		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread -lsodium -lcrypto
