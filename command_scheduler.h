@@ -16,6 +16,7 @@
 #define DEFAULT_BATCH_SIZE 64
 #define DEFAULT_FIXED_RATE_INTERVAL_US -1
 
+#define FIXED_SIZE_B (0x1UL << 20) // 1 MB
 class CommandScheduler {
 public:
     CommandScheduler(hipStream_t stream) : stream_(stream) {}

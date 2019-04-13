@@ -148,7 +148,6 @@ struct EncryptionState {
   }
 };
 
-#define FIXED_SIZE_B (1048576ul) // 1 MB
 // One encryption state per thread
 static thread_local std::unique_ptr<EncryptionState<FIXED_SIZE_B>> _state;
 // Constructs state on demand
