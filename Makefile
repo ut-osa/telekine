@@ -75,7 +75,7 @@ manager:
 .PHONY: manager
 
 guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so lgm_memcpy.hpp libcrypto.so
-	g++ -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
+	$(HIPCC) -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
 	   -Wl,--no-allow-shlib-undefined \
 		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread -lsodium -lcrypto
 
