@@ -31,7 +31,8 @@ includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include \
 
 clangargs = -D__HIP_PLATFORM_HCC__=1
 
-CXXFLAGS = -g $(CFLAGS) -O3 -Wno-ignored-attributes -fPIC $(includes) -Wno-deprecated-declarations \
+CFLAGS = -g -O3 -fPIC $(includes)
+CXXFLAGS = $(CFLAGS) -Wno-ignored-attributes -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
@@ -84,4 +85,32 @@ libcrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
 clean:
 	rm -rf hip_nw *.o *.so manager_tcp MatrixTranspose copy
 	$(MAKE) -C nw/worker clean
+
 .PHONY: clean
+DEPDIR := .d
+$(shell mkdir -p $(DEPDIR) >/dev/null)
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
+
+COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
+COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
+POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
+
+%.o : %.c
+%.o : %.c $(DEPDIR)/%.d
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POSTCOMPILE)
+
+%.o : %.cc
+%.o : %.cc $(DEPDIR)/%.d
+	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+	$(POSTCOMPILE)
+
+%.o : %.cpp
+%.o : %.cpp $(DEPDIR)/%.d
+	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+	$(POSTCOMPILE)
+
+$(DEPDIR)/%.d: ;
+.PRECIOUS: $(DEPDIR)/%.d
+
+include $(wildcard $(DEPDIR)/*.d)
