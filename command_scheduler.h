@@ -40,8 +40,9 @@ public:
             size_t extra_size, hipEvent_t start, hipEvent_t stop) override;
     hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
     hipError_t Wait(void) override;
-private:
+protected:
     void ProcessThread();
+    virtual void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind);
 
     struct KernelLaunchParam {
         hsa_kernel_dispatch_packet_t aql;
@@ -75,6 +76,16 @@ private:
     std::unique_ptr<QuantumWaiter> quantum_waiter_;
     bool running;
     std::unique_ptr<std::thread> process_thread_;
+};
+
+class SepMemcpyCommandScheduler : public BatchCommandScheduler {
+public:
+    SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
+    ~SepMemcpyCommandScheduler(void);
+protected:
+    void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind);
+
+    hipStream_t memcpy_stream_;
 };
 
 class BaselineCommandScheduler : public CommandScheduler {

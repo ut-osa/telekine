@@ -48,17 +48,31 @@ static bool fixed_rate_command_scheduler_enabled() {
     return ret;
 }
 
-std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t stream) {
+static bool fixed_rate_sep_memcpy_command_scheduler_enabled() {
+    static bool ret = CHECK_ENV("HIP_ENABLE_SEP_MEMCPY_COMMAND_SCHEDULER");
+    return ret;
+}
+
+std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t stream)
+{
     std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
     if (!command_scheduler_map_.count(stream)) {
-        if (fixed_rate_command_scheduler_enabled()) {
-            int batch_size = DEFAULT_BATCH_SIZE;
-            char* s = getenv("HIP_COMMAND_SCHEDULER_BATCH_SIZE");
-            if (s) batch_size = atoi(s);
-            int fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
-            s = getenv("HIP_COMMAND_SCHEDULER_FR_INTERVAL_US");
-            if (s) fixed_rate_interval_us = atoi(s);
-            fprintf(stderr, "Create new CommandScheduler with stream = %p, "
+        int batch_size = DEFAULT_BATCH_SIZE;
+        char* s = getenv("HIP_COMMAND_SCHEDULER_BATCH_SIZE");
+        if (s) batch_size = atoi(s);
+        int fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
+        s = getenv("HIP_COMMAND_SCHEDULER_FR_INTERVAL_US");
+        if (s) fixed_rate_interval_us = atoi(s);
+
+        if (fixed_rate_sep_memcpy_command_scheduler_enabled()) {
+            fprintf(stderr, "Create new SepMemcpyCommandScheduler with stream = %p, "
+                    "batch_size = %d, interval = %d\n",
+                    (void*)stream, batch_size, fixed_rate_interval_us);
+            command_scheduler_map_.emplace(stream, std::make_shared<SepMemcpyCommandScheduler>(
+                    stream, batch_size, fixed_rate_interval_us));
+        }
+        else if (fixed_rate_command_scheduler_enabled()) {
+            fprintf(stderr, "Create new BatchCommandScheduler with stream = %p, "
                     "batch_size = %d, interval = %d\n",
                     (void*)stream, batch_size, fixed_rate_interval_us);
             command_scheduler_map_.emplace(stream, std::make_shared<BatchCommandScheduler>(
@@ -96,12 +110,26 @@ BatchCommandScheduler::BatchCommandScheduler(hipStream_t stream, int batch_size,
     quantum_waiter_((fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
     std::unique_ptr<QuantumWaiter>(new QuantumWaiter(fixed_rate_interval_us))),
     running(true),
-    process_thread_(new std::thread(&BatchCommandScheduler::ProcessThread, this)) {
+    process_thread_(new std::thread(&BatchCommandScheduler::ProcessThread, this))
+{
 }
 
 BatchCommandScheduler::~BatchCommandScheduler(void) {
     running = false;
     process_thread_->join();
+}
+
+SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int batch_size,
+                                                     int fixed_rate_interval_us)
+   : BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
+{
+   if (hipStreamCreate(&memcpy_stream_) != hipSuccess)
+      assert(false && "failed to create memcpy_stream");
+}
+
+SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
+{
+    hipStreamDestroy(memcpy_stream_);
 }
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
@@ -153,6 +181,20 @@ hipError_t BatchCommandScheduler::Wait(void) {
     return hipSuccess; // TODO more accurate return value
 }
 
+void BatchCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
+                                      hipMemcpyKind kind)
+{
+   auto ret = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
+   assert(ret == hipSuccess);
+}
+
+void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
+                                          hipMemcpyKind kind)
+{
+   auto ret = nw_hipMemcpyAsync(dst, src, size, kind, memcpy_stream_);
+   assert(ret == hipSuccess);
+}
+
 void BatchCommandScheduler::ProcessThread() {
     while (this->running) {
         std::vector<KernelLaunchParam> params;
@@ -173,7 +215,7 @@ void BatchCommandScheduler::ProcessThread() {
             if (pending_commands_[0].kind == MEMCPY) {
                 MemcpyParam param = pending_commands_[0].memcpy_param;
                 pending_commands_.pop_front();
-                nw_hipMemcpyAsync(param.dst, param.src, param.size, param.kind, stream_);
+                do_memcpy(param.dst, param.src, param.size, param.kind);
                 pending_commands_cv_.notify_all();
                 continue;
             }
