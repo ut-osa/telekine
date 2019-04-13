@@ -74,10 +74,11 @@ manager:
 	$(MAKE) -C nw/worker && ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
-guestshim.so: guestshim.o program_state.o code_object_bundle.o libguestlib.so lgm_memcpy.hpp libcrypto.so
-	$(HIPCC) -fPIC -shared $(includes) -o $@ guestshim.o program_state.o code_object_bundle.o \
+guestshim.so: guestshim.o program_state.o code_object_bundle.o
+	$(HIPCC) -fPIC -shared $(includes) -o $@ $^ \
 	   -Wl,--no-allow-shlib-undefined \
 		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread -lsodium -lcrypto
+guestshim.so: libguestlib.so libcrypto.so
 
 libcrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
 	$(HIPCC) $(includes) -shared -fPIC crypto/aes_gcm.cpp -o $@ -lsodium -ldl
