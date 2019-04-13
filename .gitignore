@@ -9,3 +9,4 @@ manager_tcp
 *.swn
 *.swo
 copy
+.d
