@@ -80,7 +80,7 @@ protected:
     std::unique_ptr<std::thread> process_thread_;
 };
 
-#define N_IN_BUFFERS 256
+#define N_STG_BUFS 256
 #define N_DBELLS 256
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
@@ -90,12 +90,12 @@ public:
 protected:
     void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
     void pre_notify(void) override;
-    void enqueue_device_copy(void *dst, const void *src, size_t size, uint64_t *tag);
+    void enqueue_device_copy(void *dst, const void *src, size_t size, uint64_t *tag, bool now);
 
-    inline void *next_in(void) {
-      if (in_buffer_idx >= N_IN_BUFFERS)
-         in_buffer_idx = 0;
-      return in_buffers[in_buffer_idx++];
+    inline void *next_stg_buf(void) {
+      if (stg_buf_idx >= N_STG_BUFS)
+         stg_buf_idx = 0;
+      return stg_bufs[stg_buf_idx++];
     }
     struct d2h_cpy_op {
        void *dst_;
@@ -109,9 +109,8 @@ protected:
     std::deque<d2h_cpy_op> pending_d2h_;
     std::mutex pending_d2h_mutex_;
     hipStream_t xfer_stream_;
-    void *in_buffers[N_IN_BUFFERS];
-    int in_buffer_idx;
-    int dbell_idx;
+    void *stg_bufs[N_STG_BUFS];
+    int stg_buf_idx;
 
 	 /* fast way to get tags that won't likely be repeated */
 	 uint64_t gen_tag(void) {          //period 2^96-1
