@@ -79,14 +79,26 @@ protected:
     std::unique_ptr<std::thread> process_thread_;
 };
 
+#define N_STAGING_BUFFERS 256
+#define N_DBELLS 256
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
     SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
     ~SepMemcpyCommandScheduler(void);
 protected:
-    void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind);
+    void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
+    void enqueue_device_copy(void *dst, const void *src, size_t size);
 
-    hipStream_t memcpy_stream_;
+    inline void *next_sb(void) {
+      if (staging_buffer_idx >= N_STAGING_BUFFERS)
+         staging_buffer_idx = 0;
+      return staging_buffers[staging_buffer_idx++];
+    }
+
+    hipStream_t xfer_stream_;
+    void *staging_buffers[N_STAGING_BUFFERS];
+    int staging_buffer_idx;
+    int dbell_idx;
 };
 
 class BaselineCommandScheduler : public CommandScheduler {

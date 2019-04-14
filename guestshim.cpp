@@ -107,13 +107,20 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
                                                      int fixed_rate_interval_us)
    : BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
 {
-   if (hipStreamCreate(&memcpy_stream_) != hipSuccess)
-      assert(false && "failed to create memcpy_stream");
+   hipError_t ret;
+   ret = hipStreamCreate(&xfer_stream_);
+   assert(ret == hipSuccess);
+   for (int i = 0; i < N_STAGING_BUFFERS; i++) {
+      ret = hipMalloc(staging_buffers + i, FIXED_SIZE_B);
+      assert(ret == hipSuccess);
+   }
 }
 
 SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
 {
-    hipStreamDestroy(memcpy_stream_);
+   hipStreamDestroy(xfer_stream_);
+   for (int i = 0; i < N_STAGING_BUFFERS; i++)
+      hipFree(staging_buffers[i]);
 }
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
@@ -147,7 +154,6 @@ hipError_t BatchCommandScheduler::AddMemcpyAsync(void* dst, const void* src, siz
         command.memcpy_param.src = src;
         command.memcpy_param.kind = kind;
         command.memcpy_param.size = size;
-        std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
         pending_commands_.push_back(command);
     }
     pending_commands_cv_.notify_all();
@@ -172,11 +178,81 @@ void BatchCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
    assert(ret == hipSuccess);
 }
 
+__global__ void
+vector_copy(uint8_t *C_d, uint8_t *A_d, size_t N)
+{
+    size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
+    size_t stride = blockDim.x * gridDim.x ;
+
+    for (size_t i=offset; i<N; i+=stride) {
+        C_d[i] = A_d[i];
+    }
+}
+
+#define BLOCKS_THREADS_TO_AQL(blocks, threads) \
+   (blocks * threads), 1, 1, threads, 1, 1
+
+void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
+                                                    size_t size)
+{
+   static std::once_flag f;
+   static hsa_kernel_dispatch_packet_t copy_aql = {0};
+   auto cp_args = hip_impl::make_kernarg(dst, src, size);
+   hipEvent_t event;
+
+   call_once(f, [&]() {
+      auto fun = hip_function_lookup((uintptr_t)vector_copy, stream_);
+      hip_function_to_aql(&copy_aql, fun, BLOCKS_THREADS_TO_AQL(512, 256), 0);
+   });
+   hipEventCreate(&event);
+   hipEventRecord(event, xfer_stream_);
+   hipStreamWaitEvent(stream_, event, 0);
+
+	assert(cp_args.size() < FIXED_EXTRA_SIZE);
+
+	CommandEntry command;
+	command.kind = KERNEL_LAUNCH;
+	command.kernel_launch_param.aql = copy_aql;
+	command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
+	command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
+	memcpy(command.kernel_launch_param.kernArg, cp_args.data(), cp_args.size());
+	pending_commands_.push_front(command);
+}
+
 void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
                                           hipMemcpyKind kind)
 {
-   auto ret = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
-   assert(ret == hipSuccess);
+   void *sb;
+   hipError_t err;
+   static uint8_t scratch[FIXED_SIZE_B];
+
+   switch (kind) {
+   case hipMemcpyHostToDevice:
+      assert(size <= FIXED_SIZE_B);
+      /* if buffer is too small, copy it to the scratch so that the
+       * transfer is fixed size
+       */
+      if (size < FIXED_SIZE_B) {
+         memcpy(scratch, src, size);
+         src = scratch;
+      }
+      sb = next_sb();
+      err = nw_hipMemcpyAsync(sb, src, FIXED_SIZE_B, kind, xfer_stream_);
+      assert(err == hipSuccess);
+      err = nw_hipStreamSynchronize(xfer_stream_);
+
+      /* only copy the requested size, since we may have copied more than
+       * expected */
+      enqueue_device_copy(dst, sb, size);
+      break;
+   case hipMemcpyDeviceToHost:
+      assert(size <= FIXED_SIZE_B);
+      break;
+   default:
+      err = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
+      assert(err == hipSuccess);
+      break;
+   }
 }
 
 void BatchCommandScheduler::ProcessThread() {
@@ -277,15 +353,13 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
 extern "C" hipError_t
 hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream) {
-    return CommandScheduler::GetForStream(stream)->AddMemcpyAsync(dst, src, sizeBytes, kind);
+    return lgmMemcpyAsync(dst, src, sizeBytes, kind, stream);
 }
 
 extern "C" hipError_t
 hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
 {
-    CommandScheduler::GetForStream(nullptr)->Wait();
-    CommandScheduler::GetForStream(nullptr)->AddMemcpyAsync(dst, src, sizeBytes, kind);
-    return CommandScheduler::GetForStream(nullptr)->Wait();
+    return lgmMemcpy(dst, src, sizeBytes, kind);
 }
 
 extern "C" hipError_t
