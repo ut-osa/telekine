@@ -40,10 +40,11 @@ public:
     hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, uint8_t *extra,
             size_t extra_size, hipEvent_t start, hipEvent_t stop) override;
     hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
-    hipError_t Wait(void) override;
+    virtual hipError_t Wait(void) override;
 protected:
     void ProcessThread();
     virtual void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind);
+    virtual void pre_notify(void){};
 
     struct KernelLaunchParam {
         hsa_kernel_dispatch_packet_t aql;
@@ -79,26 +80,55 @@ protected:
     std::unique_ptr<std::thread> process_thread_;
 };
 
-#define N_STAGING_BUFFERS 256
+#define N_IN_BUFFERS 256
 #define N_DBELLS 256
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
     SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
     ~SepMemcpyCommandScheduler(void);
+    virtual hipError_t Wait(void) override;
 protected:
     void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
-    void enqueue_device_copy(void *dst, const void *src, size_t size);
+    void pre_notify(void) override;
+    void enqueue_device_copy(void *dst, const void *src, size_t size, uint64_t *tag);
 
-    inline void *next_sb(void) {
-      if (staging_buffer_idx >= N_STAGING_BUFFERS)
-         staging_buffer_idx = 0;
-      return staging_buffers[staging_buffer_idx++];
+    inline void *next_in(void) {
+      if (in_buffer_idx >= N_IN_BUFFERS)
+         in_buffer_idx = 0;
+      return in_buffers[in_buffer_idx++];
     }
+    struct d2h_cpy_op {
+       void *dst_;
+       void *src_;
+       size_t size_;
+       uint64_t tag_;
+       d2h_cpy_op(void *dst, void *src, size_t size, uint64_t tag) :
+          dst_(dst), src_(src), size_(size), tag_(tag) {} ;
+    };
 
+    std::deque<d2h_cpy_op> pending_d2h_;
+    std::mutex pending_d2h_mutex_;
     hipStream_t xfer_stream_;
-    void *staging_buffers[N_STAGING_BUFFERS];
-    int staging_buffer_idx;
+    void *in_buffers[N_IN_BUFFERS];
+    int in_buffer_idx;
     int dbell_idx;
+
+	 /* fast way to get tags that won't likely be repeated */
+	 uint64_t gen_tag(void) {          //period 2^96-1
+	 	 static unsigned long x=123456789, y=362436069, z=521288629;
+	 	 unsigned long t;
+		 x ^= x << 16;
+		 x ^= x >> 5;
+		 x ^= x << 1;
+
+		 t = x;
+		 x = y;
+		 y = z;
+		 z = t ^ x ^ y;
+
+	    return z;
+	 }
+
 };
 
 class BaselineCommandScheduler : public CommandScheduler {

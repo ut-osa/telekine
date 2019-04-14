@@ -110,8 +110,9 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
    hipError_t ret;
    ret = hipStreamCreate(&xfer_stream_);
    assert(ret == hipSuccess);
-   for (int i = 0; i < N_STAGING_BUFFERS; i++) {
-      ret = hipMalloc(staging_buffers + i, FIXED_SIZE_B);
+   for (int i = 0; i < N_IN_BUFFERS; i++) {
+      /* allocate space for the buffer plus an 8 byte tag */
+      ret = hipMalloc(in_buffers + i, FIXED_SIZE_B + 8);
       assert(ret == hipSuccess);
    }
 }
@@ -119,8 +120,8 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
 SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
 {
    hipStreamDestroy(xfer_stream_);
-   for (int i = 0; i < N_STAGING_BUFFERS; i++)
-      hipFree(staging_buffers[i]);
+   for (int i = 0; i < N_IN_BUFFERS; i++)
+      hipFree(in_buffers[i]);
 }
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
@@ -171,6 +172,19 @@ hipError_t BatchCommandScheduler::Wait(void) {
     return hipSuccess; // TODO more accurate return value
 }
 
+hipError_t SepMemcpyCommandScheduler::Wait(void)
+{
+    std::lock_guard<std::mutex> lk2(wait_mutex_);
+    {
+        std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
+        pending_commands_cv_.wait(lk1, [this] () {
+                return pending_commands_.size() == 0 &&
+                       pending_d2h_.size() == 0;
+                });
+    }
+    return hipSuccess; // TODO more accurate return value
+}
+
 void BatchCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
                                       hipMemcpyKind kind)
 {
@@ -189,30 +203,80 @@ vector_copy(uint8_t *C_d, uint8_t *A_d, size_t N)
     }
 }
 
+
+#define BUF_TAG(buf, sz) (*((uint64_t *)(&((buf)[(sz)]))))
+__global__ void
+vector_copy_tag(uint8_t *C_d, uint8_t *A_d, size_t N, uint64_t tag)
+{
+    size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
+    size_t stride = blockDim.x * gridDim.x ;
+
+    for (size_t i=offset; i<N; i+=stride) {
+        C_d[i] = A_d[i];
+    }
+    __syncthreads();
+    /* set this tag to show that copy was done */
+    BUF_TAG(C_d, N) = tag;
+}
+
 #define BLOCKS_THREADS_TO_AQL(blocks, threads) \
    (blocks * threads), 1, 1, threads, 1, 1
 
 void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
-                                                    size_t size)
+                                                    size_t size, uint64_t *tag)
 {
    static std::once_flag f;
    static hsa_kernel_dispatch_packet_t copy_aql = {0};
-   auto cp_args = hip_impl::make_kernarg(dst, src, size);
+   static hsa_kernel_dispatch_packet_t copy_tag_aql = {0};
+   hsa_kernel_dispatch_packet_t *aql;
    hipEvent_t event;
 
    call_once(f, [&]() {
       auto fun = hip_function_lookup((uintptr_t)vector_copy, stream_);
       hip_function_to_aql(&copy_aql, fun, BLOCKS_THREADS_TO_AQL(512, 256), 0);
+      auto fun_tag = hip_function_lookup((uintptr_t)vector_copy, stream_);
+      hip_function_to_aql(&copy_tag_aql, fun_tag, BLOCKS_THREADS_TO_AQL(512, 256), 0);
    });
+
+   auto cp_args = tag ? hip_impl::make_kernarg(dst, src, size, *tag) :
+                        hip_impl::make_kernarg(dst, src, size);
+   aql = tag ? &copy_tag_aql : &copy_aql;
 	assert(cp_args.size() < FIXED_EXTRA_SIZE);
 
 	CommandEntry command;
 	command.kind = KERNEL_LAUNCH;
-	command.kernel_launch_param.aql = copy_aql;
+	command.kernel_launch_param.aql = *aql;
 	command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
 	command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
 	memcpy(command.kernel_launch_param.kernArg, cp_args.data(), cp_args.size());
 	pending_commands_.push_front(command);
+}
+
+void SepMemcpyCommandScheduler::pre_notify(void)
+{
+   static uint8_t scratch[FIXED_SIZE_B + sizeof(uint64_t)];
+   int err;
+
+	/* todo, do memcpy even if there aren't outstanding copies */
+   std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
+	if (pending_d2h_.size() == 0)
+      return;
+
+   auto &op = pending_d2h_.at(0);
+
+   err = nw_hipMemcpyAsync(scratch, op.src_, FIXED_SIZE_B + sizeof(uint64_t), hipMemcpyDeviceToHost,
+                           xfer_stream_);
+   assert(err == hipSuccess);
+
+   /* would decrypt here */
+
+   /* if the tag matches the buffer was ready and we can stop looking for it */
+   if (BUF_TAG(scratch, FIXED_SIZE_B) == op.tag_) {
+      memcpy(op.dst_, scratch, op.size_);
+      pending_d2h_.pop_front();
+   } else {
+      /* if not... then we have to look for it next time */
+   }
 }
 
 void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
@@ -221,11 +285,13 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
    hipEvent_t event;
    void *sb;
    hipError_t err;
+   uint64_t tag;
    static uint8_t scratch[FIXED_SIZE_B];
+
+   assert(size <= FIXED_SIZE_B);
 
    switch (kind) {
    case hipMemcpyHostToDevice:
-      assert(size <= FIXED_SIZE_B);
       /* if buffer is too small, copy it to the scratch so that the
        * transfer is fixed size
        */
@@ -233,20 +299,23 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
          memcpy(scratch, src, size);
          src = scratch;
       }
-      sb = next_sb();
+      sb = next_in();
       err = nw_hipMemcpyAsync(sb, src, FIXED_SIZE_B, kind, xfer_stream_);
       assert(err == hipSuccess);
       assert(hipEventCreate(&event) == hipSuccess);
       assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
       assert(hipStreamWaitEvent(stream_, event, 0) == hipSuccess);
-      enqueue_device_copy(dst, sb, size);
-
-      /* only copy the requested size, since we may have copied more than
-       * expected */
-      //enqueue_device_copy(dst, sb, size);
+      enqueue_device_copy(dst, sb, size, nullptr);
       break;
    case hipMemcpyDeviceToHost:
-      assert(size <= FIXED_SIZE_B);
+      //tag = gen_tag();
+      //sb = next_in();
+      //enqueue_device_copy(sb, src, size, &tag);
+      //err = nw_hipMemcpyAsync(scratch, sb, FIXED_SIZE_B, kind, xfer_stream_);
+      err = nw_hipMemcpyAsync(scratch, src, size, kind, stream_);
+      assert(err == hipSuccess);
+      memcpy(dst, scratch, size);
+      break;
    default:
       err = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
       assert(err == hipSuccess);
