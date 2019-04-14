@@ -808,6 +808,21 @@ __wrapper_hipMemset(void *dst, int value, size_t sizeBytes)
     return ret;
 }
 
+static hipError_t
+__wrapper_hipStreamWaitEvent(hipStream_t stream, hipEvent_t event, unsigned int flags)
+{
+    hipError_t ret;
+    ret = hipStreamWaitEvent(stream, event, flags);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
 static hsa_status_t
 __wrapper___do_c_hsa_agent_get_info(hsa_agent_t agent, hsa_agent_info_t attribute, size_t max_value, void *value)
 {
@@ -4308,6 +4323,69 @@ __handle_command_hip(struct command_base *__cmd)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_hipMemset);  /* Deallocate all memory in the alloc list */
+        break;
+    }
+    case CALL_HIP_HIP_STREAM_WAIT_EVENT:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list_hipStreamWaitEvent = g_ptr_array_new_full(0, free);
+        struct hip_hip_stream_wait_event_call *__call = (struct hip_hip_stream_wait_event_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip_hip_stream_wait_event_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
+        /* Input: hipEvent_t event */
+        hipEvent_t event;
+        event = __call->event;
+        event = __call->event;
+
+        /* Input: unsigned int flags */
+        unsigned int flags;
+        flags = __call->flags;
+        flags = __call->flags;
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper_hipStreamWaitEvent(stream, event, flags);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+        }
+        struct hip_hip_stream_wait_event_ret *__ret =
+            (struct hip_hip_stream_wait_event_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_hip_stream_wait_event_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP_HIP_STREAM_WAIT_EVENT;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list_hipStreamWaitEvent); /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
     case CALL_HIP___DO_C_HSA_AGENT_GET_INFO:{

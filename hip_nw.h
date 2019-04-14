@@ -42,12 +42,13 @@ enum hip_functions {
         RET_HIP_HIP_MODULE_LOAD, CALL_HIP_HIP_MODULE_UNLOAD, RET_HIP_HIP_MODULE_UNLOAD, CALL_HIP_NW_HIP_STREAM_DESTROY,
         RET_HIP_NW_HIP_STREAM_DESTROY, CALL_HIP_HIP_MODULE_GET_FUNCTION, RET_HIP_HIP_MODULE_GET_FUNCTION,
         CALL_HIP_HIP_GET_LAST_ERROR, RET_HIP_HIP_GET_LAST_ERROR, CALL_HIP_HIP_MEMSET, RET_HIP_HIP_MEMSET,
-        CALL_HIP___DO_C_HSA_AGENT_GET_INFO, RET_HIP___DO_C_HSA_AGENT_GET_INFO, CALL_HIP___DO_C_LOAD_EXECUTABLE,
-        RET_HIP___DO_C_LOAD_EXECUTABLE, CALL_HIP___DO_C_GET_AGENTS, RET_HIP___DO_C_GET_AGENTS, CALL_HIP___DO_C_GET_ISAS,
-        RET_HIP___DO_C_GET_ISAS, CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS,
-        CALL_HIP___DO_C_QUERY_HOST_ADDRESS, RET_HIP___DO_C_QUERY_HOST_ADDRESS, CALL_HIP___DO_C_GET_KERNEL_DESCRIPTOR,
-        RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR, CALL_HIP_NW_HIP_CTX_GET_DEVICE, RET_HIP_NW_HIP_CTX_GET_DEVICE,
-        CALL_HIP_NW_LOOKUP_KERN_INFO, RET_HIP_NW_LOOKUP_KERN_INFO
+        CALL_HIP_HIP_STREAM_WAIT_EVENT, RET_HIP_HIP_STREAM_WAIT_EVENT, CALL_HIP___DO_C_HSA_AGENT_GET_INFO,
+        RET_HIP___DO_C_HSA_AGENT_GET_INFO, CALL_HIP___DO_C_LOAD_EXECUTABLE, RET_HIP___DO_C_LOAD_EXECUTABLE,
+        CALL_HIP___DO_C_GET_AGENTS, RET_HIP___DO_C_GET_AGENTS, CALL_HIP___DO_C_GET_ISAS, RET_HIP___DO_C_GET_ISAS,
+        CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS, CALL_HIP___DO_C_QUERY_HOST_ADDRESS,
+        RET_HIP___DO_C_QUERY_HOST_ADDRESS, CALL_HIP___DO_C_GET_KERNEL_DESCRIPTOR, RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR,
+        CALL_HIP_NW_HIP_CTX_GET_DEVICE, RET_HIP_NW_HIP_CTX_GET_DEVICE, CALL_HIP_NW_LOOKUP_KERN_INFO,
+        RET_HIP_NW_LOOKUP_KERN_INFO
 };
 
 #include "hip_nw_utility_types.h"
@@ -1010,6 +1011,30 @@ struct hip_hip_memset_call_record {
     void *dst;
     int value;
     size_t sizeBytes;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip_hip_stream_wait_event_call {
+    struct command_base base;
+    intptr_t __call_id;
+    hipStream_t stream;
+    hipEvent_t event;
+    unsigned int flags;
+};
+
+struct hip_hip_stream_wait_event_ret {
+    struct command_base base;
+    intptr_t __call_id;
+
+    hipError_t ret;
+};
+
+struct hip_hip_stream_wait_event_call_record {
+    hipStream_t stream;
+    hipEvent_t event;
+    unsigned int flags;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;

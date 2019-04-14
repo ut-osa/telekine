@@ -495,6 +495,13 @@ hipError_t hipMemset(void *dst, int value, size_t sizeBytes)
    ava_argument(dst) ava_opaque;
 }
 
+hipError_t
+hipStreamWaitEvent(hipStream_t stream, hipEvent_t event, unsigned int flags)
+{
+   ava_argument(stream) ava_opaque;
+   ava_argument(event) ava_opaque;
+}
+
 hsa_status_t HSA_API __do_c_hsa_agent_get_info(
     hsa_agent_t agent,
     hsa_agent_info_t attribute,
