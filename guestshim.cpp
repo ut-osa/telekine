@@ -105,7 +105,8 @@ BatchCommandScheduler::~BatchCommandScheduler(void) {
 
 SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int batch_size,
                                                      int fixed_rate_interval_us)
-   : BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
+   : BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us),
+     stg_buf_idx(0)
 {
    hipError_t ret;
    ret = hipStreamCreate(&xfer_stream_);

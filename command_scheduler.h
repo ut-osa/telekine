@@ -113,7 +113,7 @@ protected:
     std::deque<d2h_cpy_op> pending_d2h_;
     hipStream_t xfer_stream_;
     void *stg_bufs[N_STG_BUFS];
-    int stg_buf_idx;
+    unsigned stg_buf_idx;
 
 	 /* fast way to get tags that won't likely be repeated */
 	 tag_t gen_tag(void) {          //period 2^96-1
