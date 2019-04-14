@@ -276,6 +276,10 @@ void SepMemcpyCommandScheduler::pre_notify(void)
     * scratch
     */
 
+   hipEvent_t event;
+   assert(hipEventCreate(&event) == hipSuccess);
+   assert(hipEventRecord(event, stream_) == hipSuccess);
+   assert(hipStreamWaitEvent(xfer_stream_, event, 0) == hipSuccess);
    err = nw_hipMemcpyAsync(scratch, op.src_, FIXED_SIZE_FULL,
                            hipMemcpyDeviceToHost, xfer_stream_);
    assert(err == hipSuccess);
@@ -320,6 +324,10 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
        * from sb1 to dst
        */
 
+      assert(err == hipSuccess);
+      assert(hipEventCreate(&event) == hipSuccess);
+      assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
+      assert(hipStreamWaitEvent(stream_, event, 0) == hipSuccess);
       enqueue_device_copy(dst, sb, size, tag, true);
       break;
    case hipMemcpyDeviceToHost:
