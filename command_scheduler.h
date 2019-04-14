@@ -16,7 +16,12 @@
 #define DEFAULT_BATCH_SIZE 64
 #define DEFAULT_FIXED_RATE_INTERVAL_US -1
 
-#define FIXED_SIZE_B (0x1UL << 20) // 1 MB
+typedef uint64_t tag_t;
+
+#define FIXED_SIZE_FULL (0x1UL << 20) // 1 MB
+#define FIXED_SIZE_B (FIXED_SIZE_FULL - sizeof(tag_t))
+#define BUF_TAG(buf) (*((uint64_t *)(&((buf)[FIXED_SIZE_B]))))
+
 class CommandScheduler {
 public:
     CommandScheduler(hipStream_t stream) : stream_(stream) {}
@@ -90,7 +95,7 @@ public:
 protected:
     void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
     void pre_notify(void) override;
-    void enqueue_device_copy(void *dst, const void *src, size_t size, uint64_t *tag, bool now);
+    void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
 
     inline void *next_stg_buf(void) {
       if (stg_buf_idx >= N_STG_BUFS)
@@ -113,7 +118,7 @@ protected:
     int stg_buf_idx;
 
 	 /* fast way to get tags that won't likely be repeated */
-	 uint64_t gen_tag(void) {          //period 2^96-1
+	 tag_t gen_tag(void) {          //period 2^96-1
 	 	 static unsigned long x=123456789, y=362436069, z=521288629;
 	 	 unsigned long t;
 		 x ^= x << 16;

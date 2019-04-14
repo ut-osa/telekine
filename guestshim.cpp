@@ -112,7 +112,7 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
    assert(ret == hipSuccess);
    for (int i = 0; i < N_STG_BUFS; i++) {
       /* allocate space for the buffer plus an 8 byte tag */
-      ret = hipMalloc(stg_bufs + i, FIXED_SIZE_B + 8);
+      ret = hipMalloc(stg_bufs + i, FIXED_SIZE_FULL);
       assert(ret == hipSuccess);
    }
 }
@@ -193,10 +193,13 @@ void BatchCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
 }
 
 __global__ void
-vector_copy(uint8_t *C_d, uint8_t *A_d, size_t N)
+vector_copy_in(uint8_t *C_d, uint8_t *A_d, size_t N, tag_t tag)
 {
     size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
     size_t stride = blockDim.x * gridDim.x ;
+
+    while (BUF_TAG(A_d) != tag)
+       /* spin */;
 
     for (size_t i=offset; i<N; i+=stride) {
         C_d[i] = A_d[i];
@@ -204,9 +207,8 @@ vector_copy(uint8_t *C_d, uint8_t *A_d, size_t N)
 }
 
 
-#define BUF_TAG(buf) (*((uint64_t *)(&((buf)[FIXED_SIZE_B]))))
 __global__ void
-vector_copy_tag(uint8_t *C_d, uint8_t *A_d, size_t N, uint64_t tag)
+vector_copy_out(uint8_t *C_d, uint8_t *A_d, size_t N, tag_t tag)
 {
     size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
     size_t stride = blockDim.x * gridDim.x ;
@@ -223,25 +225,25 @@ vector_copy_tag(uint8_t *C_d, uint8_t *A_d, size_t N, uint64_t tag)
    (blocks * threads), 1, 1, threads, 1, 1
 
 void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
-                                                    size_t size, uint64_t *tag,
-                                                    bool now)
+                                                    size_t size, tag_t tag,
+                                                    bool in)
 {
    static std::once_flag f;
-   static hsa_kernel_dispatch_packet_t copy_aql = {0};
-   static hsa_kernel_dispatch_packet_t copy_tag_aql = {0};
+   static hsa_kernel_dispatch_packet_t copy_in_aql = {0};
+   static hsa_kernel_dispatch_packet_t copy_out_aql = {0};
    hsa_kernel_dispatch_packet_t *aql;
    hipEvent_t event;
 
    call_once(f, [&]() {
-      auto fun = hip_function_lookup((uintptr_t)vector_copy, stream_);
-      hip_function_to_aql(&copy_aql, fun, BLOCKS_THREADS_TO_AQL(512, 256), 0);
-      auto fun_tag = hip_function_lookup((uintptr_t)vector_copy_tag, stream_);
-      hip_function_to_aql(&copy_tag_aql, fun_tag, BLOCKS_THREADS_TO_AQL(512, 256), 0);
+      auto fun = hip_function_lookup((uintptr_t)vector_copy_out, stream_);
+      hip_function_to_aql(&copy_out_aql, fun, BLOCKS_THREADS_TO_AQL(512, 256), 0);
+      auto fun_tag = hip_function_lookup((uintptr_t)vector_copy_in, stream_);
+      hip_function_to_aql(&copy_in_aql, fun_tag, BLOCKS_THREADS_TO_AQL(512, 256), 0);
    });
 
-   auto cp_args = tag ? hip_impl::make_kernarg(dst, src, size, *tag) :
-                        hip_impl::make_kernarg(dst, src, size);
-   aql = tag ? &copy_tag_aql : &copy_aql;
+   auto cp_args = hip_impl::make_kernarg(dst, src, size, tag);
+   aql = in ? &copy_in_aql : &copy_out_aql;
+
 	assert(cp_args.size() < FIXED_EXTRA_SIZE);
 
 	CommandEntry command;
@@ -250,12 +252,16 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
 	command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
 	command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
 	memcpy(command.kernel_launch_param.kernArg, cp_args.data(), cp_args.size());
+
+   /* push_front because we want to copy kernel to run in the order the memcpy
+    * would hav
+    */
 	pending_commands_.push_front(command);
 }
 
 void SepMemcpyCommandScheduler::pre_notify(void)
 {
-   static uint8_t scratch[FIXED_SIZE_B + sizeof(uint64_t)];
+   static uint8_t scratch[FIXED_SIZE_FULL];
    int err;
 
 	/* todo, do memcpy even if there aren't outstanding copies */
@@ -270,8 +276,8 @@ void SepMemcpyCommandScheduler::pre_notify(void)
     * scratch
     */
 
-   err = nw_hipMemcpyAsync(scratch, op.src_, FIXED_SIZE_B + sizeof(uint64_t), hipMemcpyDeviceToHost,
-                           xfer_stream_);
+   err = nw_hipMemcpyAsync(scratch, op.src_, FIXED_SIZE_FULL,
+                           hipMemcpyDeviceToHost, xfer_stream_);
    assert(err == hipSuccess);
 
    /* then decrypt on the cpu here*/
@@ -292,8 +298,8 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
    hipEvent_t event;
    void *sb;
    hipError_t err;
-   uint64_t tag;
-   static uint8_t scratch[FIXED_SIZE_B];
+   tag_t tag;
+   static uint8_t scratch[FIXED_SIZE_FULL];
 
    assert(size <= FIXED_SIZE_B);
 
@@ -302,28 +308,24 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       /* if buffer is too small, copy it to the scratch so that the
        * transfer is fixed size
        */
-      if (size < FIXED_SIZE_B) {
-         memcpy(scratch, src, size);
-         src = scratch;
-      }
+      memcpy(scratch, src, size);
       sb = next_stg_buf();
-      err = nw_hipMemcpyAsync(sb, src, FIXED_SIZE_B, kind, xfer_stream_);
+      tag = gen_tag();
+      BUF_TAG(scratch) = tag;
+      err = nw_hipMemcpyAsync(sb, scratch, FIXED_SIZE_FULL, kind, xfer_stream_);
+      assert(err == hipSuccess);
 
       /* @Vance: add invocation of decrypt kernel here should take
        * sb and put it in sb1, then change the argument below to copy instead
        * from sb1 to dst
        */
 
-      assert(err == hipSuccess);
-      assert(hipEventCreate(&event) == hipSuccess);
-      assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
-      assert(hipStreamWaitEvent(stream_, event, 0) == hipSuccess);
-      enqueue_device_copy(dst, sb, size, nullptr, false);
+      enqueue_device_copy(dst, sb, size, tag, true);
       break;
    case hipMemcpyDeviceToHost:
       tag = gen_tag();
       sb = next_stg_buf();
-      enqueue_device_copy(sb, src, size, &tag, true);
+      enqueue_device_copy(sb, src, size, tag, false);
       {
          std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
          pending_d2h_.emplace_back((void *)dst, (void *)sb, size, tag);
