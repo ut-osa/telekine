@@ -265,11 +265,16 @@ void SepMemcpyCommandScheduler::pre_notify(void)
 
    auto &op = pending_d2h_.at(0);
 
+   /* @Vance: add invocation of encrypt kernel here should take op.src_ and put
+    * it in some sb, then change the argument below to copy instead from sb to
+    * scratch
+    */
+
    err = nw_hipMemcpyAsync(scratch, op.src_, FIXED_SIZE_B + sizeof(uint64_t), hipMemcpyDeviceToHost,
                            xfer_stream_);
    assert(err == hipSuccess);
 
-   /* would decrypt here */
+   /* then decrypt on the cpu here*/
 
    /* if the tag matches the buffer was ready and we can stop looking for it */
    if (BUF_TAG(scratch) == op.tag_) {
@@ -303,6 +308,12 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       }
       sb = next_stg_buf();
       err = nw_hipMemcpyAsync(sb, src, FIXED_SIZE_B, kind, xfer_stream_);
+
+      /* @Vance: add invocation of decrypt kernel here should take
+       * sb and put it in sb1, then change the argument below to copy instead
+       * from sb1 to dst
+       */
+
       assert(err == hipSuccess);
       assert(hipEventCreate(&event) == hipSuccess);
       assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
