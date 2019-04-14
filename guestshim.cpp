@@ -204,10 +204,6 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
       auto fun = hip_function_lookup((uintptr_t)vector_copy, stream_);
       hip_function_to_aql(&copy_aql, fun, BLOCKS_THREADS_TO_AQL(512, 256), 0);
    });
-   hipEventCreate(&event);
-   hipEventRecord(event, xfer_stream_);
-   hipStreamWaitEvent(stream_, event, 0);
-
 	assert(cp_args.size() < FIXED_EXTRA_SIZE);
 
 	CommandEntry command;
@@ -222,6 +218,7 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
 void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
                                           hipMemcpyKind kind)
 {
+   hipEvent_t event;
    void *sb;
    hipError_t err;
    static uint8_t scratch[FIXED_SIZE_B];
@@ -239,15 +236,17 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       sb = next_sb();
       err = nw_hipMemcpyAsync(sb, src, FIXED_SIZE_B, kind, xfer_stream_);
       assert(err == hipSuccess);
-      err = nw_hipStreamSynchronize(xfer_stream_);
+      assert(hipEventCreate(&event) == hipSuccess);
+      assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
+      assert(hipStreamWaitEvent(stream_, event, 0) == hipSuccess);
+      enqueue_device_copy(dst, sb, size);
 
       /* only copy the requested size, since we may have copied more than
        * expected */
-      enqueue_device_copy(dst, sb, size);
+      //enqueue_device_copy(dst, sb, size);
       break;
    case hipMemcpyDeviceToHost:
       assert(size <= FIXED_SIZE_B);
-      break;
    default:
       err = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
       assert(err == hipSuccess);
