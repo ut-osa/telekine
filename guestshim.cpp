@@ -265,7 +265,6 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    int err;
 
 	/* todo, do memcpy even if there aren't outstanding copies */
-   std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
 	if (pending_d2h_.size() == 0)
       return;
 
@@ -326,10 +325,7 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       tag = gen_tag();
       sb = next_stg_buf();
       enqueue_device_copy(sb, src, size, tag, false);
-      {
-         std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
-         pending_d2h_.emplace_back((void *)dst, (void *)sb, size, tag);
-      }
+      pending_d2h_.emplace_back((void *)dst, (void *)sb, size, tag);
       break;
    default:
       err = nw_hipMemcpyAsync(dst, src, size, kind, stream_);

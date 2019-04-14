@@ -85,8 +85,7 @@ protected:
     std::unique_ptr<std::thread> process_thread_;
 };
 
-#define N_STG_BUFS 256
-#define N_DBELLS 256
+#define N_STG_BUFS 1024
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
     SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
@@ -112,7 +111,6 @@ protected:
     };
 
     std::deque<d2h_cpy_op> pending_d2h_;
-    std::mutex pending_d2h_mutex_;
     hipStream_t xfer_stream_;
     void *stg_bufs[N_STG_BUFS];
     int stg_buf_idx;
