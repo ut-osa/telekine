@@ -339,10 +339,10 @@ __wrapper_hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src, size_t size
 }
 
 static hipError_t
-__wrapper_nw_hipMemcpyAsync(size_t sizeBytes, hipMemcpyKind kind, const void *src, void *dst, hipStream_t stream)
+__wrapper_nw_hipMemcpySync(size_t sizeBytes, hipMemcpyKind kind, const void *src, void *dst, hipStream_t stream)
 {
     hipError_t ret;
-    ret = nw_hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+    ret = nw_hipMemcpySync(dst, src, sizeBytes, kind, stream);
 
     /* Report resources */
 
@@ -1806,13 +1806,13 @@ __handle_command_hip(struct command_base *__cmd)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case CALL_HIP_NW_HIP_MEMCPY_ASYNC:{
+    case CALL_HIP_NW_HIP_MEMCPY_SYNC:{
         ava_is_in = 1;
         ava_is_out = 0;
-        GPtrArray *__ava_alloc_list_nw_hipMemcpyAsync = g_ptr_array_new_full(0, free);
-        struct hip_nw_hip_memcpy_async_call *__call = (struct hip_nw_hip_memcpy_async_call *)__cmd;
+        GPtrArray *__ava_alloc_list_nw_hipMemcpySync = g_ptr_array_new_full(0, free);
+        struct hip_nw_hip_memcpy_sync_call *__call = (struct hip_nw_hip_memcpy_sync_call *)__cmd;
         assert(__call->base.api_id == HIP_API);
-        assert(__call->base.command_size == sizeof(struct hip_nw_hip_memcpy_async_call));
+        assert(__call->base.command_size == sizeof(struct hip_nw_hip_memcpy_sync_call));
 #ifdef AVA_RECORD_REPLAY
 
 #endif
@@ -1847,7 +1847,7 @@ __handle_command_hip(struct command_base *__cmd)
                 if (__call->src != NULL) {
                     const size_t __size = ((size_t) (kind == hipMemcpyHostToDevice) ? (sizeBytes) : (0));
                     src = (void *)calloc(__size, sizeof(const void));
-                    g_ptr_array_add(__ava_alloc_list_nw_hipMemcpyAsync, src);
+                    g_ptr_array_add(__ava_alloc_list_nw_hipMemcpySync, src);
                     if (kind == hipMemcpyHostToDevice) {
                         void *__tmp_src_0;
                         __tmp_src_0 = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
@@ -1888,7 +1888,7 @@ __handle_command_hip(struct command_base *__cmd)
             if (__call->dst != NULL) {
                 const size_t __size = ((size_t) (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0));
                 dst = (void *)calloc(__size, sizeof(void));
-                g_ptr_array_add(__ava_alloc_list_nw_hipMemcpyAsync, dst);
+                g_ptr_array_add(__ava_alloc_list_nw_hipMemcpySync, dst);
             } else {
                 dst = NULL;
             }
@@ -1898,7 +1898,7 @@ __handle_command_hip(struct command_base *__cmd)
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper_nw_hipMemcpyAsync(sizeBytes, kind, src, dst, stream);
+        ret = __wrapper_nw_hipMemcpySync(sizeBytes, kind, src, dst, stream);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -1921,11 +1921,11 @@ __handle_command_hip(struct command_base *__cmd)
                     }
                 }
         }}
-        struct hip_nw_hip_memcpy_async_ret *__ret =
-            (struct hip_nw_hip_memcpy_async_ret *)command_channel_new_command(__chan,
-            sizeof(struct hip_nw_hip_memcpy_async_ret), __total_buffer_size);
+        struct hip_nw_hip_memcpy_sync_ret *__ret =
+            (struct hip_nw_hip_memcpy_sync_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip_nw_hip_memcpy_sync_ret), __total_buffer_size);
         __ret->base.api_id = HIP_API;
-        __ret->base.command_id = RET_HIP_NW_HIP_MEMCPY_ASYNC;
+        __ret->base.command_id = RET_HIP_NW_HIP_MEMCPY_SYNC;
         __ret->__call_id = __call->__call_id;
 
         /* Output: hipError_t ret */
@@ -1950,7 +1950,7 @@ __handle_command_hip(struct command_base *__cmd)
                     const size_t __size = (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0);
                     void *__tmp_dst_0;
                     __tmp_dst_0 = (void *)calloc(__size, sizeof(void));
-                    g_ptr_array_add(__ava_alloc_list_nw_hipMemcpyAsync, __tmp_dst_0);
+                    g_ptr_array_add(__ava_alloc_list_nw_hipMemcpySync, __tmp_dst_0);
                     const size_t __dst_size_0 = (__size);
                     for (size_t __dst_index_0 = 0; __dst_index_0 < __dst_size_0; __dst_index_0++) {
                         const size_t ava_index = __dst_index_0;
@@ -1988,7 +1988,7 @@ __handle_command_hip(struct command_base *__cmd)
 
 #endif
 
-        g_ptr_array_unref(__ava_alloc_list_nw_hipMemcpyAsync);  /* Deallocate all memory in the alloc list */
+        g_ptr_array_unref(__ava_alloc_list_nw_hipMemcpySync);  /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;

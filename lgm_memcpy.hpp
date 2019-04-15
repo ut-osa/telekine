@@ -72,7 +72,7 @@ struct EncryptionState {
         uint8_t* _nonce;
         HIP_CHECK(hipGetDevice(&current_device));
         HIP_CHECK(hipMalloc(&_nonce, crypto_aead_aes256gcm_NPUBBYTES));
-        HIP_CHECK(nw_hipMemcpyAsync(_nonce, nonce(stream), crypto_aead_aes256gcm_NPUBBYTES,
+        HIP_CHECK(nw_hipMemcpySync(_nonce, nonce(stream), crypto_aead_aes256gcm_NPUBBYTES,
               hipMemcpyHostToDevice, stream));
         HIP_CHECK(hipSetDevice(current_device));
         _nonce_device.emplace(stream, _nonce);
@@ -186,7 +186,7 @@ hipError_t lgmEncMemcpyAsyncD2D(void* dst, const void* src, size_t sizeBytes, hi
   HIP_CHECK(hipGetDevice(&current_device));
   const size_t paddedSize(((sizeBytes + (AES_BLOCKLEN - 1)) / AES_BLOCKLEN) * AES_BLOCKLEN);
   // Move data to staging buffer
-  HIP_CHECK(nw_hipMemcpyAsync(state().ciphertext_device(stream, src_device), src, sizeBytes,
+  HIP_CHECK(nw_hipMemcpySync(state().ciphertext_device(stream, src_device), src, sizeBytes,
         hipMemcpyDeviceToDevice, stream));
   // Encrypt on GPU
   HIP_CHECK(hipSetDevice(src_device));
@@ -196,7 +196,7 @@ hipError_t lgmEncMemcpyAsyncD2D(void* dst, const void* src, size_t sizeBytes, hi
   // Update nonce
   state().nextNonceAsync(stream, src_device);
   // Copy to other GPU
-  HIP_CHECK(nw_hipMemcpyAsync(state().ciphertext_device(nullptr, dst_device),
+  HIP_CHECK(nw_hipMemcpySync(state().ciphertext_device(nullptr, dst_device),
         state().ciphertext_device(nullptr, src_device), paddedSize + crypto_aead_aes256gcm_ABYTES,
         hipMemcpyDeviceToDevice, stream));
   // wait until data has been copied to other GPU, we can't move past this point until the data is
@@ -213,7 +213,7 @@ hipError_t lgmEncMemcpyAsyncD2D(void* dst, const void* src, size_t sizeBytes, hi
   // Update nonce
   state().nextNonceAsync(nullptr, dst_device); // execute on null stream
   // Move from staging buffer to real memory
-  HIP_CHECK(nw_hipMemcpyAsync(dst, state().ciphertext_device(nullptr, dst_device), sizeBytes,
+  HIP_CHECK(nw_hipMemcpySync(dst, state().ciphertext_device(nullptr, dst_device), sizeBytes,
         hipMemcpyDeviceToDevice, nullptr)); // execute on null stream
   // Reset to original device
   HIP_CHECK(hipSetDevice(current_device));

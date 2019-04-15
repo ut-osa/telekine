@@ -80,7 +80,7 @@ hipError_t BaselineCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_
 
 hipError_t BaselineCommandScheduler::AddMemcpyAsync(void* dst, const void* src, size_t size,
         hipMemcpyKind kind) {
-    return nw_hipMemcpyAsync(dst, src, size, kind, this->stream_);
+    return nw_hipMemcpySync(dst, src, size, kind, this->stream_);
 };
 
 hipError_t BaselineCommandScheduler::Wait(void) {
@@ -191,7 +191,7 @@ hipError_t SepMemcpyCommandScheduler::Wait(void)
 void BatchCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
                                       hipMemcpyKind kind)
 {
-   auto ret = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
+   auto ret = nw_hipMemcpySync(dst, src, size, kind, stream_);
    assert(ret == hipSuccess);
 }
 
@@ -250,18 +250,11 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    auto &op = pending_d2h_.at(0);
    assert(op.size_ <= FIXED_SIZE_B);
 
-   /*
-   hipEvent_t event;
-   assert(hipEventCreate(&event) == hipSuccess);
-   assert(hipEventRecord(event, stream_) == hipSuccess);
-   assert(hipStreamWaitEvent(xfer_stream_, event, 0) == hipSuccess);
-   */
-
    if (memcpy_encryption_enabled()) {
       // Encrypt op.src_
       lgmEncryptAsync(op.src_, FIXED_SIZE_FULL, xfer_stream_);
       // copy data to the host
-      err = nw_hipMemcpyAsync(ciphertext, op.src_, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+      err = nw_hipMemcpySync(ciphertext, op.src_, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
       // Decrypt on the cpu */
       // This blocks the thread.
@@ -272,7 +265,7 @@ void SepMemcpyCommandScheduler::pre_notify(void)
       lgmNextNonceAsync(xfer_stream_);
    } else {
       // copy data to the host
-      err = nw_hipMemcpyAsync(plaintext, op.src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
+      err = nw_hipMemcpySync(plaintext, op.src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
    }
@@ -311,13 +304,13 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
 
       if (memcpy_encryption_enabled()) {
          lgmCPUEncrypt(ciphertext, plaintext, FIXED_SIZE_FULL, xfer_stream_);
-         err = nw_hipMemcpyAsync(sb, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+         err = nw_hipMemcpySync(sb, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
                kind, xfer_stream_);
          assert(err == hipSuccess);
          lgmDecryptAsync(sb, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
          lgmNextNonceAsync(xfer_stream_);
       } else {
-         err = nw_hipMemcpyAsync(sb, plaintext, FIXED_SIZE_FULL, kind, xfer_stream_);
+         err = nw_hipMemcpySync(sb, plaintext, FIXED_SIZE_FULL, kind, xfer_stream_);
          assert(err == hipSuccess);
       }
       assert(hipEventCreate(&event) == hipSuccess);
@@ -333,7 +326,7 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       assert(pending_d2h_.size() <= N_STG_BUFS);
       break;
    default:
-      err = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
+      err = nw_hipMemcpySync(dst, src, size, kind, stream_);
       assert(err == hipSuccess);
       break;
    }

@@ -21,7 +21,7 @@ enum hip_functions {
         CALL_HIP_HIP_MEMCPY_DTO_H, RET_HIP_HIP_MEMCPY_DTO_H, CALL_HIP_HIP_MEMCPY_DTO_D, RET_HIP_HIP_MEMCPY_DTO_D,
         CALL_HIP_NW_HIP_MEMCPY, RET_HIP_NW_HIP_MEMCPY, CALL_HIP_HIP_MEMCPY_HTO_D_ASYNC, RET_HIP_HIP_MEMCPY_HTO_D_ASYNC,
         CALL_HIP_HIP_MEMCPY_DTO_H_ASYNC, RET_HIP_HIP_MEMCPY_DTO_H_ASYNC, CALL_HIP_HIP_MEMCPY_DTO_D_ASYNC,
-        RET_HIP_HIP_MEMCPY_DTO_D_ASYNC, CALL_HIP_NW_HIP_MEMCPY_ASYNC, RET_HIP_NW_HIP_MEMCPY_ASYNC,
+        RET_HIP_HIP_MEMCPY_DTO_D_ASYNC, CALL_HIP_NW_HIP_MEMCPY_SYNC, RET_HIP_NW_HIP_MEMCPY_SYNC,
         CALL_HIP_HIP_GET_DEVICE_COUNT, RET_HIP_HIP_GET_DEVICE_COUNT, CALL_HIP_NW_HIP_SET_DEVICE,
         RET_HIP_NW_HIP_SET_DEVICE, CALL_HIP_HIP_MEM_GET_INFO, RET_HIP_HIP_MEM_GET_INFO, CALL_HIP_NW_HIP_STREAM_CREATE,
         RET_HIP_NW_HIP_STREAM_CREATE, CALL_HIP_NW_HIP_GET_DEVICE, RET_HIP_NW_HIP_GET_DEVICE, CALL_HIP_HIP_INIT,
@@ -317,7 +317,7 @@ struct hip_hip_memcpy_dto_d_async_call_record {
     volatile char __call_complete;
 };
 
-struct hip_nw_hip_memcpy_async_call {
+struct hip_nw_hip_memcpy_sync_call {
     struct command_base base;
     intptr_t __call_id;
     size_t sizeBytes;
@@ -327,14 +327,14 @@ struct hip_nw_hip_memcpy_async_call {
     void *dst;
 };
 
-struct hip_nw_hip_memcpy_async_ret {
+struct hip_nw_hip_memcpy_sync_ret {
     struct command_base base;
     intptr_t __call_id;
     void *dst;
     hipError_t ret;
 };
 
-struct hip_nw_hip_memcpy_async_call_record {
+struct hip_nw_hip_memcpy_sync_call_record {
     size_t sizeBytes;
     hipMemcpyKind kind;
     hipStream_t stream;

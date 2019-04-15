@@ -27,11 +27,16 @@ inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {
 }
 
 extern "C" hipError_t
-nw_hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
+nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
-
-   return hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+    hipError_t e = hipSuccess;
+    try {
+        stream->locked_copySync(dst, src, sizeBytes, kind);
+    } catch (ihipException& ex) {
+        e = ex._code;
+    }
+    return e;
 }
 
 hipError_t

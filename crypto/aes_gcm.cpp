@@ -676,16 +676,16 @@ void AES_GCM_init(AES_GCM_engine** engine, const uint8_t* key, hipStream_t strea
   HIP_CHECK(hipMalloc(engine, sizeof(AES_GCM_engine)));
   AES_GCM_engine* e = *engine;
 
-  HIP_CHECK(nw_hipMemcpyAsync(e->sbox, sbox_host, sizeof(sbox_host), hipMemcpyHostToDevice, stream));
-  HIP_CHECK(nw_hipMemcpyAsync(e->rsbox, rsbox_host, sizeof(rsbox_host), hipMemcpyHostToDevice, stream));
-  HIP_CHECK(nw_hipMemcpyAsync(e->Rcon, Rcon_host, sizeof(Rcon_host), hipMemcpyHostToDevice, stream));
-  HIP_CHECK(nw_hipMemcpyAsync(e->key, key, AES_KEYLEN, hipMemcpyHostToDevice, stream));
+  HIP_CHECK(nw_hipMemcpySync(e->sbox, sbox_host, sizeof(sbox_host), hipMemcpyHostToDevice, stream));
+  HIP_CHECK(nw_hipMemcpySync(e->rsbox, rsbox_host, sizeof(rsbox_host), hipMemcpyHostToDevice, stream));
+  HIP_CHECK(nw_hipMemcpySync(e->Rcon, Rcon_host, sizeof(Rcon_host), hipMemcpyHostToDevice, stream));
+  HIP_CHECK(nw_hipMemcpySync(e->key, key, AES_KEYLEN, hipMemcpyHostToDevice, stream));
 
   hipLaunchNOW(HIP_KERNEL_NAME(AES_key_expansion_kernel), 1, 1, 0, stream,
       e->sbox, e->Rcon, e->key, e->aes_roundkey);
   HIP_CHECK(hipMemset(e->gcm_h, 0, 16)); // memset async isn't supported by HIP, so we block here
   AES_GCM_encrypt_one_block(e, e->gcm_h, stream);
-  HIP_CHECK(nw_hipMemcpyAsync(e->gf_last4, gf_last4_host, sizeof(gf_last4_host), hipMemcpyHostToDevice, stream));
+  HIP_CHECK(nw_hipMemcpySync(e->gf_last4, gf_last4_host, sizeof(gf_last4_host), hipMemcpyHostToDevice, stream));
   hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_setup_gf_mult_table_kernel), 1, 1, 0, stream,
       e->gf_last4, e->gcm_h, e->HL, e->HH, e->HL_long, e->HH_long, e->HL_sqr_long, e->HH_sqr_long);
   // no need to synchronize since all future GPU encryption operations will be on the same stream (hopefully?)
