@@ -58,6 +58,14 @@ protected:
         hsa_kernel_dispatch_packet_t aql;
         size_t kernArgSize;
         void* kernArg;
+        KernelLaunchParam(const hsa_kernel_dispatch_packet_t *_aql,
+                          uint8_t *kern_arg, size_t kern_arg_size) :
+           aql(*_aql), kernArgSize(FIXED_EXTRA_SIZE)
+        {
+           assert(kern_arg_size < FIXED_EXTRA_SIZE);
+           kernArg = malloc(FIXED_EXTRA_SIZE);
+           memcpy(kernArg, kern_arg, kern_arg_size);
+        }
     };
 
     struct MemcpyParam {
@@ -65,6 +73,8 @@ protected:
         const void* src;
         size_t size;
         hipMemcpyKind kind;
+        MemcpyParam(void *_dst, const void *_src, size_t _size, hipMemcpyKind _kind) :
+           dst(_dst), src(_src), size(_size), kind(_kind) {}
     };
 
     enum CommandKind {
@@ -74,8 +84,17 @@ protected:
 
     struct CommandEntry {
         CommandKind kind;
-        KernelLaunchParam kernel_launch_param;
-        MemcpyParam memcpy_param;
+        union {
+           KernelLaunchParam kernel_launch_param;
+           MemcpyParam memcpy_param;
+        };
+        CommandEntry(const hsa_kernel_dispatch_packet_t *aql, uint8_t *kern_arg,
+                     size_t kern_arg_size) :
+           kind(KERNEL_LAUNCH),
+           kernel_launch_param(aql, kern_arg, kern_arg_size) {}
+        CommandEntry(void *dst, const void *src, size_t size, hipMemcpyKind mkind) :
+           kind(MEMCPY),
+           memcpy_param(dst, src, size, mkind) {}
     };
 
     std::deque<CommandEntry> pending_commands_;
@@ -102,16 +121,7 @@ protected:
     void push_front_kernel(hsa_kernel_dispatch_packet_t *aql,
                            std::vector<uint8_t> &args)
     {
-         assert(args.size() < FIXED_EXTRA_SIZE);
-
-         CommandEntry command;
-         command.kind = KERNEL_LAUNCH;
-         command.kernel_launch_param.aql = *aql;
-         command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
-         command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
-         memcpy(command.kernel_launch_param.kernArg, args.data(), args.size());
-
-         pending_commands_.push_front(command);
+         pending_commands_.emplace_front(aql, args.data(), args.size());
     }
 
     template <typename... Args, typename F = void (*)(Args...)>

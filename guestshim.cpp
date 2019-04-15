@@ -135,16 +135,8 @@ hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *
     assert(!start && !stop);
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
-        assert(extra_size < FIXED_EXTRA_SIZE);
-
-        CommandEntry command;
-        command.kind = KERNEL_LAUNCH;
-        command.kernel_launch_param.aql = *aql;
-        command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
-        command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
-        memcpy(command.kernel_launch_param.kernArg, extra, extra_size);
         std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
-        pending_commands_.push_back(command);
+        pending_commands_.emplace_back(aql, extra, extra_size);
     }
     pending_commands_cv_.notify_all();
     return hipSuccess; // TODO more accurate return value
@@ -154,13 +146,7 @@ hipError_t BatchCommandScheduler::AddMemcpyAsync(void* dst, const void* src, siz
         hipMemcpyKind kind) {
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
-        CommandEntry command;
-        command.kind = MEMCPY;
-        command.memcpy_param.dst = dst;
-        command.memcpy_param.src = src;
-        command.memcpy_param.kind = kind;
-        command.memcpy_param.size = size;
-        pending_commands_.push_back(command);
+        pending_commands_.emplace_back(dst, src, size, kind);
     }
     pending_commands_cv_.notify_all();
     return hipSuccess; // TODO more accurate return value
