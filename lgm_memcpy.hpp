@@ -159,8 +159,11 @@ static EncryptionState<FIXED_SIZE_B>& state(void) {
 
 static std::map<const void*, int> ptrDevice; // Global map from memory allocations to devices
 
-// Helper functions //
-static hipError_t sendAsync(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
+#define lgmEncPad(sizeBytes) \
+  (((sizeBytes + (AES_BLOCKLEN - 1)) / AES_BLOCKLEN) * AES_BLOCKLEN)
+
+// Encrypted Memcpy functions //
+hipError_t lgmEncMemcpyAsyncH2D(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
   hipError_t ret = hipSuccess;
   const size_t paddedSize(((sizeBytes + (AES_BLOCKLEN - 1)) / AES_BLOCKLEN) * AES_BLOCKLEN);
   uint8_t *tmp(nullptr);
@@ -198,39 +201,29 @@ static hipError_t sendAsync(void* dst, const void* src, size_t sizeBytes, hipStr
   return ret;
 }
 
-static hipError_t receiveAsync(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
-  const size_t paddedSize(((sizeBytes + (AES_BLOCKLEN - 1)) / AES_BLOCKLEN) * AES_BLOCKLEN);
+std::pair<const void*, size_t> lgmStageAndEncrypt(const void* src, size_t sizeBytes,
+    hipStream_t stream) {
   // Copy to staging buffer
   HIP_CHECK(nw_hipMemcpyAsync(state().ciphertext_device(stream), src, sizeBytes,
         hipMemcpyDeviceToDevice, stream));
-  // Encrypt on GPU
-  // Write mac at end of ciphertext
+  const size_t paddedSize(lgmEncPad(sizeBytes));
   AES_GCM_encrypt(state().engine_device(), state().nonce_device(stream),
-      state().ciphertext_device(stream), paddedSize, &state().ciphertext_device(stream)[paddedSize],
-      stream);
-  // Copy to CPU
-  uint8_t* ciphertext(static_cast<uint8_t*>(malloc(paddedSize + crypto_aead_aes256gcm_ABYTES)));
-  HIP_CHECK(nw_hipMemcpyAsync(ciphertext, state().ciphertext_device(stream), paddedSize +
-        crypto_aead_aes256gcm_ABYTES, hipMemcpyDeviceToHost, stream));
-  // TODO add a future and copy data asynchronously
-  hipError_t ret = hipStreamSynchronize(stream);
-  if (ret != hipSuccess) return ret;
-  // Decrypt on CPU
-  uint8_t *plaintext(static_cast<uint8_t*>(malloc(paddedSize)));
-  unsigned long long plaintext_len;
-  if (crypto_aead_aes256gcm_decrypt(plaintext, &plaintext_len, NULL, ciphertext,
-        paddedSize + crypto_aead_aes256gcm_ABYTES, NULL, 0, state().nonce(stream), state().key) < 0) {
-    throw std::runtime_error("failed to decrypt");
-  }
-  // Update nonce
-  state().nextNonceAsync(stream);
-  free(ciphertext);
-  memcpy(dst, plaintext, sizeBytes);
-  free(plaintext);
-  return ret;
+      state().ciphertext_device(stream), paddedSize,
+      &state().ciphertext_device(stream)[paddedSize], stream);
+  return {state().ciphertext_device(stream), paddedSize};
 }
 
-static hipError_t sendReceiveAsync(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
+void lgmCPUDecrypt(void* dst, const void* ciphertext, size_t size, hipStream_t stream) {
+  unsigned long long plaintext_len;
+  if (crypto_aead_aes256gcm_decrypt(static_cast<uint8_t*>(dst), &plaintext_len, NULL,
+        static_cast<const uint8_t*>(ciphertext), size, NULL, 0, state().nonce(stream),
+        state().key) < 0) {
+    throw std::runtime_error("failed to decrypt");
+  }
+  assert(plaintext_len == size);
+}
+
+hipError_t lgmEncMemcpyAsyncD2D(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
   int dst_device(ptrDevice.at(dst));
   int src_device(ptrDevice.at(src));
   int current_device;
@@ -283,20 +276,6 @@ static hipError_t fixedSizeHipMemcpyAsync(void* dst, const void* src, size_t siz
     if (ret != hipSuccess) break;
   }
   return ret;
-}
-
-static hipError_t encryptedMemcpyAsync(void* dst, const void* src, size_t sizeBytes,
-    hipMemcpyKind kind, hipStream_t stream) {
-  switch (kind) {
-    case hipMemcpyHostToDevice:
-      return sendAsync(dst, src, sizeBytes, stream);
-    case hipMemcpyDeviceToHost:
-      return receiveAsync(dst, src, sizeBytes, stream);
-    case hipMemcpyDeviceToDevice:
-      return sendReceiveAsync(dst, src, sizeBytes, stream);
-    default:
-      throw std::runtime_error("unsupported memcpy type in encrypted memcpy");
-  }
 }
 
 void lgm_register_gpu_ptr(void *ptr) {

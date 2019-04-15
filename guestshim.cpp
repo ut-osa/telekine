@@ -253,32 +253,48 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
 	pending_commands_.push_front(command);
 }
 
+#define TAGGED_MEMCPY_SIZE (FIXED_SIZE_B + sizeof(uint64_t))
 void SepMemcpyCommandScheduler::pre_notify(void)
 {
-   static uint8_t scratch[FIXED_SIZE_B + sizeof(uint64_t)];
-   int err;
+   // This implementation assumes we use FIXED_SIZE_B buffers
+   // make scratch buffer big enough to store encrypted (padded + MACed) data
+   static uint8_t encrypted[lgmEncPad(TAGGED_MEMCPY_SIZE) + crypto_aead_aes256gcm_ABYTES];
+   static uint8_t plaintext[lgmEncPad(TAGGED_MEMCPY_SIZE)];
+   hipError_t err;
 
-	/* todo, do memcpy even if there aren't outstanding copies */
+   /* TODO, do memcpy even if there aren't outstanding copies */
    std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
-	if (pending_d2h_.size() == 0)
+   if (pending_d2h_.size() == 0)
       return;
 
    auto &op = pending_d2h_.at(0);
+   const void* src = op.src_;
+   assert(op.size_ == FIXED_SIZE_B);
 
-   /* @Vance: add invocation of encrypt kernel here should take op.src_ and put
-    * it in some sb, then change the argument below to copy instead from sb to
-    * scratch
-    */
-
-   err = nw_hipMemcpyAsync(scratch, op.src_, FIXED_SIZE_B + sizeof(uint64_t), hipMemcpyDeviceToHost,
-                           xfer_stream_);
-   assert(err == hipSuccess);
-
-   /* then decrypt on the cpu here*/
-
+   if (memcpy_encryption_enabled()) {
+      // Copy data (op.src_) to a staging buffer and encrypt it
+      std::pair<const void*, size_t> sbSize = lgmStageAndEncrypt(src, TAGGED_MEMCPY_SIZE,
+            xfer_stream_);
+      // Set src to the staging buffer
+      src = sbSize.first;
+      // copy data to the host
+      err = nw_hipMemcpyAsync(encrypted, src, TAGGED_MEMCPY_SIZE + crypto_aead_aes256gcm_ABYTES,
+            hipMemcpyDeviceToHost, xfer_stream_);
+      // Decrypt on the cpu */
+      // This code blocks this thread.
+      err = hipStreamSynchronize(xfer_stream_);
+      assert(err == hipSuccess);
+      lgmCPUDecrypt(plaintext, encrypted, TAGGED_MEMCPY_SIZE + crypto_aead_aes256gcm_ABYTES,
+            xfer_stream_);
+   } else {
+      // copy data to the host
+      err = nw_hipMemcpyAsync(plaintext, src, TAGGED_MEMCPY_SIZE, hipMemcpyDeviceToHost,
+            xfer_stream_);
+      assert(err == hipSuccess);
+   }
    /* if the tag matches the buffer was ready and we can stop looking for it */
-   if (BUF_TAG(scratch) == op.tag_) {
-      memcpy(op.dst_, scratch, op.size_);
+   if (BUF_TAG(plaintext) == op.tag_) {
+      memcpy(op.dst_, plaintext, op.size_);
       pending_d2h_.pop_front();
       pending_commands_cv_.notify_all();
    } else {
@@ -293,18 +309,18 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
    void *sb;
    hipError_t err;
    uint64_t tag;
-   static uint8_t scratch[FIXED_SIZE_B];
+   static uint8_t plaintext[FIXED_SIZE_B];
 
    assert(size <= FIXED_SIZE_B);
 
    switch (kind) {
    case hipMemcpyHostToDevice:
-      /* if buffer is too small, copy it to the scratch so that the
+      /* if buffer is too small, copy it to the plaintext buffer so that the
        * transfer is fixed size
        */
       if (size < FIXED_SIZE_B) {
-         memcpy(scratch, src, size);
-         src = scratch;
+         memcpy(plaintext, src, size);
+         src = plaintext;
       }
       sb = next_stg_buf();
       err = nw_hipMemcpyAsync(sb, src, FIXED_SIZE_B, kind, xfer_stream_);
