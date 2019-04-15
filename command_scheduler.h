@@ -57,13 +57,12 @@ protected:
     struct KernelLaunchParam {
         hsa_kernel_dispatch_packet_t aql;
         size_t kernArgSize;
-        void* kernArg;
+        uint8_t kernArg[FIXED_EXTRA_SIZE];
         KernelLaunchParam(const hsa_kernel_dispatch_packet_t *_aql,
                           uint8_t *kern_arg, size_t kern_arg_size) :
            aql(*_aql), kernArgSize(FIXED_EXTRA_SIZE)
         {
            assert(kern_arg_size < FIXED_EXTRA_SIZE);
-           kernArg = malloc(FIXED_EXTRA_SIZE);
            memcpy(kernArg, kern_arg, kern_arg_size);
         }
     };

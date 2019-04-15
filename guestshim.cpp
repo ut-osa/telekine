@@ -326,7 +326,7 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
 
 void BatchCommandScheduler::ProcessThread() {
     while (this->running) {
-        std::vector<KernelLaunchParam> params;
+        std::vector<KernelLaunchParam *> params;
         {
             std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
             if (!quantum_waiter_) {
@@ -352,7 +352,7 @@ void BatchCommandScheduler::ProcessThread() {
             for (int i = 0; i < batch_size_; i++) {
                 if (i >= pending_commands_.size()) break;
                 if (pending_commands_[i].kind == MEMCPY) break;
-                params.push_back(pending_commands_[i].kernel_launch_param);
+                params.push_back(&pending_commands_[i].kernel_launch_param);
             }
         }
 
@@ -361,16 +361,15 @@ void BatchCommandScheduler::ProcessThread() {
 
         size_t total_extra_size = 0;
         for (int i = 0; i < params.size(); i++) {
-            aql.emplace_back(params[i].aql);
-            extra_size.push_back(params[i].kernArgSize);
-            total_extra_size += params[i].kernArgSize;
+            aql.emplace_back(params[i]->aql);
+            extra_size.push_back(params[i]->kernArgSize);
+            total_extra_size += params[i]->kernArgSize;
         }
         char* all_extra = (char*)malloc(total_extra_size);
         size_t cursor = 0;
         for (int i = 0; i < params.size(); i++) {
-            memcpy(all_extra + cursor, params[i].kernArg, params[i].kernArgSize);
-            cursor += params[i].kernArgSize;
-            free(params[i].kernArg);
+            memcpy(all_extra + cursor, params[i]->kernArg, params[i]->kernArgSize);
+            cursor += params[i]->kernArgSize;
         }
 
         __do_c_hipHccModuleLaunchMultiKernel(
