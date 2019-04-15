@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "hip/hip_runtime.h"
+#include "hip_function_info.hpp"
 
 #include "quantum_waiter.h"
 
@@ -21,6 +22,8 @@ typedef uint64_t tag_t;
 #define FIXED_SIZE_FULL (0x1UL << 20) // 1 MB
 #define FIXED_SIZE_B (FIXED_SIZE_FULL - sizeof(tag_t))
 #define BUF_TAG(buf) (*((uint64_t *)(&((buf)[FIXED_SIZE_B]))))
+#define FIXED_EXTRA_SIZE 256
+
 
 class CommandScheduler {
 public:
@@ -95,6 +98,35 @@ protected:
     void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
     void pre_notify(void) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
+
+    void push_front_kernel(hsa_kernel_dispatch_packet_t *aql,
+                           std::vector<uint8_t> &args)
+    {
+         assert(args.size() < FIXED_EXTRA_SIZE);
+
+         CommandEntry command;
+         command.kind = KERNEL_LAUNCH;
+         command.kernel_launch_param.aql = *aql;
+         command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
+         command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
+         memcpy(command.kernel_launch_param.kernArg, args.data(), args.size());
+
+         pending_commands_.push_front(command);
+    }
+
+    template <typename... Args, typename F = void (*)(Args...)>
+    inline void inject_kern(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
+                             std::uint32_t sharedMemBytes, Args... args)
+    {
+        auto kern_args = hip_impl::make_kernarg(std::move(args)...);
+        auto fun = hip_function_lookup((uintptr_t)kernel, stream_);
+        hsa_kernel_dispatch_packet_t aql = {0};
+
+        hip_function_to_aql(&aql, fun, DIM3_TO_AQL(numBlocks, dimBlocks), 0);
+
+        push_front_kernel(&aql, kern_args);
+    }
+
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= N_STG_BUFS)
