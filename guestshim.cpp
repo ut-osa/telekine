@@ -110,10 +110,10 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
    ret = hipStreamCreate(&xfer_stream_);
    assert(ret == hipSuccess);
    for (int i = 0; i < N_STG_BUFS; i++) {
-      /* allocate space for the buffer plus an 8 byte tag */
-      ret = hipMalloc(in_bufs + i, FIXED_SIZE_FULL);
+      /* allocate space for the buffer plus an 8 byte tag plus the MAC */
+      ret = hipMalloc(in_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
       assert(ret == hipSuccess);
-      ret = hipMalloc(out_bufs + i, FIXED_SIZE_FULL);
+      ret = hipMalloc(out_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
       assert(ret == hipSuccess);
    }
 }
@@ -259,16 +259,17 @@ void SepMemcpyCommandScheduler::pre_notify(void)
 
    if (memcpy_encryption_enabled()) {
       // Encrypt op.src_
-      lgmEncryptAsync(op.src_, FIXED_SIZE_B, xfer_stream_);
+      lgmEncryptAsync(op.src_, FIXED_SIZE_FULL, xfer_stream_);
       // copy data to the host
       err = nw_hipMemcpyAsync(ciphertext, op.src_, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
       // Decrypt on the cpu */
       // This blocks the thread.
-      err = hipStreamSynchronize(xfer_stream_);
+      err = nw_hipStreamSynchronize(xfer_stream_);
       assert(err == hipSuccess);
       lgmCPUDecrypt(plaintext, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             xfer_stream_);
+      lgmNextNonceAsync(xfer_stream_);
    } else {
       // copy data to the host
       err = nw_hipMemcpyAsync(plaintext, op.src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
@@ -314,6 +315,7 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
                kind, xfer_stream_);
          assert(err == hipSuccess);
          lgmDecryptAsync(sb, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
+         lgmNextNonceAsync(xfer_stream_);
       } else {
          err = nw_hipMemcpyAsync(sb, plaintext, FIXED_SIZE_FULL, kind, xfer_stream_);
          assert(err == hipSuccess);

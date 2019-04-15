@@ -2,7 +2,6 @@
 #define LGM_MEMCPY_H
 
 #include "command_scheduler.h"
-
 #include "check_env.h"
 
 #include "crypto/aes_gcm.h"
@@ -90,19 +89,19 @@ struct EncryptionState {
     }
   };
 
+  const hipStream_t stream;
   std::map<int, DeviceState> dstate;
-  bool initialized = false;
   uint8_t key[AES_KEYLEN];
 
-  EncryptionState(void) {
+  EncryptionState(hipStream_t stream) : stream(stream) {
     randombytes_buf(key, AES_KEYLEN);
-    int device_count;
-    HIP_CHECK(hipGetDeviceCount(&device_count));
+    int device_count = 1;
+    //HIP_CHECK(hipGetDeviceCount(&device_count));
+    // TODO enable when multiple devices are supported
     for (int i = 0; i < device_count; i++) {
       dstate.emplace(std::piecewise_construct, std::forward_as_tuple(i),
-          std::forward_as_tuple(i, key, nullptr)); // initialize on default stream
+          std::forward_as_tuple(i, key, stream));
     }
-    initialized = true;
   }
 
   const AES_GCM_engine* engine_device(int device = -1) {
@@ -110,17 +109,17 @@ struct EncryptionState {
     return dstate.at(device).engine_device;
   }
 
-  uint8_t* nonce(hipStream_t stream, int device = -1) {
+  uint8_t* nonce(int device = -1) {
     if (device == -1) HIP_CHECK(hipGetDevice(&device));
     return dstate.at(device).nonce(stream);
   }
 
-  uint8_t* nonce_device(hipStream_t stream, int device = -1) {
+  uint8_t* nonce_device(int device = -1) {
     if (device == -1) HIP_CHECK(hipGetDevice(&device));
     return dstate.at(device).nonce_device(stream);
   }
 
-  void nextNonceAsync(hipStream_t stream, int device = -1) {
+  void nextNonceAsync(int device = -1) {
     if (device == -1) HIP_CHECK(hipGetDevice(&device));
     dstate.at(device).nextNonceAsync(stream);
   }
@@ -129,9 +128,10 @@ struct EncryptionState {
 // One encryption state per thread
 static thread_local std::unique_ptr<EncryptionState<FIXED_SIZE_B>> _state;
 // Constructs state on demand
-static EncryptionState<FIXED_SIZE_B>& state(void) {
+static EncryptionState<FIXED_SIZE_B>& state(hipStream_t stream) {
   if (!_state)
-    _state = std::unique_ptr<EncryptionState<FIXED_SIZE_B>>(new EncryptionState<FIXED_SIZE_B>());
+    _state = std::unique_ptr<EncryptionState<FIXED_SIZE_B>>(
+        new EncryptionState<FIXED_SIZE_B>(stream));
   return *_state;
 }
 
@@ -142,7 +142,7 @@ static std::map<const void*, int> ptrDevice; // Global map from memory allocatio
 
 // ciphertext_len includes MAC
 void lgmDecryptAsync(void* ciphertext, size_t ciphertext_len, hipStream_t stream) {
-  AES_GCM_decrypt(state().engine_device(), state().nonce_device(stream),
+  AES_GCM_decrypt(state(stream).engine_device(), state(stream).nonce_device(),
       static_cast<uint8_t*>(ciphertext), ciphertext_len - crypto_aead_aes256gcm_ABYTES,
       &static_cast<uint8_t*>(ciphertext)[ciphertext_len - crypto_aead_aes256gcm_ABYTES],
       stream);
@@ -150,17 +150,16 @@ void lgmDecryptAsync(void* ciphertext, size_t ciphertext_len, hipStream_t stream
 
 // sizes are padded
 void lgmEncryptAsync(void* buf, size_t sizeBytes, hipStream_t stream) {
-  AES_GCM_encrypt(state().engine_device(), state().nonce_device(stream),
+  AES_GCM_encrypt(state(stream).engine_device(), state(stream).nonce_device(),
       static_cast<uint8_t*>(buf), sizeBytes, &static_cast<uint8_t*>(buf)[sizeBytes], stream);
 }
 
 // provide a ciphertext buffer of size lgmEncPad(size) + crypto_aead_aes256gcm_ABYTES
 void lgmCPUEncrypt(void* ciphertext, const void* src, size_t size, hipStream_t stream) {
   unsigned long long ciphertext_len;
-  printf("encryptiong size %zx B\n", size);
   if (crypto_aead_aes256gcm_encrypt(static_cast<uint8_t*>(ciphertext), &ciphertext_len,
-      static_cast<const uint8_t*>(src), size, NULL, 0, NULL, state().nonce(stream),
-      state().key) < 0) {
+      static_cast<const uint8_t*>(src), size, NULL, 0, NULL, state(stream).nonce(),
+      state(stream).key) < 0) {
     throw std::runtime_error("failed to encrypt");
   }
 }
@@ -168,12 +167,17 @@ void lgmCPUEncrypt(void* ciphertext, const void* src, size_t size, hipStream_t s
 void lgmCPUDecrypt(void* dst, const void* ciphertext, size_t size, hipStream_t stream) {
   unsigned long long plaintext_len;
   if (crypto_aead_aes256gcm_decrypt(static_cast<uint8_t*>(dst), &plaintext_len, NULL,
-        static_cast<const uint8_t*>(ciphertext), size, NULL, 0, state().nonce(stream),
-        state().key) < 0) {
+        static_cast<const uint8_t*>(ciphertext), size, NULL, 0, state(stream).nonce(),
+        state(stream).key) < 0) {
     throw std::runtime_error("failed to decrypt");
   }
-  assert(plaintext_len == size);
+  assert(plaintext_len + crypto_aead_aes256gcm_ABYTES == size);
 }
+
+void lgmNextNonceAsync(hipStream_t stream, int device=-1) {
+  state(stream).nextNonceAsync();
+}
+
 #if 0
 hipError_t lgmEncMemcpyAsyncD2D(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
   int dst_device(ptrDevice.at(dst));
@@ -230,6 +234,7 @@ static hipError_t fixedSizeHipMemcpyAsync(void* dst, const void* src, size_t siz
   return ret;
 }
 
+// TODO for multi-gpu support, register location of all hipmallocs with this method
 void lgm_register_gpu_ptr(void *ptr) {
   int device;
   HIP_CHECK(hipGetDevice(&device));
