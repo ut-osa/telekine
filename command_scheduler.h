@@ -151,6 +151,7 @@ protected:
     hipStream_t xfer_stream_;
     void *in_bufs[N_STG_BUFS];
     void *out_bufs[N_STG_BUFS];
+    void *encrypt_out_buf;
     unsigned stg_in_idx;
     unsigned stg_out_idx;
 

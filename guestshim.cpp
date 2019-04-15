@@ -114,8 +114,9 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
       ret = hipMalloc(in_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
       assert(ret == hipSuccess);
       ret = hipMalloc(out_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
-      assert(ret == hipSuccess);
    }
+   ret = hipMalloc(&encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+   assert(ret == hipSuccess);
 }
 
 SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
@@ -125,6 +126,7 @@ SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
       hipFree(in_bufs[i]);
       hipFree(out_bufs[i]);
    }
+   hipFree(encrypt_out_buf);
 }
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
@@ -250,13 +252,11 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    auto &op = pending_d2h_.at(0);
    assert(op.size_ <= FIXED_SIZE_B);
 
-   void* src = op.src_;
    if (memcpy_encryption_enabled()) {
       // Encrypt op.src_
-      src = next_out_buf();
-      lgmEncryptAsync(src, op.src_, FIXED_SIZE_FULL, xfer_stream_);
+      lgmEncryptAsync(encrypt_out_buf, op.src_, FIXED_SIZE_FULL, xfer_stream_);
       // copy data to the host
-      err = nw_hipMemcpySync(ciphertext, src, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+      err = nw_hipMemcpySync(ciphertext, encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
       // Decrypt on the cpu */
       // This blocks the thread.
@@ -267,7 +267,7 @@ void SepMemcpyCommandScheduler::pre_notify(void)
       lgmNextNonceAsync(xfer_stream_);
    } else {
       // copy data to the host
-      err = nw_hipMemcpySync(plaintext, src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
+      err = nw_hipMemcpySync(plaintext, op.src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
    }
