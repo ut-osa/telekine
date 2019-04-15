@@ -65,6 +65,19 @@ protected:
            assert(kern_arg_size < FIXED_EXTRA_SIZE);
            memcpy(kernArg, kern_arg, kern_arg_size);
         }
+        template <typename... Args, typename F = void (*)(Args...)>
+        KernelLaunchParam(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
+                          std::uint32_t sharedMemBytes, hipStream_t stream,
+                          Args... args) : aql{0}, kernArgSize(FIXED_EXTRA_SIZE)
+        {
+           auto kern_args = hip_impl::make_kernarg(std::move(args)...);
+           auto fun = hip_function_lookup((uintptr_t)kernel, stream);
+
+           hip_function_to_aql(&aql, fun, DIM3_TO_AQL(numBlocks, dimBlocks),
+                               sharedMemBytes);
+           assert(kern_args.size() < FIXED_EXTRA_SIZE);
+           memcpy(kernArg, kern_args.data(), kern_args.size());
+        }
     };
 
     struct MemcpyParam {
@@ -94,6 +107,13 @@ protected:
         CommandEntry(void *dst, const void *src, size_t size, hipMemcpyKind mkind) :
            kind(MEMCPY),
            memcpy_param(dst, src, size, mkind) {}
+        template <typename... Args, typename F = void (*)(Args...)>
+        CommandEntry(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
+                          std::uint32_t sharedMemBytes, hipStream_t stream,
+                          Args... args) :
+           kind(KERNEL_LAUNCH),
+           kernel_launch_param(std::move(kernel), numBlocks, dimBlocks, sharedMemBytes,
+                               stream, std::move(args)...) {}
     };
 
     std::deque<CommandEntry> pending_commands_;
@@ -116,26 +136,6 @@ protected:
     void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
     void pre_notify(void) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
-
-    void push_front_kernel(hsa_kernel_dispatch_packet_t *aql,
-                           std::vector<uint8_t> &args)
-    {
-         pending_commands_.emplace_front(aql, args.data(), args.size());
-    }
-
-    template <typename... Args, typename F = void (*)(Args...)>
-    inline void inject_kern(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
-                             std::uint32_t sharedMemBytes, Args... args)
-    {
-        auto kern_args = hip_impl::make_kernarg(std::move(args)...);
-        auto fun = hip_function_lookup((uintptr_t)kernel, stream_);
-        hsa_kernel_dispatch_packet_t aql = {0};
-
-        hip_function_to_aql(&aql, fun, DIM3_TO_AQL(numBlocks, dimBlocks), 0);
-
-        push_front_kernel(&aql, kern_args);
-    }
-
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= N_STG_BUFS)

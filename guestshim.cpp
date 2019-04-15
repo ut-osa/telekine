@@ -219,8 +219,9 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
                                                     size_t size, tag_t tag,
                                                     bool in)
 {
-   inject_kern(in ? vector_copy_in : vector_copy_out, dim3(512), dim3(256),
-                             0, dst, src, size, tag);
+   pending_commands_.emplace_front(in ? vector_copy_in : vector_copy_out,
+                                   dim3(512), dim3(256), 0, stream_, dst, src,
+                                   size, tag);
 }
 
 void SepMemcpyCommandScheduler::pre_notify(void)
