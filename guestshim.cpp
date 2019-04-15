@@ -112,8 +112,8 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
    ret = hipStreamCreate(&xfer_stream_);
    assert(ret == hipSuccess);
    for (int i = 0; i < N_STG_BUFS; i++) {
-      /* allocate space for the buffer plus an 8 byte tag */
-      ret = hipMalloc(stg_bufs + i, FIXED_SIZE_FULL);
+      /* allocate space for the buffer plus an 8 byte tag plus a MAC */
+      ret = hipMalloc(stg_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
       assert(ret == hipSuccess);
    }
 }
@@ -264,8 +264,8 @@ void SepMemcpyCommandScheduler::pre_notify(void)
 {
    // This implementation assumes we use FIXED_SIZE_B buffers
    // make scratch buffer big enough to store encrypted (padded + MACed) data
-   static uint8_t encrypted[lgmEncPad(FIXED_SIZE_FULL) + crypto_aead_aes256gcm_ABYTES];
-   static uint8_t plaintext[lgmEncPad(FIXED_SIZE_FULL)];
+   static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+   static uint8_t plaintext[FIXED_SIZE_FULL];
    hipError_t err;
 
    /* TODO, do memcpy even if there aren't outstanding copies */
@@ -273,8 +273,7 @@ void SepMemcpyCommandScheduler::pre_notify(void)
       return;
 
    auto &op = pending_d2h_.at(0);
-   const void* src = op.src_;
-   assert(op.size_ == FIXED_SIZE_B);
+   assert(op.size_ <= FIXED_SIZE_B);
 
    hipEvent_t event;
    assert(hipEventCreate(&event) == hipSuccess);
@@ -282,23 +281,20 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    assert(hipStreamWaitEvent(xfer_stream_, event, 0) == hipSuccess);
 
    if (memcpy_encryption_enabled()) {
-      // Copy data (op.src_) to a staging buffer and encrypt it
-      std::pair<const void*, size_t> sbSize = lgmStageAndEncrypt(src, FIXED_SIZE_FULL,
-            xfer_stream_);
-      // Set src to the staging buffer
-      src = sbSize.first;
+      // Encrypt op.src_
+      lgmEncryptAsync(op.src_, FIXED_SIZE_B, xfer_stream_);
       // copy data to the host
-      err = nw_hipMemcpyAsync(encrypted, src, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+      err = nw_hipMemcpyAsync(ciphertext, op.src_, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
       // Decrypt on the cpu */
-      // This code blocks this thread.
+      // This blocks the thread.
       err = hipStreamSynchronize(xfer_stream_);
       assert(err == hipSuccess);
-      lgmCPUDecrypt(plaintext, encrypted, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+      lgmCPUDecrypt(plaintext, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             xfer_stream_);
    } else {
       // copy data to the host
-      err = nw_hipMemcpyAsync(plaintext, src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
+      err = nw_hipMemcpyAsync(plaintext, op.src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
    }
@@ -320,28 +316,31 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
    void *sb;
    hipError_t err;
    tag_t tag;
-   static uint8_t scratch[FIXED_SIZE_FULL];
+   static uint8_t plaintext[FIXED_SIZE_FULL];
+   static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
 
-   assert(size <= FIXED_SIZE_B);
+   assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
 
    switch (kind) {
    case hipMemcpyHostToDevice:
       /* if buffer is too small, copy it to the plaintext buffer so that the
        * transfer is fixed size
        */
-      memcpy(scratch, src, size);
+      memcpy(plaintext, src, size);
       sb = next_stg_buf();
       tag = gen_tag();
-      BUF_TAG(scratch) = tag;
-      err = nw_hipMemcpyAsync(sb, scratch, FIXED_SIZE_FULL, kind, xfer_stream_);
-      assert(err == hipSuccess);
+      BUF_TAG(plaintext) = tag;
 
-      /* @Vance: add invocation of decrypt kernel here should take
-       * sb and put it in sb1, then change the argument below to copy instead
-       * from sb1 to dst
-       */
-
-      assert(err == hipSuccess);
+      if (memcpy_encryption_enabled()) {
+         lgmCPUEncrypt(ciphertext, plaintext, FIXED_SIZE_FULL, xfer_stream_);
+         err = nw_hipMemcpyAsync(sb, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+               kind, xfer_stream_);
+         assert(err == hipSuccess);
+         lgmDecryptAsync(sb, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
+      } else {
+         err = nw_hipMemcpyAsync(sb, plaintext, FIXED_SIZE_FULL, kind, xfer_stream_);
+         assert(err == hipSuccess);
+      }
       assert(hipEventCreate(&event) == hipSuccess);
       assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
       assert(hipStreamWaitEvent(stream_, event, 0) == hipSuccess);

@@ -35,7 +35,6 @@ struct EncryptionState {
     int device;
     std::map<hipStream_t, Nonce> _nonce_host;
     std::map<hipStream_t, uint8_t*> _nonce_device;
-    std::map<hipStream_t, uint8_t*> _ciphertext_device;
     AES_GCM_engine* engine_device;
 
     DeviceState(void) {}
@@ -52,7 +51,6 @@ struct EncryptionState {
       int current_device;
       HIP_CHECK(hipGetDevice(&current_device));
       for (auto& n : _nonce_device) HIP_CHECK(hipFree(n.second));
-      for (auto& ct : _ciphertext_device) HIP_CHECK(hipFree(ct.second));
       AES_GCM_destroy(engine_device);
       HIP_CHECK(hipSetDevice(current_device));
     }
@@ -90,26 +88,11 @@ struct EncryptionState {
       AES_GCM_next_nonce(_nonce_device.at(stream), stream);
       HIP_CHECK(hipSetDevice(current_device));
     }
-
-    uint8_t* ciphertext_device(hipStream_t stream) {
-      if (_ciphertext_device.find(stream) != _ciphertext_device.end())
-        return _ciphertext_device.at(stream);
-      else {
-        int current_device;
-        uint8_t* ciphertext;
-        HIP_CHECK(hipGetDevice(&current_device));
-        HIP_CHECK(hipMalloc(&ciphertext, TRANSFER_UNIT_SIZE + crypto_aead_aes256gcm_ABYTES));
-        HIP_CHECK(hipSetDevice(current_device));
-        _ciphertext_device.emplace(stream, ciphertext);
-        return _ciphertext_device.at(stream);
-      }
-    }
   };
 
   std::map<int, DeviceState> dstate;
   bool initialized = false;
   uint8_t key[AES_KEYLEN];
-  uint8_t *ciphertext;
 
   EncryptionState(void) {
     randombytes_buf(key, AES_KEYLEN);
@@ -141,11 +124,6 @@ struct EncryptionState {
     if (device == -1) HIP_CHECK(hipGetDevice(&device));
     dstate.at(device).nextNonceAsync(stream);
   }
-
-  uint8_t* ciphertext_device(hipStream_t stream, int device = -1) {
-    if (device == -1) HIP_CHECK(hipGetDevice(&device));
-    return dstate.at(device).ciphertext_device(stream);
-  }
 };
 
 // One encryption state per thread
@@ -162,55 +140,29 @@ static std::map<const void*, int> ptrDevice; // Global map from memory allocatio
 #define lgmEncPad(sizeBytes) \
   (((sizeBytes + (AES_BLOCKLEN - 1)) / AES_BLOCKLEN) * AES_BLOCKLEN)
 
-// Encrypted Memcpy functions //
-hipError_t lgmEncMemcpyAsyncH2D(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
-  hipError_t ret = hipSuccess;
-  const size_t paddedSize(((sizeBytes + (AES_BLOCKLEN - 1)) / AES_BLOCKLEN) * AES_BLOCKLEN);
-  uint8_t *tmp(nullptr);
-  if (sizeBytes < paddedSize) {
-    // Copy src to staging buffer because crypto_aead_aes256gcm will read past end
-    tmp = new uint8_t[paddedSize];
-    memcpy(tmp, src, sizeBytes);
-    src = tmp;
-  }
-  // Encrypt on CPU
-  uint8_t* ciphertext(static_cast<uint8_t*>(malloc(paddedSize + crypto_aead_aes256gcm_ABYTES)));
-  unsigned long long ciphertext_len;
-  if (crypto_aead_aes256gcm_encrypt(ciphertext, &ciphertext_len, static_cast<const uint8_t*>(src),
-        paddedSize, NULL, 0, NULL, state().nonce(stream), state().key) < 0) {
-    throw std::runtime_error("failed to encrypt");
-  }
-  // TODO crypto_aead_aes256gcm_encrypt blocks forward progress
-  // Copy to GPU
-  ret = nw_hipMemcpyAsync(state().ciphertext_device(stream), ciphertext, ciphertext_len,
-      hipMemcpyHostToDevice, stream);
-  // Decrypt on GPU
-  AES_GCM_decrypt(state().engine_device(), state().nonce_device(stream), state().ciphertext_device(stream),
-      ciphertext_len - crypto_aead_aes256gcm_ABYTES,
-      &state().ciphertext_device(stream)[ciphertext_len - crypto_aead_aes256gcm_ABYTES], stream);
-  // Update nonce
-  state().nextNonceAsync(stream);
-  // Move from staging buffer to real memory
-  HIP_CHECK(nw_hipMemcpyAsync(dst, state().ciphertext_device(stream), sizeBytes,
-        hipMemcpyDeviceToDevice, stream));
-  // Clean up padded input
-  if (tmp) delete[] tmp;
-  // TODO make this happen asynchronously. We can't clean ciphertext up until it's copied to the GPU
-  HIP_CHECK(hipStreamSynchronize(stream));
-  free(ciphertext);
-  return ret;
+// ciphertext_len includes MAC
+void lgmDecryptAsync(void* ciphertext, size_t ciphertext_len, hipStream_t stream) {
+  AES_GCM_decrypt(state().engine_device(), state().nonce_device(stream),
+      static_cast<uint8_t*>(ciphertext), ciphertext_len - crypto_aead_aes256gcm_ABYTES,
+      &static_cast<uint8_t*>(ciphertext)[ciphertext_len - crypto_aead_aes256gcm_ABYTES],
+      stream);
 }
 
-std::pair<const void*, size_t> lgmStageAndEncrypt(const void* src, size_t sizeBytes,
-    hipStream_t stream) {
-  // Copy to staging buffer
-  HIP_CHECK(nw_hipMemcpyAsync(state().ciphertext_device(stream), src, sizeBytes,
-        hipMemcpyDeviceToDevice, stream));
-  const size_t paddedSize(lgmEncPad(sizeBytes));
+// sizes are padded
+void lgmEncryptAsync(void* buf, size_t sizeBytes, hipStream_t stream) {
   AES_GCM_encrypt(state().engine_device(), state().nonce_device(stream),
-      state().ciphertext_device(stream), paddedSize,
-      &state().ciphertext_device(stream)[paddedSize], stream);
-  return {state().ciphertext_device(stream), paddedSize};
+      static_cast<uint8_t*>(buf), sizeBytes, &static_cast<uint8_t*>(buf)[sizeBytes], stream);
+}
+
+// provide a ciphertext buffer of size lgmEncPad(size) + crypto_aead_aes256gcm_ABYTES
+void lgmCPUEncrypt(void* ciphertext, const void* src, size_t size, hipStream_t stream) {
+  unsigned long long ciphertext_len;
+  printf("encryptiong size %zx B\n", size);
+  if (crypto_aead_aes256gcm_encrypt(static_cast<uint8_t*>(ciphertext), &ciphertext_len,
+      static_cast<const uint8_t*>(src), size, NULL, 0, NULL, state().nonce(stream),
+      state().key) < 0) {
+    throw std::runtime_error("failed to encrypt");
+  }
 }
 
 void lgmCPUDecrypt(void* dst, const void* ciphertext, size_t size, hipStream_t stream) {
@@ -222,7 +174,7 @@ void lgmCPUDecrypt(void* dst, const void* ciphertext, size_t size, hipStream_t s
   }
   assert(plaintext_len == size);
 }
-
+#if 0
 hipError_t lgmEncMemcpyAsyncD2D(void* dst, const void* src, size_t sizeBytes, hipStream_t stream) {
   int dst_device(ptrDevice.at(dst));
   int src_device(ptrDevice.at(src));
@@ -263,7 +215,7 @@ hipError_t lgmEncMemcpyAsyncD2D(void* dst, const void* src, size_t sizeBytes, hi
   HIP_CHECK(hipSetDevice(current_device));
   return ret;
 }
-
+#endif
 template <size_t SIZE>
 static hipError_t fixedSizeHipMemcpyAsync(void* dst, const void* src, size_t sizeBytes,
     hipMemcpyKind kind, hipStream_t stream) {
