@@ -106,14 +106,16 @@ BatchCommandScheduler::~BatchCommandScheduler(void) {
 SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int batch_size,
                                                      int fixed_rate_interval_us)
    : BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us),
-     stg_buf_idx(0)
+     stg_in_idx(0), stg_out_idx(0)
 {
    hipError_t ret;
    ret = hipStreamCreate(&xfer_stream_);
    assert(ret == hipSuccess);
    for (int i = 0; i < N_STG_BUFS; i++) {
-      /* allocate space for the buffer plus an 8 byte tag plus a MAC */
-      ret = hipMalloc(stg_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+      /* allocate space for the buffer plus an 8 byte tag */
+      ret = hipMalloc(in_bufs + i, FIXED_SIZE_FULL);
+      assert(ret == hipSuccess);
+      ret = hipMalloc(out_bufs + i, FIXED_SIZE_FULL);
       assert(ret == hipSuccess);
    }
 }
@@ -121,8 +123,10 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
 SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
 {
    hipStreamDestroy(xfer_stream_);
-   for (int i = 0; i < N_STG_BUFS; i++)
-      hipFree(stg_bufs[i]);
+   for (int i = 0; i < N_STG_BUFS; i++) {
+      hipFree(in_bufs[i]);
+      hipFree(out_bufs[i]);
+   }
 }
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
@@ -275,10 +279,12 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    auto &op = pending_d2h_.at(0);
    assert(op.size_ <= FIXED_SIZE_B);
 
+   /*
    hipEvent_t event;
    assert(hipEventCreate(&event) == hipSuccess);
    assert(hipEventRecord(event, stream_) == hipSuccess);
    assert(hipStreamWaitEvent(xfer_stream_, event, 0) == hipSuccess);
+   */
 
    if (memcpy_encryption_enabled()) {
       // Encrypt op.src_
@@ -327,7 +333,7 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
        * transfer is fixed size
        */
       memcpy(plaintext, src, size);
-      sb = next_stg_buf();
+      sb = next_in_buf();
       tag = gen_tag();
       BUF_TAG(plaintext) = tag;
 
@@ -348,9 +354,10 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       break;
    case hipMemcpyDeviceToHost:
       tag = gen_tag();
-      sb = next_stg_buf();
+      sb = next_out_buf();
       enqueue_device_copy(sb, src, size, tag, false);
       pending_d2h_.emplace_back((void *)dst, (void *)sb, size, tag);
+      assert(pending_d2h_.size() <= N_STG_BUFS);
       break;
    default:
       err = nw_hipMemcpyAsync(dst, src, size, kind, stream_);
