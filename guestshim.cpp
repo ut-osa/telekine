@@ -250,11 +250,13 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    auto &op = pending_d2h_.at(0);
    assert(op.size_ <= FIXED_SIZE_B);
 
+   void* src = op.src_;
    if (memcpy_encryption_enabled()) {
       // Encrypt op.src_
-      lgmEncryptAsync(op.src_, FIXED_SIZE_FULL, xfer_stream_);
+      src = next_out_buf();
+      lgmEncryptAsync(src, op.src_, FIXED_SIZE_FULL, xfer_stream_);
       // copy data to the host
-      err = nw_hipMemcpySync(ciphertext, op.src_, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+      err = nw_hipMemcpySync(ciphertext, src, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
       // Decrypt on the cpu */
       // This blocks the thread.
@@ -265,7 +267,7 @@ void SepMemcpyCommandScheduler::pre_notify(void)
       lgmNextNonceAsync(xfer_stream_);
    } else {
       // copy data to the host
-      err = nw_hipMemcpySync(plaintext, op.src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
+      err = nw_hipMemcpySync(plaintext, src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
    }
@@ -284,7 +286,8 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
                                           hipMemcpyKind kind)
 {
    hipEvent_t event;
-   void *sb;
+   void *sb1;
+   void *sb2;
    hipError_t err;
    tag_t tag;
    static uint8_t plaintext[FIXED_SIZE_FULL];
@@ -298,31 +301,34 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
        * transfer is fixed size
        */
       memcpy(plaintext, src, size);
-      sb = next_in_buf();
+      sb1 = next_in_buf();
       tag = gen_tag();
       BUF_TAG(plaintext) = tag;
 
       if (memcpy_encryption_enabled()) {
+         sb2 = next_in_buf();
          lgmCPUEncrypt(ciphertext, plaintext, FIXED_SIZE_FULL, xfer_stream_);
-         err = nw_hipMemcpySync(sb, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+         err = nw_hipMemcpySync(sb1, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
                kind, xfer_stream_);
          assert(err == hipSuccess);
-         lgmDecryptAsync(sb, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
+         // TODO for now we write back in to the sb buffer but this could be a different buffer
+         lgmDecryptAsync(sb2, sb1, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
          lgmNextNonceAsync(xfer_stream_);
       } else {
-         err = nw_hipMemcpySync(sb, plaintext, FIXED_SIZE_FULL, kind, xfer_stream_);
+         sb2 = sb1;
+         err = nw_hipMemcpySync(sb2, plaintext, FIXED_SIZE_FULL, kind, xfer_stream_);
          assert(err == hipSuccess);
       }
       assert(hipEventCreate(&event) == hipSuccess);
       assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
       assert(hipStreamWaitEvent(stream_, event, 0) == hipSuccess);
-      enqueue_device_copy(dst, sb, size, tag, true);
+      enqueue_device_copy(dst, sb2, size, tag, true);
       break;
    case hipMemcpyDeviceToHost:
       tag = gen_tag();
-      sb = next_out_buf();
-      enqueue_device_copy(sb, src, size, tag, false);
-      pending_d2h_.emplace_back((void *)dst, (void *)sb, size, tag);
+      sb1 = next_out_buf();
+      enqueue_device_copy(sb1, src, size, tag, false);
+      pending_d2h_.emplace_back((void *)dst, (void *)sb1, size, tag);
       assert(pending_d2h_.size() <= N_STG_BUFS);
       break;
    default:

@@ -141,17 +141,18 @@ static std::map<const void*, int> ptrDevice; // Global map from memory allocatio
   (((sizeBytes + (AES_BLOCKLEN - 1)) / AES_BLOCKLEN) * AES_BLOCKLEN)
 
 // ciphertext_len includes MAC
-void lgmDecryptAsync(void* ciphertext, size_t ciphertext_len, hipStream_t stream) {
-  AES_GCM_decrypt(state(stream).engine_device(), state(stream).nonce_device(),
-      static_cast<uint8_t*>(ciphertext), ciphertext_len - crypto_aead_aes256gcm_ABYTES,
-      &static_cast<uint8_t*>(ciphertext)[ciphertext_len - crypto_aead_aes256gcm_ABYTES],
-      stream);
+void lgmDecryptAsync(void* plaintext, const void* ciphertext, size_t ciphertext_len,
+    hipStream_t stream) {
+  AES_GCM_decrypt(static_cast<uint8_t*>(plaintext), state(stream).engine_device(),
+      state(stream).nonce_device(), static_cast<const uint8_t*>(ciphertext),
+      ciphertext_len - crypto_aead_aes256gcm_ABYTES, stream);
 }
 
 // sizes are padded
-void lgmEncryptAsync(void* buf, size_t sizeBytes, hipStream_t stream) {
-  AES_GCM_encrypt(state(stream).engine_device(), state(stream).nonce_device(),
-      static_cast<uint8_t*>(buf), sizeBytes, &static_cast<uint8_t*>(buf)[sizeBytes], stream);
+void lgmEncryptAsync(void* ciphertext, const void* plaintext, size_t sizeBytes,
+    hipStream_t stream) {
+  AES_GCM_encrypt(static_cast<uint8_t*>(ciphertext), state(stream).engine_device(),
+      state(stream).nonce_device(), static_cast<const uint8_t*>(plaintext), sizeBytes, stream);
 }
 
 // provide a ciphertext buffer of size lgmEncPad(size) + crypto_aead_aes256gcm_ABYTES

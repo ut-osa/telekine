@@ -32,11 +32,11 @@ void AES_GCM_init(AES_GCM_engine** engine, const uint8_t* key, hipStream_t strea
 
 void AES_GCM_destroy(AES_GCM_engine* engine);
 
-void AES_GCM_encrypt(const AES_GCM_engine* engine, const uint8_t* nonce, uint8_t* data,
-        uint32_t data_size, uint8_t* mac, hipStream_t stream);
+void AES_GCM_encrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+        const uint8_t* src, uint32_t size, hipStream_t stream);
 
-void AES_GCM_decrypt(const AES_GCM_engine* engine, const uint8_t* nonce, uint8_t* data,
-       uint32_t data_size, uint8_t* mac, hipStream_t stream);
+void AES_GCM_decrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+        const uint8_t* src, uint32_t size, hipStream_t stream);
 
 void AES_GCM_next_nonce(uint8_t* nonce, hipStream_t stream);
 

@@ -536,10 +536,10 @@ __global__ void AES_GCM_setup_gf_mult_table_kernel(
   }
 }
 
-__global__ void AES_GCM_xcrypt_kernel(const uint8_t* sbox, const uint8_t* roundkey,
-    const uint8_t* nonce, uint8_t* data, uint32_t data_size) {
+__global__ void AES_GCM_xcrypt_kernel(uint8_t* dst, const uint8_t* sbox, const uint8_t* roundkey,
+    const uint8_t* nonce, const uint8_t* src, uint32_t size) {
   int tid = hipThreadIdx_x + hipBlockIdx_x * hipBlockDim_x;
-  if (tid * AES_BLOCKLEN < data_size) {
+  if (tid * AES_BLOCKLEN < size) {
     uint8_t buffer[16];
 #pragma unroll
     for (int i = 0; i < 12; i++) {
@@ -549,7 +549,7 @@ __global__ void AES_GCM_xcrypt_kernel(const uint8_t* sbox, const uint8_t* roundk
     Cipher(sbox, (state_t*)buffer, roundkey);
 #pragma unroll
     for (int i = 0; i < AES_BLOCKLEN; i++) {
-      data[tid*AES_BLOCKLEN+i] ^= buffer[i];
+      dst[tid*AES_BLOCKLEN+i] = src[tid*AES_BLOCKLEN+i] ^ buffer[i];
     }
   }
 }
@@ -643,11 +643,11 @@ __global__ void AES_GCM_next_nonce_kernel(uint8_t* nonce) {
   }
 }
 
-void AES_GCM_xcrypt(const AES_GCM_engine* engine, const uint8_t* nonce, uint8_t* data,
-    uint32_t data_size, hipStream_t stream) {
-  int num_block = (data_size / 16 + kBaseThreadNum-1) / kBaseThreadNum;
+void AES_GCM_xcrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+    const uint8_t* src, uint32_t size, hipStream_t stream) {
+  int num_block = (size / 16 + kBaseThreadNum-1) / kBaseThreadNum;
   hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_xcrypt_kernel), num_block, kBaseThreadNum, 0, stream,
-      engine->sbox, engine->aes_roundkey, nonce, data, data_size);
+      dst, engine->sbox, engine->aes_roundkey, nonce, src, size);
 }
 
 void AES_GCM_encrypt_one_block(const AES_GCM_engine* engine, uint8_t* data, hipStream_t stream) {
@@ -655,19 +655,19 @@ void AES_GCM_encrypt_one_block(const AES_GCM_engine* engine, uint8_t* data, hipS
       engine->sbox, engine->aes_roundkey, data);
 }
 
-void AES_GCM_compute_mac(const AES_GCM_engine* engine, const uint8_t* nonce, uint8_t* data,
-    uint32_t data_size, uint8_t* mac, hipStream_t stream) {
+void AES_GCM_compute_mac(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+    const uint8_t* src, uint32_t size, hipStream_t stream) {
   hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_kernel), AES_GCM_STEP, AES_GCM_STEP, 0, stream,
       engine->gf_last4, engine->HL_sqr_long, engine->HH_sqr_long, AES_GCM_STEP * AES_GCM_STEP,
-      data, data_size / 16, engine->buffer1);
+      src, size / 16, engine->buffer1);
   hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_kernel), AES_GCM_STEP / 8, 8, 0, stream,
       engine->gf_last4, engine->HL_long, engine->HH_long, AES_GCM_STEP,
       engine->buffer1, AES_GCM_STEP * AES_GCM_STEP, engine->buffer2);
   hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_kernel), 1, 1, 0, stream,
-      engine->gf_last4, engine->HL, engine->HH, 1, engine->buffer2, AES_GCM_STEP, mac);
+      engine->gf_last4, engine->HL, engine->HH, 1, engine->buffer2, AES_GCM_STEP, dst);
   hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_final_kernel), 1, 1, 0, stream,
       engine->gf_last4, engine->HL, engine->HH, engine->sbox, engine->aes_roundkey,
-      nonce, mac, data_size, mac);
+      nonce, dst, size, dst);
 }
 
 } // end anonymous namespace
@@ -695,18 +695,21 @@ void AES_GCM_destroy(AES_GCM_engine* engine) {
   HIP_CHECK(hipFree(engine));
 }
 
-void AES_GCM_encrypt(const AES_GCM_engine* engine, const uint8_t* nonce, uint8_t* data,
-    uint32_t data_size, uint8_t* mac, hipStream_t stream) {
-  assert(data_size % AES_BLOCKLEN == 0);
-  AES_GCM_xcrypt(engine, nonce, data, data_size, stream);
-  AES_GCM_compute_mac(engine, nonce, data, data_size, mac, stream);
+// dst buffer should be of size: size + crypto_aead_aes256gcm_ABYTES
+void AES_GCM_encrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+    const uint8_t* src, uint32_t size, hipStream_t stream) {
+  assert(size % AES_BLOCKLEN == 0);
+  AES_GCM_xcrypt(dst, engine, nonce, src, size, stream);
+  AES_GCM_compute_mac(&dst[size], engine, nonce, dst, size, stream);
 }
 
-void AES_GCM_decrypt(const AES_GCM_engine* engine, const uint8_t* nonce, uint8_t* data,
-    uint32_t data_size, uint8_t* mac, hipStream_t stream) {
-  assert(data_size % AES_BLOCKLEN == 0);
-  AES_GCM_compute_mac(engine, nonce, data, data_size, mac, stream);
-  AES_GCM_xcrypt(engine, nonce, data, data_size, stream);
+// src buffer should be of size: size + crypto_aead_aes256gcm_ABYTES
+void AES_GCM_decrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+    const uint8_t* src, uint32_t size, hipStream_t stream) {
+  assert(size % AES_BLOCKLEN == 0);
+  AES_GCM_compute_mac(dst, engine, nonce, src, size, stream);
+  // TODO verify mac for i in crypto_aead_aes256gcm_ABYTES: (dst == src[size])
+  AES_GCM_xcrypt(dst, engine, nonce, src, size, stream);
 }
 
 void AES_GCM_next_nonce(uint8_t* nonce, hipStream_t stream) {
