@@ -36,4 +36,25 @@ void hip_function_to_aql(hsa_kernel_dispatch_packet_t *aql, hipFunction_t f,
             (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
 }
 
+/* TODO double check this .... */
+#define DIM3_TO_AQL(blocks, threads) \
+   (blocks.x * threads.x), (threads.y * blocks.y), (threads.z * blocks.z), \
+   threads.x, threads.y, threads.z
+
+template <typename... Args, typename F = void (*)(Args...)>
+inline void hipLaunchNOW(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
+                         std::uint32_t sharedMemBytes, hipStream_t stream, Args... args)
+{
+    hsa_kernel_dispatch_packet_t aql = {0};
+    auto kernarg = hip_impl::make_kernarg(std::move(args)...);
+    std::size_t kernarg_size = kernarg.size();
+
+    auto fun = hip_function_lookup((uintptr_t)kernel, stream);
+    hip_function_to_aql(&aql, fun, DIM3_TO_AQL(numBlocks, dimBlocks), 0);
+
+    __do_c_hipHccModuleLaunchKernel(&aql, stream, nullptr, (char *)kernarg.data(),
+                                    kernarg.size(), nullptr, nullptr);
+}
+
+
 #endif

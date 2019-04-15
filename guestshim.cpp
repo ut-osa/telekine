@@ -25,8 +25,6 @@
 
 using namespace std;
 
-#define FIXED_EXTRA_SIZE 256
-
 static bool fixed_rate_command_scheduler_enabled() {
     static bool ret = CHECK_ENV("HIP_ENABLE_COMMAND_SCHEDULER");
     return ret;
@@ -233,35 +231,8 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
                                                     size_t size, tag_t tag,
                                                     bool in)
 {
-   static std::once_flag f;
-   static hsa_kernel_dispatch_packet_t copy_in_aql = {0};
-   static hsa_kernel_dispatch_packet_t copy_out_aql = {0};
-   hsa_kernel_dispatch_packet_t *aql;
-   hipEvent_t event;
-
-   call_once(f, [&]() {
-      auto fun = hip_function_lookup((uintptr_t)vector_copy_out, stream_);
-      hip_function_to_aql(&copy_out_aql, fun, BLOCKS_THREADS_TO_AQL(512, 256), 0);
-      auto fun_tag = hip_function_lookup((uintptr_t)vector_copy_in, stream_);
-      hip_function_to_aql(&copy_in_aql, fun_tag, BLOCKS_THREADS_TO_AQL(512, 256), 0);
-   });
-
-   auto cp_args = hip_impl::make_kernarg(dst, src, size, tag);
-   aql = in ? &copy_in_aql : &copy_out_aql;
-
-	assert(cp_args.size() < FIXED_EXTRA_SIZE);
-
-	CommandEntry command;
-	command.kind = KERNEL_LAUNCH;
-	command.kernel_launch_param.aql = *aql;
-	command.kernel_launch_param.kernArgSize = FIXED_EXTRA_SIZE;
-	command.kernel_launch_param.kernArg = malloc(FIXED_EXTRA_SIZE);
-	memcpy(command.kernel_launch_param.kernArg, cp_args.data(), cp_args.size());
-
-   /* push_front because we want to copy kernel to run in the order the memcpy
-    * would hav
-    */
-	pending_commands_.push_front(command);
+   inject_kern(in ? vector_copy_in : vector_copy_out, dim3(512), dim3(256),
+                             0, dst, src, size, tag);
 }
 
 void SepMemcpyCommandScheduler::pre_notify(void)
