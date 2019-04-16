@@ -78,6 +78,12 @@ int main(int argc, char *argv[])
 
     worker_id = 1;
 
+    int manager_port = 4000;
+    const char* manager_port_str = getenv("AVA_MANAGER_PORT");
+    if (manager_port_str != NULL) manager_port = atoi(manager_port_str);
+    char ava_fifo[32];
+    sprintf(ava_fifo, "/tmp/ava_fifo_%d", manager_port);
+
     worker_bin = "./worker";
     while ((opt = getopt(argc, argv, "lh")) != -1) {
        switch (opt) {
@@ -102,9 +108,9 @@ int main(int argc, char *argv[])
     }
 
     worker_bin = worker_bin_buf;
-    if (mkfifo("/tmp/ava_fifo", (S_IRWXO|S_IRWXG|S_IRWXU) & ~(S_IXUSR|S_IXGRP|S_IXOTH))) {
+    if (mkfifo(ava_fifo, (S_IRWXO|S_IRWXG|S_IRWXU) & ~(S_IXUSR|S_IXGRP|S_IXOTH))) {
        if (errno !=  EEXIST) {
-          perror("mkfifo /tmp/ava_fifo");
+          perror("mkfifo");
           return 1;
        }
     }
@@ -120,7 +126,7 @@ int main(int argc, char *argv[])
     }
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons( 4000 );
+    address.sin_port = htons( manager_port );
 
     if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address))<0) {
         perror("bind failed");
@@ -149,18 +155,18 @@ int main(int argc, char *argv[])
         }
         /* wait for the worker to listen... */
         uint64_t val;
-        int fifo_fd = open("/tmp/ava_fifo", O_RDONLY|O_CLOEXEC);
+        int fifo_fd = open(ava_fifo, O_RDONLY|O_CLOEXEC);
         if (fifo_fd < 0) {
-          perror("/tmp/ava_fifo");
+          perror(ava_fifo);
           return 1;
         }
         if (read(fifo_fd, &val, sizeof(val)) != sizeof(val)) {
-           perror("Read /tmp/ava_fifo");
+           perror("Read fifo");
         } else {
            /* return worker port to guestlib */
            response.api_id = INTERNAL_API;
            worker_port = (uintptr_t *)response.reserved_area;
-           *worker_port = worker_id + WORKER_PORT_BASE;
+           *worker_port = worker_id + manager_port;
            send_socket(client_fd, &response, sizeof(struct command_base));
            close(client_fd);
         }
@@ -199,7 +205,7 @@ int main(int argc, char *argv[])
     pb_info = (struct param_block_info *)msg.reserved_area;
     sprintf(str_vm_id, "%d", msg.vm_id);
     sprintf(str_rt_type, "%d", msg.api_id);
-    sprintf(str_port, "%d", worker_id + WORKER_PORT_BASE);
+    sprintf(str_port, "%d", worker_id + manager_port);
     sprintf(str_pb_offset, "%lu", pb_info->param_local_offset);
     sprintf(str_pb_size, "%lu", pb_info->param_block_size);
     char * argv_list[] = {worker_bin,

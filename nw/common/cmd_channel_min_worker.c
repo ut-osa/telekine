@@ -265,10 +265,16 @@ struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, 
 
     printf("[worker#%d] waiting for guestlib connection\n", listen_port);
 
+    int manager_port = 4000;
+    const char* manager_port_str = getenv("AVA_MANAGER_PORT");
+    if (manager_port_str != NULL) manager_port = atoi(manager_port_str);
+    char ava_fifo[32];
+    sprintf(ava_fifo, "/tmp/ava_fifo_%d", manager_port);
+
     uint64_t rdy = 1;
-    int fifo_fd = open("/tmp/ava_fifo", O_WRONLY|O_CLOEXEC);
+    int fifo_fd = open(ava_fifo, O_WRONLY|O_CLOEXEC);
     if (fifo_fd < 0) {
-       perror("/tmp/ava_fifo");
+       perror(ava_fifo);
        abort();
     }
     if (write(fifo_fd, &rdy, sizeof(rdy)) != sizeof(rdy)) {

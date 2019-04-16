@@ -203,13 +203,15 @@ struct command_channel* command_channel_min_new()
     const char *ip_str = getenv("AVA_IP");
     if (!ip_str)
        ip_str = "127.0.0.1";
+    const char *ava_port = getenv("AVA_PORT");
+    if (!ava_port) ava_port = "4000";
 
     struct addrinfo hints = {
        .ai_family = AF_INET,
        .ai_socktype = SOCK_STREAM,
     };
     struct addrinfo *result, *rp;
-    if ((ret = getaddrinfo(ip_str, "4000", &hints, &result))) {
+    if ((ret = getaddrinfo(ip_str, ava_port, &hints, &result))) {
        if (ret == EAI_SYSTEM)
           perror(ip_str);
        else
