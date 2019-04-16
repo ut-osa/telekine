@@ -31,6 +31,7 @@ nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kin
                hipStream_t stream)
 {
     hipError_t e = hipSuccess;
+    stream = ihipSyncAndResolveStream(stream);
     try {
         stream->locked_copySync(dst, src, sizeBytes, kind);
     } catch (ihipException& ex) {
