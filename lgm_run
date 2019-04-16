@@ -58,8 +58,10 @@ click_option = functools.partial(click.option, show_default=True)
 @click_option('--gpu-op-sep-memcpy', is_flag=True)
 @click_option('--hip-memcpy-fixed-size', is_flag=True)
 @click_option('--hip-memcpy-encrypted', is_flag=True)
+@click_option('--hip-check-complete', is_flag=True)
 def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size,
-         hip_memcpy_fixed_size, hip_memcpy_encrypted, gpu_op_sep_memcpy):
+         hip_memcpy_fixed_size, hip_memcpy_encrypted, gpu_op_sep_memcpy,
+         hip_check_complete):
     global ava_ip
     if len(test_cmd) == 0:
         print("no command given exiting!")
@@ -78,6 +80,8 @@ def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size,
     if hip_memcpy_encrypted:
       print("Encryption on")
       extra_client_env["LGM_MEMCPY_ENABLE_ENCRYPTION"] = "1"
+    if check_complete:
+        extra_client_env["HIP_SYNC_CHECK_BATCH_COMPLETE"]
     if run_type == "ava":
         extra_client_env['LD_PRELOAD'] = ':'.join([shim, guest_lib])
     sys.exit(run_test(test_cmd))

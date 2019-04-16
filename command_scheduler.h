@@ -116,6 +116,9 @@ protected:
                                stream, std::move(args)...) {}
     };
 
+    virtual void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
+                             const std::vector<KernelLaunchParam *> &params) {};
+
     std::deque<CommandEntry> pending_commands_;
     std::mutex pending_commands_mutex_;
     std::condition_variable pending_commands_cv_;
@@ -135,6 +138,8 @@ public:
 protected:
     void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
     void pre_notify(void) override;
+    void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
+                             const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
 
     inline void *next_in_buf(void) {
@@ -156,11 +161,15 @@ protected:
           dst_(dst), src_(src), size_(size), tag_(tag) {} ;
     };
 
+    uint64_t cur_batch_id;
+    uint64_t last_real_batch;
+    uint64_t batches_finished;
     std::deque<d2h_cpy_op> pending_d2h_;
     hipStream_t xfer_stream_;
     void *in_bufs[N_STG_BUFS];
     void *out_bufs[N_STG_BUFS];
     void *encrypt_out_buf;
+    void *status_buf;
     unsigned stg_in_idx;
     unsigned stg_out_idx;
 

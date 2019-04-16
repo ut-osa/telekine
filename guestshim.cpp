@@ -25,6 +25,11 @@
 
 using namespace std;
 
+static bool check_batch_complete() {
+    static bool ret = CHECK_ENV("HIP_SYNC_CHECK_BATCH_COMPLETE");
+    return ret;
+}
+
 static bool fixed_rate_command_scheduler_enabled() {
     static bool ret = CHECK_ENV("HIP_ENABLE_COMMAND_SCHEDULER");
     return ret;
@@ -103,8 +108,9 @@ BatchCommandScheduler::~BatchCommandScheduler(void) {
 
 SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int batch_size,
                                                      int fixed_rate_interval_us)
-   : BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us),
-     stg_in_idx(0), stg_out_idx(0)
+   : status_buf(nullptr), last_real_batch(0),
+     stg_in_idx(0), stg_out_idx(0), cur_batch_id(0), batches_finished(0),
+     BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
 {
    hipError_t ret;
    ret = hipStreamCreate(&xfer_stream_);
@@ -116,6 +122,8 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
       ret = hipMalloc(out_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
    }
    ret = hipMalloc(&encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+   assert(ret == hipSuccess);
+   ret = hipMalloc(&status_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
    assert(ret == hipSuccess);
 }
 
@@ -169,6 +177,8 @@ hipError_t SepMemcpyCommandScheduler::Wait(void)
     {
         std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
         pending_commands_cv_.wait(lk1, [this] () {
+                if (check_batch_complete() && last_real_batch > batches_finished)
+                  return false;
                 return pending_commands_.size() == 0 &&
                        pending_d2h_.size() == 0;
                 });
@@ -212,6 +222,12 @@ vector_copy_out(uint8_t *C_d, uint8_t *A_d, size_t N, tag_t tag)
     BUF_TAG(C_d) = tag;
 }
 
+__global__ void
+note_batch_id(uint8_t *buf, uint64_t batchid)
+{
+    *((uint64_t *)buf) = batchid;
+}
+
 #define BLOCKS_THREADS_TO_AQL(blocks, threads) \
    (blocks * threads), 1, 1, threads, 1, 1
 
@@ -224,6 +240,16 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
                                    size, tag);
 }
 
+void SepMemcpyCommandScheduler::add_extra_kernels(
+                             vector<KernelLaunchParam> &extrakerns,
+                             const vector<KernelLaunchParam *> &realkerns)
+{
+   if (realkerns.size() > 0)
+         last_real_batch = cur_batch_id;
+   extrakerns.emplace_back(note_batch_id, dim3(1), dim3(1), 0, stream_,
+                           status_buf, cur_batch_id++);
+}
+
 void SepMemcpyCommandScheduler::pre_notify(void)
 {
    // This implementation assumes we use FIXED_SIZE_B buffers
@@ -233,15 +259,18 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    hipError_t err;
 
    /* TODO, do memcpy even if there aren't outstanding copies */
-   if (pending_d2h_.size() == 0)
+   struct d2h_cpy_op check_status((void *)&batches_finished, status_buf, sizeof(batches_finished), 0);
+   struct d2h_cpy_op *op = &check_status;
+   if (pending_d2h_.size() != 0)
+      op = &pending_d2h_.at(0);
+   else if (!check_batch_complete() || status_buf == nullptr)
       return;
 
-   auto &op = pending_d2h_.at(0);
-   assert(op.size_ <= FIXED_SIZE_B);
+   assert(op->size_ <= FIXED_SIZE_B);
 
    if (memcpy_encryption_enabled()) {
       // Encrypt op.src_
-      lgmEncryptAsync(encrypt_out_buf, op.src_, FIXED_SIZE_FULL, xfer_stream_);
+      lgmEncryptAsync(encrypt_out_buf, op->src_, FIXED_SIZE_FULL, xfer_stream_);
       // copy data to the host
       err = nw_hipMemcpySync(ciphertext, encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
@@ -254,18 +283,23 @@ void SepMemcpyCommandScheduler::pre_notify(void)
       lgmNextNonceAsync(xfer_stream_);
    } else {
       // copy data to the host
-      err = nw_hipMemcpySync(plaintext, op.src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
+      err = nw_hipMemcpySync(plaintext, op->src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
    }
 
-   /* if the tag matches the buffer was ready and we can stop looking for it */
-   if (BUF_TAG(plaintext) == op.tag_) {
-      memcpy(op.dst_, plaintext, op.size_);
-      pending_d2h_.pop_front();
-      pending_commands_cv_.notify_all();
+   if (op != &check_status) {
+      /* if the tag matches the buffer was ready and we can stop looking for it */
+      if (BUF_TAG(plaintext) == op->tag_) {
+         memcpy(op->dst_, plaintext, op->size_);
+         pending_d2h_.pop_front();
+         pending_commands_cv_.notify_all();
+      } else {
+         /* if not... then we have to look for it next time */
+      }
    } else {
-      /* if not... then we have to look for it next time */
+      memcpy(op->dst_, plaintext, op->size_);
+      pending_commands_cv_.notify_all();
    }
 }
 
@@ -306,9 +340,6 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
          err = nw_hipMemcpySync(sb2, plaintext, FIXED_SIZE_FULL, kind, xfer_stream_);
          assert(err == hipSuccess);
       }
-      assert(hipEventCreate(&event) == hipSuccess);
-      assert(hipEventRecord(event, xfer_stream_) == hipSuccess);
-      assert(hipStreamWaitEvent(stream_, event, 0) == hipSuccess);
       enqueue_device_copy(dst, sb2, size, tag, true);
       break;
    case hipMemcpyDeviceToHost:
@@ -357,6 +388,9 @@ void BatchCommandScheduler::ProcessThread() {
             }
         }
 
+        std::vector<KernelLaunchParam> extra_kerns;
+        add_extra_kernels(extra_kerns, params);
+
         std::vector<hsa_kernel_dispatch_packet_t> aql;
         std::vector<size_t> extra_size;
 
@@ -366,15 +400,24 @@ void BatchCommandScheduler::ProcessThread() {
             extra_size.push_back(params[i]->kernArgSize);
             total_extra_size += params[i]->kernArgSize;
         }
+        for (int i = 0; i < extra_kerns.size(); i++) {
+            aql.emplace_back(extra_kerns[i].aql);
+            extra_size.push_back(extra_kerns[i].kernArgSize);
+            total_extra_size += extra_kerns[i].kernArgSize;
+        }
         char* all_extra = (char*)malloc(total_extra_size);
         size_t cursor = 0;
         for (int i = 0; i < params.size(); i++) {
             memcpy(all_extra + cursor, params[i]->kernArg, params[i]->kernArgSize);
             cursor += params[i]->kernArgSize;
         }
+        for (int i = 0; i < extra_kerns.size(); i++) {
+            memcpy(all_extra + cursor, extra_kerns[i].kernArg, extra_kerns[i].kernArgSize);
+            cursor += extra_kerns[i].kernArgSize;
+        }
 
         __do_c_hipHccModuleLaunchMultiKernel(
-            params.size(),
+            params.size() + extra_kerns.size(),
             aql.data(), stream_,
             all_extra, total_extra_size, extra_size.data());
 
