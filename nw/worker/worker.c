@@ -18,11 +18,13 @@
 #include "common/register.h"
 #include "common/socket.h"
 
-struct command_channel *chan;
+struct command_channel *chan0;
+struct command_channel *chan1;
 
 void sig_handler(int signo)
 {
-    command_channel_free(chan);
+    command_channel_free(chan0);
+    command_channel_free(chan1);
     exit(0);
 }
 
@@ -34,17 +36,42 @@ void sigsegv_handler(int signo, siginfo_t *info, void *data)
 
 void nw_report_storage_resource_allocation(const char* const name, ssize_t amount)
 {
-    command_channel_report_storage_resource_allocation(chan, name, amount);
+    command_channel_report_storage_resource_allocation(chan0, name, amount);
+    command_channel_report_storage_resource_allocation(chan1, name, amount);
 }
 
 void nw_report_throughput_resource_consumption(const char* const name, ssize_t amount)
 {
-    command_channel_report_throughput_resource_consumption(chan, name, amount);
+    command_channel_report_throughput_resource_consumption(chan0, name, amount);
+    command_channel_report_throughput_resource_consumption(chan1, name, amount);
 }
 
-static struct command_channel* channel_create()
+static struct command_channel* channel_create(int chan_no)
 {
-    return chan;
+   if (chan_no == 0)
+    return chan0;
+   else
+    return chan1;
+}
+
+void notify_manager()
+{
+        int manager_port = 4000;
+        const char* manager_port_str = getenv("AVA_MANAGER_PORT");
+        if (manager_port_str != NULL) manager_port = atoi(manager_port_str);
+        char ava_fifo[32];
+        sprintf(ava_fifo, "/tmp/ava_fifo_%d", manager_port);
+        uint64_t rdy = 1;
+        int fifo_fd = open(ava_fifo, O_WRONLY|O_CLOEXEC);
+        if (fifo_fd < 0) {
+           perror(ava_fifo);
+           abort();
+        }
+        if (write(fifo_fd, &rdy, sizeof(rdy)) != sizeof(rdy)) {
+           perror("write fifo");
+           abort();
+        }
+        close(fifo_fd);
 }
 
 int main(int argc, char *argv[])
@@ -70,26 +97,39 @@ int main(int argc, char *argv[])
 #endif
 
     if (!getenv("AVA_CHANNEL") || !strcmp(getenv("AVA_CHANNEL"), "LOCAL")) {
-        chan = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
+        int listen_fds[2];
+        int port = atoi(argv[3]);
+        set_up_ports(port, listen_fds);
+
+        notify_manager();
+        chan0 = command_channel_min_worker_new(
+                atoi(argv[1]), atoi(argv[2]), listen_fds[0], port, atoi(argv[5]));
+        chan1= command_channel_min_worker_new(
+                atoi(argv[1]), atoi(argv[2]), listen_fds[1], port + CHANNEL_1_OFFSET, atoi(argv[5]));
     }
     else if (!strcmp(getenv("AVA_CHANNEL"), "SHM")) {
-        chan = command_channel_shm_worker_new(
+        chan0 = command_channel_shm_worker_new(
                 atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
+        chan1= command_channel_min_worker_new(
+                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]) + CHANNEL_1_OFFSET, atoi(argv[4]), atoi(argv[5]));
     }
     else if (!strcmp(getenv("AVA_CHANNEL"), "VSOCK")) {
-        chan = command_channel_socket_worker_new(
+        chan0= command_channel_socket_worker_new(
                 atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
+        chan1= command_channel_min_worker_new(
+                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]) + CHANNEL_1_OFFSET, atoi(argv[4]), atoi(argv[5]));
     }
     else {
         printf("Unsupported AVA_CHANNEL type (export AVA_CHANNEL=[LOCAL | SHM | VSOCK]\n");
         return 0;
     }
 
-    init_command_handler(channel_create);
+    init_command_handler(channel_create, 0);
+    init_command_handler(channel_create, 1);
     DEBUG_PRINT("[worker#%s] start polling tasks\n", argv[3]);
     wait_for_command_handler();
-    command_channel_free(chan);
+    command_channel_free(chan0);
+    command_channel_free(chan1);
 
     return 0;
 }

@@ -20,6 +20,8 @@
 
 #include "devconf.h"
 
+#define CHANNEL_1_OFFSET 666
+
 typedef enum {
     MSG_UNDEFINED,
     MSG_NEW_INVOCATION,

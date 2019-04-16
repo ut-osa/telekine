@@ -26,7 +26,7 @@ static atomic_intptr_t hip_call_counter;
 
 static void __handle_command_hip_init();
 static void __handle_command_hip_destroy();
-void __handle_command_hip(struct command_base *__cmd);
+void __handle_command_hip(struct command_base *__cmd, int chan_no);
 
 struct ava_coupled_record_t {
     GPtrArray * /* elements: struct call_id_and_handle_t* */ key_list;
@@ -178,10 +178,11 @@ ava_add_dependency(void *a, void *b)
 
 #include "hip_nw_utilities.h"
 
-#define __chan nw_global_command_channel
-
 static bool was_initted;
 static pthread_once_t guestlib_init = PTHREAD_ONCE_INIT;
+
+__thread int chan_no;
+#define __chan nw_global_command_channel[chan_no]
 
 /* DON'T CALL DIRECTLY! must be protected by pthread_once */
 void init_hip_guestlib(void)
@@ -230,10 +231,11 @@ __handle_command_hip_destroy()
 }
 
 void
-__handle_command_hip(struct command_base *__cmd)
+__handle_command_hip(struct command_base *__cmd, int _chan_no)
 {
     int ava_is_in,
      ava_is_out;
+    chan_no = _chan_no;
     switch (__cmd->command_id) {
     case RET_HIP_HIP_DEVICE_SYNCHRONIZE:{
         ava_is_in = 0;

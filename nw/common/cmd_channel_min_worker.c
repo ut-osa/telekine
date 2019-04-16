@@ -26,7 +26,6 @@ struct command_channel_min {
     struct msghdr *nl_msg;
 
     int listen_fd;
-    int listen_port;
     uint8_t init_command_type;
 };
 
@@ -227,61 +226,52 @@ void command_channel_min_free_command(struct command_channel* c, struct command_
     free(cmd);
 }
 
-struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, int listen_port,
-        uintptr_t dummy2, size_t dummy3)
+void set_up_ports(int listen_port, int listen_fds[2])
 {
-    struct command_channel_min *chan = (struct command_channel_min *)malloc(sizeof(struct command_channel_min));
-    command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
-
-    // TODO: notify executor when VM created or destroyed
-    printf("spawn worker port#%d, rt_type#%d\n", listen_port, chan->init_command_type);
-    chan->init_command_type = rt_type;
-    chan->listen_port = listen_port;
-
     /* connect guestlib */
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     int opt = 1;
     struct command_base msg, response;
 
-    if ((chan->listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("socket");
+    for (int i = 0; i < 2; i++) {
+       if ((listen_fds[i] = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+           perror("socket");
+       }
+       // Forcefully attaching socket to the worker port
+       if (setsockopt(listen_fds[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+           perror("setsockopt");
+       }
+       address.sin_family = AF_INET;
+       address.sin_addr.s_addr = INADDR_ANY;
+       address.sin_port = htons(listen_port);
+
+       if (bind(listen_fds[i], (struct sockaddr *)&address, sizeof(address)) < 0) {
+           perror("bind failed");
+       }
+
+       if (listen(listen_fds[i], 10) < 0) {
+           perror("listen");
+       }
+
+       printf("[worker#%d] waiting for guestlib connection\n", listen_port);
+       listen_port += CHANNEL_1_OFFSET;
     }
-    // Forcefully attaching socket to the worker port
-    if (setsockopt(chan->listen_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-        perror("setsockopt");
-    }
+}
+
+struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, int listen_fd,
+        uintptr_t port, size_t dummy3)
+{
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+    struct command_channel_min *chan = (struct command_channel_min *)malloc(sizeof(struct command_channel_min));
+    command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
+    chan->init_command_type = rt_type;
+    chan->listen_fd = listen_fd;
+
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(listen_port);
-
-    if (bind(chan->listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-        perror("bind failed");
-    }
-
-    if (listen(chan->listen_fd, 10) < 0) {
-        perror("listen");
-    }
-
-    printf("[worker#%d] waiting for guestlib connection\n", listen_port);
-
-    int manager_port = 4000;
-    const char* manager_port_str = getenv("AVA_MANAGER_PORT");
-    if (manager_port_str != NULL) manager_port = atoi(manager_port_str);
-    char ava_fifo[32];
-    sprintf(ava_fifo, "/tmp/ava_fifo_%d", manager_port);
-
-    uint64_t rdy = 1;
-    int fifo_fd = open(ava_fifo, O_WRONLY|O_CLOEXEC);
-    if (fifo_fd < 0) {
-       perror(ava_fifo);
-       abort();
-    }
-    if (write(fifo_fd, &rdy, sizeof(rdy)) != sizeof(rdy)) {
-       perror("write fifo");
-       abort();
-    }
-    close(fifo_fd);
+    address.sin_port = htons(port);
 
     chan->guestlib_fd = accept(chan->listen_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen);
 

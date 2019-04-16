@@ -31,7 +31,7 @@ includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include \
 
 clangargs = -D__HIP_PLATFORM_HCC__=1
 
-CFLAGS = -g -O3 -fPIC $(includes)
+CFLAGS = -g -Og -fPIC $(includes)
 CXXFLAGS = $(CFLAGS) -Wno-ignored-attributes -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)

@@ -191,7 +191,8 @@ void command_channel_min_free_command(struct command_channel* c, struct command_
     free(cmd);
 }
 
-struct command_channel* command_channel_min_new()
+uintptr_t worker_port;
+struct command_channel* command_channel_min_new(int chan_no)
 {
     struct command_channel_min *chan = (struct command_channel_min *)malloc(sizeof(struct command_channel_min));
     command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
@@ -199,52 +200,55 @@ struct command_channel* command_channel_min_new()
     /* connect manager to get worker port */
     int ret;
     int manager_fd;
-
     const char *ip_str = getenv("AVA_IP");
-    if (!ip_str)
-       ip_str = "127.0.0.1";
-    const char *ava_port = getenv("AVA_PORT");
-    if (!ava_port) ava_port = "4000";
-
+    struct addrinfo *result, *rp;
     struct addrinfo hints = {
        .ai_family = AF_INET,
        .ai_socktype = SOCK_STREAM,
     };
-    struct addrinfo *result, *rp;
-    if ((ret = getaddrinfo(ip_str, ava_port, &hints, &result))) {
-       if (ret == EAI_SYSTEM)
-          perror(ip_str);
-       else
-          fprintf(stderr, "%s: %s\n", ip_str, gai_strerror(ret));
-       abort();
-    }
 
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-       manager_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-       if (manager_fd == -1)
-          continue;
-       if (connect(manager_fd, rp->ai_addr, rp->ai_addrlen) != -1)
-          break;
+    if (!ip_str)
+       ip_str = "127.0.0.1";
+
+    if (chan_no == 0) {
+       const char *ava_port = getenv("AVA_PORT");
+       if (!ava_port) ava_port = "4000";
+
+       if ((ret = getaddrinfo(ip_str, ava_port, &hints, &result))) {
+          if (ret == EAI_SYSTEM)
+             perror(ip_str);
+          else
+             fprintf(stderr, "%s: %s\n", ip_str, gai_strerror(ret));
+          abort();
+       }
+
+       for (rp = result; rp != NULL; rp = rp->ai_next) {
+          manager_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+          if (manager_fd == -1)
+             continue;
+          if (connect(manager_fd, rp->ai_addr, rp->ai_addrlen) != -1)
+             break;
+          close(manager_fd);
+       }
+       if (rp == NULL) {
+          fprintf(stderr, "%s:%d couldn't connect!\n", __FILE__, __LINE__);
+          abort();
+       }
+       freeaddrinfo(result);
+
+       struct command_base* msg = command_channel_min_new_command((struct command_channel *)chan, sizeof(struct command_base), 0);
+       msg->command_type = MSG_NEW_APPLICATION;
+       msg->vm_id = 1;
+       struct param_block_info *pb_info = (struct param_block_info *)msg->reserved_area;
+       pb_info->param_local_offset = 0;
+       pb_info->param_block_size = 0;
+       send_socket(manager_fd, msg, sizeof(struct command_base));
+
+       recv_socket(manager_fd, msg, sizeof(struct command_base));
+       worker_port = *((uintptr_t *)msg->reserved_area);
+       command_channel_min_free_command((struct command_channel *)chan, msg);
        close(manager_fd);
     }
-    if (rp == NULL) {
-       fprintf(stderr, "%s:%d couldn't connect!\n", __FILE__, __LINE__);
-       abort();
-    }
-    freeaddrinfo(result);
-
-    struct command_base* msg = command_channel_min_new_command((struct command_channel *)chan, sizeof(struct command_base), 0);
-    msg->command_type = MSG_NEW_APPLICATION;
-    msg->vm_id = 1;
-    struct param_block_info *pb_info = (struct param_block_info *)msg->reserved_area;
-    pb_info->param_local_offset = 0;
-    pb_info->param_block_size = 0;
-    send_socket(manager_fd, msg, sizeof(struct command_base));
-
-    recv_socket(manager_fd, msg, sizeof(struct command_base));
-    uintptr_t worker_port = *((uintptr_t *)msg->reserved_area);
-    command_channel_min_free_command((struct command_channel *)chan, msg);
-    close(manager_fd);
 
     /* connect worker */
     DEBUG_PRINT("assigned worker at %lu\n", worker_port);
@@ -271,6 +275,7 @@ struct command_channel* command_channel_min_new()
 
     chan->pfd.fd = chan->sock_fd;
     chan->pfd.events = POLLIN | POLLRDHUP;
+    worker_port += CHANNEL_1_OFFSET;
 
     return (struct command_channel *)chan;
 }
