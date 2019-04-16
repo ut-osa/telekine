@@ -181,7 +181,7 @@ ava_add_dependency(void *a, void *b)
 static bool was_initted;
 static pthread_once_t guestlib_init = PTHREAD_ONCE_INIT;
 
-__thread int chan_no;
+EXPORTED __thread int chan_no;
 #define __chan nw_global_command_channel[chan_no]
 
 /* DON'T CALL DIRECTLY! must be protected by pthread_once */

@@ -141,6 +141,7 @@ protected:
     void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
+    void MemcpyThread();
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= N_STG_BUFS)
@@ -159,6 +160,7 @@ protected:
        uint64_t tag_;
        d2h_cpy_op(void *dst, void *src, size_t size, uint64_t tag) :
           dst_(dst), src_(src), size_(size), tag_(tag) {} ;
+       d2h_cpy_op()  {};
     };
 
     uint64_t cur_batch_id;
@@ -172,6 +174,10 @@ protected:
     void *status_buf;
     unsigned stg_in_idx;
     unsigned stg_out_idx;
+    std::mutex pending_copy_mutex_;
+    std::condition_variable pending_copy_cv_;
+    std::deque<std::unique_ptr<CommandEntry>> pending_copy_commands;
+    std::unique_ptr<std::thread> memcpy_thread_;
 
 	 /* fast way to get tags that won't likely be repeated */
 	 tag_t gen_tag(void) {          //period 2^96-1
@@ -188,7 +194,6 @@ protected:
 
 	    return z;
 	 }
-
 };
 
 class BaselineCommandScheduler : public CommandScheduler {
