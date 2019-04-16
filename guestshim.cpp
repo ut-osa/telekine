@@ -357,6 +357,16 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
 }
 
 void BatchCommandScheduler::ProcessThread() {
+    const char* nice_str = getenv("HIP_SCHEDULER_THREAD_NICE");
+    if (nice_str != NULL) {
+        int value = atoi(nice_str);
+        int ret = nice(value);
+        if (ret == -1 && errno != 0) {
+            fprintf(stderr, "Failed to set nice value\n");
+        } else {
+            fprintf(stderr, "Set nice value to %d\n", value);
+        }
+    }
     while (this->running) {
         std::vector<KernelLaunchParam *> params;
         {
