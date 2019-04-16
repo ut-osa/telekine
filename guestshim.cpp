@@ -144,7 +144,7 @@ hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
         std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
-        pending_commands_.emplace_back(aql, extra, extra_size);
+        pending_commands_.emplace_back(new CommandEntry(aql, extra, extra_size));
     }
     pending_commands_cv_.notify_all();
     return hipSuccess; // TODO more accurate return value
@@ -154,7 +154,7 @@ hipError_t BatchCommandScheduler::AddMemcpyAsync(void* dst, const void* src, siz
         hipMemcpyKind kind) {
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
-        pending_commands_.emplace_back(dst, src, size, kind);
+        pending_commands_.emplace_back(new CommandEntry(dst, src, size, kind));
     }
     pending_commands_cv_.notify_all();
     return hipSuccess; // TODO more accurate return value
@@ -235,9 +235,9 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
                                                     size_t size, tag_t tag,
                                                     bool in)
 {
-   pending_commands_.emplace_front(in ? vector_copy_in : vector_copy_out,
-                                   dim3(512), dim3(256), 0, stream_, dst, src,
-                                   size, tag);
+   pending_commands_.emplace_front(new CommandEntry(
+       in ? vector_copy_in : vector_copy_out,
+       dim3(512), dim3(256), 0, stream_, dst, src, size, tag));
 }
 
 void SepMemcpyCommandScheduler::add_extra_kernels(
@@ -374,8 +374,8 @@ void BatchCommandScheduler::ProcessThread() {
             }
             pre_notify();
             if (pending_commands_.size() == 0) continue;
-            if (pending_commands_[0].kind == MEMCPY) {
-                MemcpyParam param = pending_commands_[0].memcpy_param;
+            if (pending_commands_[0]->kind == MEMCPY) {
+                MemcpyParam param = pending_commands_[0]->memcpy_param;
                 pending_commands_.pop_front();
                 do_memcpy(param.dst, param.src, param.size, param.kind);
                 pending_commands_cv_.notify_all();
@@ -383,8 +383,8 @@ void BatchCommandScheduler::ProcessThread() {
             }
             for (int i = 0; i < batch_size_; i++) {
                 if (i >= pending_commands_.size()) break;
-                if (pending_commands_[i].kind == MEMCPY) break;
-                params.push_back(&pending_commands_[i].kernel_launch_param);
+                if (pending_commands_[i]->kind == MEMCPY) break;
+                params.push_back(&pending_commands_[i]->kernel_launch_param);
             }
         }
 

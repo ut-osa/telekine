@@ -119,7 +119,7 @@ protected:
     virtual void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) {};
 
-    std::deque<CommandEntry> pending_commands_;
+    std::deque<std::unique_ptr<CommandEntry>> pending_commands_;
     std::mutex pending_commands_mutex_;
     std::condition_variable pending_commands_cv_;
     std::mutex wait_mutex_;
