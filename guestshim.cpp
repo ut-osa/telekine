@@ -205,6 +205,17 @@ void BatchCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
 }
 
 __global__ void
+vector_copy(uint8_t *C_d, uint8_t *A_d, size_t N)
+{
+    size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
+    size_t stride = blockDim.x * gridDim.x ;
+
+    for (size_t i=offset; i<N; i+=stride) {
+        C_d[i] = A_d[i];
+    }
+}
+
+__global__ void
 vector_copy_in(uint8_t *C_d, uint8_t *A_d, size_t N, tag_t tag)
 {
     size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
@@ -309,8 +320,13 @@ void SepMemcpyCommandScheduler::pre_notify(void)
             xfer_stream_);
       lgmNextNonceAsync(xfer_stream_);
    } else {
-      // copy data to the host
-      err = nw_hipMemcpySync(plaintext, op->src_, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
+      /* XXX this extra vector_copy here makes it work, my best guess is that
+       * there's some issue with memcpys on different streams and what data is
+       * in l2.
+       */
+      hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, xfer_stream_,
+                         encrypt_out_buf, op->src_, FIXED_SIZE_FULL);
+      err = nw_hipMemcpySync(plaintext, encrypt_out_buf, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
    }
@@ -403,11 +419,8 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
 extern __thread int chan_no;
 void SepMemcpyCommandScheduler::MemcpyThread()
 {
-    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
     hipError_t err;
     chan_no = 1;
-    void *sb2;
-
     while (this->running) {
        std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
        pre_notify();
@@ -418,23 +431,10 @@ void SepMemcpyCommandScheduler::MemcpyThread()
           continue;
        assert(pending_copy_commands[0]->kind == MEMCPY);
        MemcpyParam param = pending_copy_commands[0]->memcpy_param;
-       assert(param.kind == hipMemcpyHostToDevice);
        pending_copy_commands.pop_front();
 
-       /*
-       if (memcpy_encryption_enabled()) {
-         sb2 = next_in_buf();
-         lgmCPUEncrypt(ciphertext, param.src, FIXED_SIZE_FULL, xfer_stream_);
-         err = nw_hipMemcpySync(sb2, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
-               param.kind, xfer_stream_);
-         assert(err == hipSuccess);
-         // TODO for now we write back in to the sb buffer but this could be a different buffer
-         lgmDecryptAsync(param.dst, sb2, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
-         lgmNextNonceAsync(xfer_stream_);
-       } else */{
-          err = nw_hipMemcpySync(param.dst, param.src, param.size, param.kind, xfer_stream_);
-          assert(err == hipSuccess);
-       }
+       err = nw_hipMemcpySync(param.dst, param.src, param.size, param.kind, xfer_stream_);
+       assert(err == hipSuccess);
        free((void *)param.src);
     }
 }

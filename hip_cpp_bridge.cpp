@@ -26,17 +26,55 @@ inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {
 }
 }
 
+#define pinned_buf_size (1UL << 30)
+static void *allocate_pinned_buf()
+{
+   void *pinned;
+   unsigned int flags = hipHostMallocPortable|hipHostMallocCoherent|hipHostMallocMapped;
+   assert(hipHostMalloc(&pinned, pinned_buf_size, flags) == hipSuccess);
+   return pinned;
+}
+
+
+void *pinned_buf = allocate_pinned_buf();
+std::once_flag pinned_f;
+
 extern "C" hipError_t
 nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
+    stream = ihipSyncAndResolveStream(stream);
     hipError_t e = hipSuccess;
+    assert(sizeBytes < pinned_buf_size);
+    switch (kind) {
+       case hipMemcpyHostToDevice:
+          memcpy(pinned_buf, src, sizeBytes);
+          e = hipMemcpyAsync(dst, pinned_buf, sizeBytes, kind, stream);
+          assert(e == hipSuccess);
+          e = hipStreamSynchronize(stream);
+          assert(e == hipSuccess);
+          break;
+       case hipMemcpyDeviceToHost:
+          e = hipMemcpyAsync(pinned_buf, src, sizeBytes, kind, stream);
+          assert(e == hipSuccess);
+          e = hipStreamSynchronize(stream);
+          assert(e == hipSuccess);
+          memcpy(dst, pinned_buf, sizeBytes);
+          break;
+       case hipMemcpyDeviceToDevice:
+       case hipMemcpyHostToHost:
+       case hipMemcpyDefault:
+       defatult:
+          assert("impossible");
+    }
+#if 0
     stream = ihipSyncAndResolveStream(stream);
     try {
         stream->locked_copySync(dst, src, sizeBytes, kind);
     } catch (ihipException& ex) {
         e = ex._code;
     }
+#endif
     return e;
 }
 
