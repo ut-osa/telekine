@@ -81,7 +81,7 @@ def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size,
       print("Encryption on")
       extra_client_env["LGM_MEMCPY_ENABLE_ENCRYPTION"] = "1"
     if hip_check_complete:
-        extra_client_env["HIP_SYNC_CHECK_BATCH_COMPLETE"]
+        extra_client_env["HIP_SYNC_CHECK_BATCH_COMPLETE"] = "1"
     if run_type == "ava":
         extra_client_env['LD_PRELOAD'] = ':'.join([shim, guest_lib])
     sys.exit(run_test(test_cmd))
