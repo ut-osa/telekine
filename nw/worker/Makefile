@@ -9,7 +9,7 @@ all: $(targets)
 	gcc -g -Iinclude \
 		  $^ -o $@ \
 		  `pkg-config --cflags --libs glib-2.0` \
-		  -pthread -lrt -ldl -D_GNU_SOURCE \
+		  -pthread -lrt -ldl -lssl -lcrypto -D_GNU_SOURCE \
 		  -Wall
 
 clean:

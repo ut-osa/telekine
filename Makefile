@@ -54,10 +54,10 @@ GUESTLIB_SOURCES = hip_nw_guestlib.c $(addprefix nw/guestlib/src/,init.c) \
 													   cmd_channel_socket.c)
 
 worker: $(GENERAL_SOURCES) $(WORKER_SOURCES) hip_cpp_bridge.o
-	$(CC) -O3 -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -o $@
+	$(CC) -O3 -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -lssl -lcrypto -o $@
 
 libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
-	$(CC) -O3 -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -o $@
+	$(CC) -O3 -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -lssl -lcrypto -o $@
 
 
 $(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so libcrypto.so
@@ -81,7 +81,7 @@ guestshim.so: guestshim.o program_state.o code_object_bundle.o hip_function_info
 guestshim.so: libguestlib.so libcrypto.so
 
 libcrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
-	$(HIPCC) $(includes) -shared -fPIC crypto/aes_gcm.cpp -o $@ -lsodium -ldl
+	$(HIPCC) $(includes) -shared -O3 -fPIC crypto/aes_gcm.cpp -o $@ -lsodium -ldl
 
 clean:
 	rm -rf hip_nw *.o *.so manager_tcp MatrixTranspose copy

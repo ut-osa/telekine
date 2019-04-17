@@ -8,6 +8,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #define SOL_NETLINK 270
 
@@ -222,6 +225,114 @@ int recv_socket(int sockfd, void *buf, size_t size)
         if ((ret = recv(sockfd, buf, size, 0)) <= 0) {
             perror("ERROR receiving from socket");
             close(sockfd);
+            exit(0);
+        }
+        buf += ret;
+        size -= ret;
+    }
+    return ret;
+}
+
+void init_ssl(void)
+{
+    static int inited = 0;
+    if (!inited) {
+        OpenSSL_add_all_algorithms();
+        OpenSSL_add_ssl_algorithms();
+        SSL_load_error_strings();
+        inited = 1;
+    }
+}
+
+void* create_ssl_server_context(const char* cert_file, const char* key_file)
+{
+    SSL_CTX* ctx = SSL_CTX_new(TLSv1_2_method());
+    if (ctx == NULL) {
+        perror("Cannot create SSL server context");
+        ERR_print_errors_fp(stderr);
+        exit(0);
+    }
+    SSL_CTX_set_ecdh_auto(ctx, 1);
+    if (SSL_CTX_use_certificate_file(ctx, cert_file, SSL_FILETYPE_PEM) <= 0) {
+        perror("Failed to set cert file for SSL context");
+        ERR_print_errors_fp(stderr);
+	    exit(0);
+    }
+    if (SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM) <= 0 ) {
+        perror("Failed to set key file for SSL context");
+        ERR_print_errors_fp(stderr);
+	    exit(EXIT_FAILURE);
+    }
+    return ctx;
+}
+
+void* create_ssl_client_context(void)
+{
+    SSL_CTX* ctx = SSL_CTX_new(TLSv1_2_method());
+    if (ctx == NULL) {
+        perror("Cannot create SSL client context");
+        ERR_print_errors_fp(stderr);
+        exit(0);
+    }
+    return ctx;
+}
+
+void* create_ssl_session(void* ssl_ctx, int sockfd)
+{
+    SSL* ssl = SSL_new((SSL_CTX*)ssl_ctx);
+    if (ssl == NULL) {
+        perror("Cannot create SSL session");
+        ERR_print_errors_fp(stderr);
+        exit(0);
+    }
+    SSL_set_fd(ssl, sockfd);
+    SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
+    SSL_set_mode(ssl, SSL_MODE_AUTO_RETRY);
+    return ssl;
+}
+
+int ssl_accept(void* ssl)
+{
+    if (SSL_accept((SSL*)ssl) <= 0) {
+        perror("SSL accept failed");
+        ERR_print_errors_fp(stderr);
+        exit(0);
+    }
+    return 0;
+}
+
+int ssl_connect(void* ssl)
+{
+    if (SSL_connect((SSL*)ssl) <= 0) {
+        perror("SSL connect failed");
+        ERR_print_errors_fp(stderr);
+        exit(0);
+    }
+    return 0;
+}
+
+int recv_ssl_socket(void* ssl, void *buf, size_t size)
+{
+    ssize_t ret = -1;
+    while (size > 0) {
+        if ((ret = SSL_read((SSL*)ssl, buf, size)) <= 0) {
+            perror("ERROR receiving from socket");
+            ERR_print_errors_fp(stderr);
+            exit(0);
+        }
+        size -= ret;
+        buf += ret;
+    }
+    return ret;
+}
+
+int send_ssl_socket(void* ssl, void *buf, size_t size)
+{
+    ssize_t ret = -1;
+    while (size > 0) {
+        if ((ret = SSL_write((SSL*)ssl, buf, size)) <= 0) {
+            perror("ERROR sending to socket");
+            ERR_print_errors_fp(stderr);
             exit(0);
         }
         buf += ret;

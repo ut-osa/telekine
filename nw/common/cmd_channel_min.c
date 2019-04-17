@@ -15,12 +15,33 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
+
+static int ssl_enabled_impl(void)
+{
+    const char* env = getenv("AVA_ENABLE_SSL");
+    if (env == NULL || atoi(env) == 0) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+static int ssl_enabled(void)
+{
+    static int enabled = -1;
+    if (enabled == -1) enabled = ssl_enabled_impl();
+    return enabled;
+}
 
 struct command_channel_min {
     struct command_channel_base base;
     int sock_fd;
     struct pollfd pfd;
+    void* ssl_ctx;
+    void* ssl;
+    pthread_mutex_t send_mutex;
 };
 
 static struct command_channel_vtable command_channel_min_vtable;
@@ -122,8 +143,16 @@ void command_channel_min_send_command(struct command_channel* c, struct command_
     struct command_channel_min *chan = (struct command_channel_min *)c;
     cmd->command_type = MSG_NEW_INVOCATION;
 
+    pthread_mutex_lock(&chan->send_mutex);
+
     /* vsock interposition does not block send_message */
-    send_socket(chan->sock_fd, cmd, cmd->command_size + cmd->region_size);
+    if (ssl_enabled()) {
+        send_ssl_socket(chan->ssl, cmd, cmd->command_size + cmd->region_size);
+    } else {
+        send_socket(chan->sock_fd, cmd, cmd->command_size + cmd->region_size);
+    }
+
+    pthread_mutex_unlock(&chan->send_mutex);
 }
 
 //! Receiving
@@ -161,11 +190,20 @@ struct command_base* command_channel_min_receive_command(struct command_channel*
 
     if (chan->pfd.revents & POLLIN) {
         memset(&cmd_base, 0, sizeof(struct command_base));
-        recv_socket(chan->pfd.fd, &cmd_base, sizeof(struct command_base));
+        if (ssl_enabled()) {
+            recv_ssl_socket(chan->ssl, &cmd_base, sizeof(struct command_base));
+        } else {
+            recv_socket(chan->pfd.fd, &cmd_base, sizeof(struct command_base));
+        }
         cmd = (struct command_base *)malloc(cmd_base.command_size + cmd_base.region_size);
         memcpy(cmd, &cmd_base, sizeof(struct command_base));
-        recv_socket(chan->pfd.fd, (void *)cmd + sizeof(struct command_base),
-                    cmd_base.command_size + cmd_base.region_size - sizeof(struct command_base));
+        if (ssl_enabled()) {
+            recv_ssl_socket(chan->ssl, (void *)cmd + sizeof(struct command_base),
+                            cmd_base.command_size + cmd_base.region_size - sizeof(struct command_base));
+        } else {
+            recv_socket(chan->pfd.fd, (void *)cmd + sizeof(struct command_base),
+                        cmd_base.command_size + cmd_base.region_size - sizeof(struct command_base));
+        }
         DEBUG_PRINT("receive new command:\n");
         command_channel_min_print_command(c, cmd);
         return cmd;
@@ -276,6 +314,15 @@ struct command_channel* command_channel_min_new(int chan_no)
     chan->pfd.fd = chan->sock_fd;
     chan->pfd.events = POLLIN | POLLRDHUP;
     worker_port += CHANNEL_1_OFFSET;
+
+    if (ssl_enabled()) {
+        fprintf(stderr, "Init SSL connection\n");
+        init_ssl();
+        chan->ssl_ctx = create_ssl_client_context();
+        chan->ssl = create_ssl_session(chan->ssl_ctx, chan->sock_fd);
+        ssl_connect(chan->ssl);
+    }
+    pthread_mutex_init(&chan->send_mutex, NULL);
 
     return (struct command_channel *)chan;
 }

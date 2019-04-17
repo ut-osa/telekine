@@ -104,4 +104,13 @@ int accept_vm_socket(int listen_fd);
 int send_socket(int sockfd, void *buf, size_t size);
 int recv_socket(int sockfd, void *buf, size_t size);
 
+void init_ssl(void);
+void* create_ssl_server_context(const char* cert_file, const char* key_file);
+void* create_ssl_client_context(void);
+void* create_ssl_session(void* ssl_context, int sockfd);
+int ssl_accept(void* ssl);
+int ssl_connect(void* ssl);
+int send_ssl_socket(void* ssl, void *buf, size_t size);
+int recv_ssl_socket(void* ssl, void *buf, size_t size);
+
 #endif
