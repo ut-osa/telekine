@@ -247,6 +247,10 @@ note_batch_id(uint8_t *buf, uint64_t batchid)
 #define BLOCKS_THREADS_TO_AQL(blocks, threads) \
    (blocks * threads), 1, 1, threads, 1, 1
 
+__global__ void nullKern(void)
+{
+}
+
 void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
                                                     size_t size, tag_t tag,
                                                     bool in)
@@ -265,6 +269,10 @@ void SepMemcpyCommandScheduler::add_extra_kernels(
 {
    if (realkerns.size() > 0)
          last_real_batch = cur_batch_id;
+   for (int i = realkerns.size(); i <= batch_size_; i++) {
+      extrakerns.emplace_back(nullKern, dim3(0, 0, 0), dim3(0, 0, 0),
+                              0, stream_);
+   }
    extrakerns.emplace_back(note_batch_id, dim3(1), dim3(1), 0, stream_,
                            status_buf, cur_batch_id++);
 }
