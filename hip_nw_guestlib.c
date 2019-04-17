@@ -1124,14 +1124,20 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
             int numKernels;
             numKernels = __local->numKernels;
 
-            size_t *extra_size;
-            extra_size = __local->extra_size;
+            hipEvent_t *stop;
+            stop = __local->stop;
+
+            hipStream_t stream;
+            stream = __local->stream;
 
             hsa_kernel_dispatch_packet_t *aql;
             aql = __local->aql;
 
-            hipStream_t stream;
-            stream = __local->stream;
+            hipEvent_t *start;
+            start = __local->start;
+
+            size_t *extra_size;
+            extra_size = __local->extra_size;
 
             size_t total_extra_size;
             total_extra_size = __local->total_extra_size;
@@ -3763,7 +3769,7 @@ __do_c_hipHccModuleLaunchKernel(hsa_kernel_dispatch_packet_t * aql, hipStream_t 
 
 EXPORTED hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hsa_kernel_dispatch_packet_t * aql, hipStream_t stream,
-    char *all_extra, size_t total_extra_size, size_t * extra_size)
+    char *all_extra, size_t total_extra_size, size_t * extra_size, hipEvent_t * start, hipEvent_t * stop)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
@@ -3771,6 +3777,11 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hsa_kernel_dispatch_packet_
     GPtrArray *__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
+        /* Size: hipEvent_t * stop */
+        if ((stop) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(hipEvent_t));
+        }
+
         /* Size: hsa_kernel_dispatch_packet_t * aql */
         if ((aql) != (NULL) && (numKernels) > (0)) {
             const size_t __aql_size_0 = (numKernels);
@@ -3789,6 +3800,11 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hsa_kernel_dispatch_packet_
                 }
             } __total_buffer_size +=
                 command_channel_buffer_size(__chan, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
+        }
+
+        /* Size: hipEvent_t * start */
+        if ((start) != (NULL) && (numKernels) > (0)) {
+            __total_buffer_size += command_channel_buffer_size(__chan, (numKernels) * sizeof(hipEvent_t));
         }
 
         /* Size: size_t * extra_size */
@@ -3857,6 +3873,22 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hsa_kernel_dispatch_packet_
         } else {
             __cmd->extra_size = NULL;
         }
+        /* Input: hipEvent_t * start */
+        if ((start) != (NULL) && (numKernels) > (0)) {
+            __cmd->start =
+                (hipEvent_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, start,
+                (numKernels) * sizeof(hipEvent_t));
+        } else {
+            __cmd->start = NULL;
+        }
+        /* Input: hipEvent_t * stop */
+        if ((stop) != (NULL) && (numKernels) > (0)) {
+            __cmd->stop =
+                (hipEvent_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd, stop,
+                (numKernels) * sizeof(hipEvent_t));
+        } else {
+            __cmd->stop = NULL;
+        }
     }
 
     struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record *__call_record =
@@ -3865,9 +3897,13 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hsa_kernel_dispatch_packet_
 
     __call_record->numKernels = numKernels;
 
-    __call_record->aql = aql;
+    __call_record->stop = stop;
 
     __call_record->stream = stream;
+
+    __call_record->aql = aql;
+
+    __call_record->start = start;
 
     __call_record->extra_size = extra_size;
 

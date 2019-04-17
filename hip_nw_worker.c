@@ -503,11 +503,14 @@ __wrapper___do_c_hipHccModuleLaunchKernel(hsa_kernel_dispatch_packet_t * aql, hi
 }
 
 static hipError_t
-__wrapper___do_c_hipHccModuleLaunchMultiKernel(int numKernels, size_t * extra_size, hsa_kernel_dispatch_packet_t * aql,
-    hipStream_t stream, size_t total_extra_size, char *all_extra)
+__wrapper___do_c_hipHccModuleLaunchMultiKernel(int numKernels, size_t * extra_size, hipEvent_t * stop,
+    hipStream_t stream, hsa_kernel_dispatch_packet_t * aql, hipEvent_t * start, size_t total_extra_size,
+    char *all_extra)
 {
     hipError_t ret;
-    ret = __do_c_hipHccModuleLaunchMultiKernel(numKernels, aql, stream, all_extra, total_extra_size, extra_size);
+    ret =
+        __do_c_hipHccModuleLaunchMultiKernel(numKernels, aql, stream, all_extra, total_extra_size, extra_size, start,
+        stop);
 
     /* Report resources */
 
@@ -2820,17 +2823,22 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
         numKernels = __call->numKernels;
         numKernels = __call->numKernels;
 
-        /* Input: size_t * extra_size */
-        size_t *extra_size;
-        extra_size =
-            ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
-                    __call->extra_size))) : (__call->extra_size);
-        if (__call->extra_size != NULL)
-            extra_size =
-                ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
-                        __call->extra_size))) : (__call->extra_size);
+        /* Input: hipEvent_t * stop */
+        hipEvent_t *stop;
+        stop =
+            ((__call->stop) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->stop))) : (__call->stop);
+        if (__call->stop != NULL)
+            stop =
+                ((__call->stop) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->stop))) : (__call->stop);
         else
-            extra_size = NULL;
+            stop = NULL;
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
 
         /* Input: hsa_kernel_dispatch_packet_t * aql */
         hsa_kernel_dispatch_packet_t *aql;
@@ -2860,10 +2868,29 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
             aql = NULL;
         }
 
-        /* Input: hipStream_t stream */
-        hipStream_t stream;
-        stream = __call->stream;
-        stream = __call->stream;
+        /* Input: hipEvent_t * start */
+        hipEvent_t *start;
+        start =
+            ((__call->start) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->start))) : (__call->start);
+        if (__call->start != NULL)
+            start =
+                ((__call->start) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->start))) : (__call->start);
+        else
+            start = NULL;
+
+        /* Input: size_t * extra_size */
+        size_t *extra_size;
+        extra_size =
+            ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->extra_size))) : (__call->extra_size);
+        if (__call->extra_size != NULL)
+            extra_size =
+                ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->extra_size))) : (__call->extra_size);
+        else
+            extra_size = NULL;
 
         /* Input: size_t total_extra_size */
         size_t total_extra_size;
@@ -2885,8 +2912,8 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
         /* Perform Call */
         hipError_t ret;
         ret =
-            __wrapper___do_c_hipHccModuleLaunchMultiKernel(numKernels, extra_size, aql, stream, total_extra_size,
-            all_extra);
+            __wrapper___do_c_hipHccModuleLaunchMultiKernel(numKernels, extra_size, stop, stream, aql, start,
+            total_extra_size, all_extra);
 
         ava_is_in = 0;
         ava_is_out = 1;

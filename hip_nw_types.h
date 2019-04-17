@@ -65,7 +65,8 @@ hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(
       int numKernels, hsa_kernel_dispatch_packet_t *aql,
       hipStream_t stream,
-      char* all_extra, size_t total_extra_size, size_t* extra_size);
+      char* all_extra, size_t total_extra_size, size_t* extra_size,
+      hipEvent_t *start, hipEvent_t *stop);
 
 hipError_t
 nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,

@@ -307,7 +307,8 @@ __do_c_hipHccModuleLaunchKernel(hsa_kernel_dispatch_packet_t *aql,
 extern "C" hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(
       int numKernels, hsa_kernel_dispatch_packet_t *aql, hipStream_t stream,
-      char* all_extra, size_t total_extra_size, size_t* extra_size) {
+      char* all_extra, size_t total_extra_size, size_t* extra_size,
+      hipEvent_t *start, hipEvent_t *stop) {
    // if (numKernels == 1) {
    //    fprintf(stderr, "Launching a batch of size 1\n");
    // }
@@ -318,7 +319,7 @@ __do_c_hipHccModuleLaunchMultiKernel(
          HIP_LAUNCH_PARAM_BUFFER_SIZE, &extra_size[i],
          HIP_LAUNCH_PARAM_END};
       hipError_t status = __do_c_hipHccModuleLaunchKernel(
-         aql+i, stream, nullptr, extra, extra_size[i], nullptr, nullptr);
+         aql+i, stream, nullptr, extra, extra_size[i], start[i], stop[i]);
       if (status != hipSuccess) {
          return status;
       }

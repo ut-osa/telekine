@@ -572,6 +572,8 @@ struct hip___do_c_hip_hcc_module_launch_multi_kernel_call {
     size_t *extra_size;
     hsa_kernel_dispatch_packet_t *aql;
     hipStream_t stream;
+    hipEvent_t *stop;
+    hipEvent_t *start;
     size_t total_extra_size;
     char *all_extra;
 };
@@ -588,6 +590,8 @@ struct hip___do_c_hip_hcc_module_launch_multi_kernel_call_record {
     size_t *extra_size;
     hsa_kernel_dispatch_packet_t *aql;
     hipStream_t stream;
+    hipEvent_t *stop;
+    hipEvent_t *start;
     size_t total_extra_size;
     char *all_extra;
     hipError_t ret;

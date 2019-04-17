@@ -260,7 +260,7 @@ hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(int numKernels,
                      hsa_kernel_dispatch_packet_t *aql, hipStream_t stream,
                      char* all_extra, size_t total_extra_size,
-                     size_t* extra_size) {
+                     size_t* extra_size, hipEvent_t *start, hipEvent_t *stop) {
    ava_argument(aql) {
       ava_in; ava_buffer(numKernels);
    }
@@ -272,6 +272,18 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels,
    }
    ava_argument(extra_size) {
       ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(start) {
+      ava_in; ava_buffer(numKernels);
+      ava_element {
+         ava_opaque;
+      }
+   }
+   ava_argument(stop) {
+      ava_in; ava_buffer(numKernels);
+      ava_element {
+         ava_opaque;
+      }
    }
 }
 

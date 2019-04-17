@@ -8,6 +8,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <future>
 
 #include "hip/hip_runtime.h"
 #include "hip_function_info.hpp"
@@ -35,9 +36,9 @@ public:
     virtual hipError_t Wait(void) = 0;
 
     static std::shared_ptr<CommandScheduler> GetForStream(hipStream_t stream);
+    static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
 protected:
     hipStream_t stream_;
-    static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
     static std::mutex command_scheduler_map_mu_;
 };
 
@@ -58,9 +59,11 @@ protected:
         hsa_kernel_dispatch_packet_t aql;
         size_t kernArgSize;
         uint8_t kernArg[FIXED_EXTRA_SIZE];
+        hipEvent_t start, stop;
         KernelLaunchParam(const hsa_kernel_dispatch_packet_t *_aql,
-                          uint8_t *kern_arg, size_t kern_arg_size) :
-           aql(*_aql), kernArgSize(FIXED_EXTRA_SIZE)
+                          uint8_t *kern_arg, size_t kern_arg_size,
+                          hipEvent_t _start, hipEvent_t _stop) :
+           aql(*_aql), kernArgSize(FIXED_EXTRA_SIZE), start(_start), stop(_stop)
         {
            assert(kern_arg_size < FIXED_EXTRA_SIZE);
            memcpy(kernArg, kern_arg, kern_arg_size);
@@ -68,7 +71,8 @@ protected:
         template <typename... Args, typename F = void (*)(Args...)>
         KernelLaunchParam(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
                           std::uint32_t sharedMemBytes, hipStream_t stream,
-                          Args... args) : aql{0}, kernArgSize(FIXED_EXTRA_SIZE)
+                          Args... args) : aql{0}, kernArgSize(FIXED_EXTRA_SIZE),
+            start(nullptr), stop(nullptr)
         {
            auto kern_args = hip_impl::make_kernarg(std::move(args)...);
            auto fun = hip_function_lookup((uintptr_t)kernel, stream);
@@ -96,24 +100,42 @@ protected:
 
     struct CommandEntry {
         CommandKind kind;
+        std::promise<void> done;
         union {
            KernelLaunchParam kernel_launch_param;
            MemcpyParam memcpy_param;
         };
+        ~CommandEntry()
+        {
+           done.set_value();
+        }
         CommandEntry(const hsa_kernel_dispatch_packet_t *aql, uint8_t *kern_arg,
                      size_t kern_arg_size) :
            kind(KERNEL_LAUNCH),
-           kernel_launch_param(aql, kern_arg, kern_arg_size) {}
+           kernel_launch_param(aql, kern_arg, kern_arg_size, nullptr, nullptr) {};
+
+        CommandEntry(const hsa_kernel_dispatch_packet_t *aql, uint8_t *kern_arg,
+                     size_t kern_arg_size, hipEvent_t start, hipEvent_t stop) :
+           kind(KERNEL_LAUNCH),
+           kernel_launch_param(aql, kern_arg, kern_arg_size, start, stop) {};
+
+        CommandEntry(const hsa_kernel_dispatch_packet_t *aql, uint8_t *kern_arg,
+                     size_t kern_arg_size, hipEvent_t start, hipEvent_t stop,
+                     std::promise<void> _done) :
+           kind(KERNEL_LAUNCH), done(std::move(_done)),
+           kernel_launch_param(aql, kern_arg, kern_arg_size, start, stop) {};
+
         CommandEntry(void *dst, const void *src, size_t size, hipMemcpyKind mkind) :
            kind(MEMCPY),
-           memcpy_param(dst, src, size, mkind) {}
+           memcpy_param(dst, src, size, mkind) {};
+
         template <typename... Args, typename F = void (*)(Args...)>
         CommandEntry(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
                           std::uint32_t sharedMemBytes, hipStream_t stream,
                           Args... args) :
            kind(KERNEL_LAUNCH),
            kernel_launch_param(std::move(kernel), numBlocks, dimBlocks, sharedMemBytes,
-                               stream, std::move(args)...) {}
+                               stream, std::move(args)...) {};
     };
 
     virtual void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,

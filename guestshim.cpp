@@ -143,13 +143,20 @@ SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
         uint8_t *extra, size_t extra_size, hipEvent_t start, hipEvent_t stop)
 {
-    assert(!start && !stop);
+   std::promise<void> done;
+   std::future<void> done_future = done.get_future();
     {
         std::lock_guard<std::mutex> lk2(wait_mutex_);
         std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
-        pending_commands_.emplace_back(new CommandEntry(aql, extra, extra_size));
+        pending_commands_.emplace_back(new CommandEntry(aql, extra, extra_size,
+                                                        start, stop, std::move(done)));
     }
     pending_commands_cv_.notify_all();
+    /* need to wait so that these events are valid if the caller wants to use
+     * them in ops since we don't handle events
+     */
+    if (start || stop)
+       done_future.wait();
     return hipSuccess; // TODO more accurate return value
 }
 
@@ -315,7 +322,6 @@ void SepMemcpyCommandScheduler::pre_notify(void)
    }
 }
 
-extern __thread int chan_no;
 
 void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
                                           hipMemcpyKind kind)
@@ -471,15 +477,20 @@ void BatchCommandScheduler::ProcessThread() {
 
         std::vector<hsa_kernel_dispatch_packet_t> aql;
         std::vector<size_t> extra_size;
+        std::vector<hipEvent_t> starts, stops;
 
         size_t total_extra_size = 0;
         for (int i = 0; i < params.size(); i++) {
             aql.emplace_back(params[i]->aql);
+            starts.push_back(params[i]->start);
+            stops.push_back(params[i]->stop);
             extra_size.push_back(params[i]->kernArgSize);
             total_extra_size += params[i]->kernArgSize;
         }
         for (int i = 0; i < extra_kerns.size(); i++) {
             aql.emplace_back(extra_kerns[i].aql);
+            starts.push_back(extra_kerns[i].start);
+            stops.push_back(extra_kerns[i].stop);
             extra_size.push_back(extra_kerns[i].kernArgSize);
             total_extra_size += extra_kerns[i].kernArgSize;
         }
@@ -497,7 +508,8 @@ void BatchCommandScheduler::ProcessThread() {
         __do_c_hipHccModuleLaunchMultiKernel(
             params.size() + extra_kerns.size(),
             aql.data(), stream_,
-            all_extra, total_extra_size, extra_size.data());
+            all_extra, total_extra_size, extra_size.data(),
+            starts.data(), stops.data());
 
         free(all_extra);
 
@@ -532,13 +544,8 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                         globalWorkSizeZ, localWorkSizeX, localWorkSizeY,
                         localWorkSizeZ, sharedMemBytes);
 
-    if (startEvent || stopEvent) {
-       return __do_c_hipHccModuleLaunchKernel(&aql, hStream, nullptr,
-               (char *)extra_buf, extra_size, startEvent, stopEvent);
-    } else {
-       return CommandScheduler::GetForStream(hStream)->AddKernelLaunch(&aql,
-               extra_buf, extra_size, nullptr, nullptr);
-   }
+    return CommandScheduler::GetForStream(hStream)->AddKernelLaunch(&aql,
+            extra_buf, extra_size, startEvent, stopEvent);
 }
 
 extern "C" hipError_t
@@ -577,7 +584,6 @@ hipStreamSynchronize(hipStream_t stream)
     // fprintf(stderr, "hipStreamSynchronize\n");
     return CommandScheduler::GetForStream(stream)->Wait();
 }
-
 
 hipError_t
 hipHostMalloc(void** ptr, size_t size, unsigned int flags)
