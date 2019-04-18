@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     CHECK(hipGetDeviceProperties(&props, deviceID));
     printf("info: running on device %s\n", props.name);
 
-    for (size_t N = 1; N < 0xFF0000; N < 0x100 ? N++ : N += 0xFFFF & rand()) {
+    for (size_t N = 1024 * 1024; N < 1024 * 1024 * 1024; N < 128 ? N++ : N += 1024 * 1024 * 256) {
       size_t Nbytes = N * sizeof(uint8_t);
 
       printf("info: allocate mem (0x%010zx B)\n", Nbytes);
@@ -96,14 +96,12 @@ int main(int argc, char *argv[])
       CHECK(hipEventRecord(e4));
       CHECK(hipEventSynchronize(e4));
       //printf("info: check result\n");
-      bool error = false;
       for (size_t i = 0; i < N; i++)  {
         if (C_h[i] != A_h[i]) {
-          printf("mismatch at index %zu. Expected %x, actual %x\n", i, A_h[i], C_h[i]);
-          error = true;
+          fprintf(stderr, "mismatch at index %zu. Expected %x, actual %x\n", i, A_h[i], C_h[i]);
+          CHECK(hipErrorUnknown);
         }
       }
-      if (error) CHECK(hipErrorUnknown);
 
 #define MBpSec(bytes, ms) ((bytes * 1000.0) / (ms * 1048576.0))
 
