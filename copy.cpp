@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
       CHECK(hipMalloc(&A_d, Nbytes));
       CHECK(hipMalloc(&C_d, Nbytes));
 
+#ifdef USE_EVENTS
       hipEvent_t e1, e2, e3, e4;
       CHECK(hipEventCreate(&e1));
       CHECK(hipEventCreate(&e2));
@@ -80,21 +81,33 @@ int main(int argc, char *argv[])
       CHECK(hipEventCreate(&e4));
 
       CHECK(hipEventRecord(e1));
+#else
+#endif
       //printf("info: copy Host2Device\n");
       CHECK(hipMemcpy(A_d, A_h, Nbytes, hipMemcpyHostToDevice));
+#ifdef USE_EVENTS
       CHECK(hipEventRecord(e2));
+#else
+#endif
 
       const unsigned blocks = 512;
       const unsigned threadsPerBlock = 256;
 
       //printf("info: launch 'vector_copy' kernel\n");
       hipLaunchKernelGGL((vector_copy), dim3(blocks), dim3(threadsPerBlock), 0, 0, C_d, A_d, N);
+#ifdef USE_EVENTS
       CHECK(hipEventRecord(e3));
+#else
+      CHECK(hipDeviceSynchronize());
+#endif
 
       //printf("info: copy Device2Host\n");
       CHECK(hipMemcpy(C_h, C_d, Nbytes, hipMemcpyDeviceToHost));
+#ifdef USE_EVENTS
       CHECK(hipEventRecord(e4));
       CHECK(hipEventSynchronize(e4));
+#else
+#endif
       //printf("info: check result\n");
       for (size_t i = 0; i < N; i++)  {
         if (C_h[i] != A_h[i]) {
@@ -105,6 +118,7 @@ int main(int argc, char *argv[])
 
 #define MBpSec(bytes, ms) ((bytes * 1000.0) / (ms * 1048576.0))
 
+#ifdef USE_EVENTS
       float ms;
       CHECK(hipEventElapsedTime(&ms, e1, e2));
       printf("info: copy-in  %8.4f MB/Sec\n", MBpSec(Nbytes, ms));
@@ -112,9 +126,10 @@ int main(int argc, char *argv[])
       printf("info: kernel   %8.4f MB/Sec\n", MBpSec(Nbytes, ms));
       CHECK(hipEventElapsedTime(&ms, e3, e4));
       printf("info: copy-out %8.4f MB/Sec\n", MBpSec(Nbytes, ms));
+#endif
+#if 0
       int device_count;
       CHECK(hipGetDeviceCount(&device_count));
-#if 0
       if (device_count > 1) {
         uint8_t *B_d;
         hipEvent_t e5, e6;
@@ -145,10 +160,12 @@ int main(int argc, char *argv[])
       delete[] C_h;
       CHECK(hipFree(A_d));
       CHECK(hipFree(C_d));
+#ifdef USE_EVENTS
       CHECK(hipEventDestroy(e1));
       CHECK(hipEventDestroy(e2));
       CHECK(hipEventDestroy(e3));
       CHECK(hipEventDestroy(e4));
+#endif
     }
     printf("PASSED!\n");
 }
