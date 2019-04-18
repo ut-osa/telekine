@@ -53,7 +53,7 @@ public:
 protected:
     void ProcessThread();
     virtual void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind);
-    virtual void pre_notify(void){};
+    virtual void do_d2h_copies(void){};
 
     struct KernelLaunchParam {
         hsa_kernel_dispatch_packet_t aql;
@@ -91,6 +91,7 @@ protected:
         hipMemcpyKind kind;
         MemcpyParam(void *_dst, const void *_src, size_t _size, hipMemcpyKind _kind) :
            dst(_dst), src(_src), size(_size), kind(_kind) {}
+        MemcpyParam() : dst(nullptr), src(nullptr), size(0) {}
     };
 
     enum CommandKind {
@@ -159,7 +160,7 @@ public:
     virtual hipError_t Wait(void) override;
 protected:
     void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
-    void pre_notify(void) override;
+    void do_d2h_copies(void) override;
     void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
@@ -194,6 +195,7 @@ protected:
     void *out_bufs[N_STG_BUFS];
     void *encrypt_out_buf;
     void *status_buf;
+    void *out_stg_buf;
     unsigned stg_in_idx;
     unsigned stg_out_idx;
     std::mutex pending_copy_mutex_;
