@@ -43,7 +43,6 @@ extern "C" hipError_t
 nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
-    stream = ihipSyncAndResolveStream(stream);
     hipError_t e = hipSuccess;
     assert(sizeBytes < pinned_buf_size);
     switch (kind) {

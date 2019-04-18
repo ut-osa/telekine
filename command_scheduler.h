@@ -22,7 +22,7 @@ typedef uint64_t tag_t;
 
 #define FIXED_SIZE_FULL (0x1UL << 20) // 1 MB
 #define FIXED_SIZE_B (FIXED_SIZE_FULL - sizeof(tag_t))
-#define BUF_TAG(buf) (*((uint64_t *)(&((buf)[FIXED_SIZE_B]))))
+#define BUF_TAG(buf) ((uint64_t *)(&(((uint8_t *)buf)[FIXED_SIZE_B])))
 #define FIXED_EXTRA_SIZE 256
 
 
@@ -98,9 +98,11 @@ protected:
         void* dst;
         const void* src;
         size_t size;
+        tag_t tag;
         hipMemcpyKind kind;
-        MemcpyParam(void *_dst, const void *_src, size_t _size, hipMemcpyKind _kind) :
-           dst(_dst), src(_src), size(_size), kind(_kind) {}
+        MemcpyParam(void *_dst, const void *_src, size_t _size, hipMemcpyKind _kind,
+                    tag_t _tag) :
+           dst(_dst), src(_src), size(_size), kind(_kind), tag(_tag) {}
         MemcpyParam() : dst(nullptr), src(nullptr), size(0) {}
     };
 
@@ -138,7 +140,12 @@ protected:
 
         CommandEntry(void *dst, const void *src, size_t size, hipMemcpyKind mkind) :
            kind(MEMCPY),
-           memcpy_param(dst, src, size, mkind) {};
+           memcpy_param(dst, src, size, mkind, 0) {};
+
+        CommandEntry(void *dst, const void *src, size_t size, hipMemcpyKind mkind,
+                     tag_t tag) :
+           kind(MEMCPY),
+           memcpy_param(dst, src, size, mkind, tag) {};
 
         template <typename... Args, typename F = void (*)(Args...)>
         CommandEntry(F kernel, const dim3& numBlocks, const dim3& dimBlocks,

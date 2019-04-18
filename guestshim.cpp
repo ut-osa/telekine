@@ -218,35 +218,28 @@ vector_copy(uint8_t *C_d, uint8_t *A_d, size_t N)
 }
 
 __global__ void
-vector_copy_in(uint8_t *C_d, uint8_t *A_d, size_t N, tag_t tag)
+tag_copy(tag_t *dst, tag_t *src)
 {
-    size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
-    size_t stride = blockDim.x * gridDim.x ;
-    uint8_t scratch[FIXED_SIZE_FULL];
-
-    while (BUF_TAG(scratch) != tag) {
-       for (size_t i=offset; i<N; i+=stride) {
-           C_d[i] = A_d[i];
-       }
-    }
-
-    for (size_t i=offset; i<N; i+=stride) {
-        C_d[i] = A_d[i];
-    }
+	atomicExch((unsigned long long *)dst, (unsigned long long)*src);
 }
 
 __global__ void
-vector_copy_out(uint8_t *C_d, uint8_t *A_d, size_t N, tag_t tag)
+check_tag(tag_t *tag_p, tag_t tag)
 {
     size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
     size_t stride = blockDim.x * gridDim.x ;
+    int n = 0;
 
-    for (size_t i=offset; i<N; i+=stride) {
-        C_d[i] = A_d[i];
-    }
-    __syncthreads();
-    /* set this tag to show that copy was done */
-    BUF_TAG(C_d) = tag;
+    /* TODO: one  thread  only */
+    while (atomicExch((unsigned long long *)tag_p, 1) != tag)
+      /* spin */;
+
+}
+
+__global__ void
+set_tag(unsigned long long *ptr, unsigned long long tag)
+{
+    atomicExch((unsigned long long *)ptr, tag);
 }
 
 __global__ void
@@ -266,9 +259,19 @@ void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
                                                     size_t size, tag_t tag,
                                                     bool in)
 {
+   assert(size <= FIXED_SIZE_B);
+   if (!in) {
+      pending_commands_.emplace_front(new CommandEntry(
+          set_tag, dim3(1), dim3(1), 0, stream_, BUF_TAG(dst), tag));
+   }
+
    pending_commands_.emplace_front(new CommandEntry(
-       in ? vector_copy_in : vector_copy_out,
-       dim3(512), dim3(256), 0, stream_, dst, src, size, tag));
+       vector_copy, dim3(512), dim3(256), 0, stream_, dst, src, size));
+
+   if (in) {
+      pending_commands_.emplace_front(new CommandEntry(
+          check_tag, dim3(1), dim3(1), 0, stream_, BUF_TAG(src), tag));
+   }
 }
 
 void SepMemcpyCommandScheduler::add_extra_kernels(
@@ -283,6 +286,17 @@ void SepMemcpyCommandScheduler::add_extra_kernels(
    }
    extrakerns.emplace_back(note_batch_id, dim3(1), dim3(1), 0, stream_,
                            status_buf, cur_batch_id++);
+}
+
+
+static inline void
+gpu_snapshot_tagged_buf(void *dst, void *src, hipStream_t s)
+{
+   /* copy the tag first since the producer could complete in the middle and
+    * depending on the interleaving we may have incorrect data in the buffer
+    */
+   hipLaunchNOW(tag_copy, dim3(1), dim3(1), 0, s, BUF_TAG(dst), BUF_TAG(src), sizeof(tag_t));
+   hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, s, dst, src, FIXED_SIZE_B);
 }
 
 void SepMemcpyCommandScheduler::do_d2h_copies(void)
@@ -307,12 +321,8 @@ void SepMemcpyCommandScheduler::do_d2h_copies(void)
    assert(op->size_ <= FIXED_SIZE_B);
 
    if (memcpy_encryption_enabled()) {
-      // Encrypt op.src_
-      /*
-      hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, xfer_stream_,
-                         out_stg_buf, op->src_, FIXED_SIZE_FULL);
-                         */
-      lgmEncryptAsync(encrypt_out_buf, op->src_, FIXED_SIZE_FULL, xfer_stream_);
+      gpu_snapshot_tagged_buf(out_stg_buf, op->src_, xfer_stream_);
+      lgmEncryptAsync(encrypt_out_buf, out_stg_buf, FIXED_SIZE_FULL, xfer_stream_);
       // copy data to the host
       err = nw_hipMemcpySync(ciphertext, encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
@@ -321,12 +331,7 @@ void SepMemcpyCommandScheduler::do_d2h_copies(void)
             xfer_stream_);
       lgmNextNonceAsync(xfer_stream_);
    } else {
-      /* XXX this extra vector_copy here makes it work, my best guess is that
-       * there's some issue with memcpys on different streams and what data is
-       * in l2.
-       */
-      hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, xfer_stream_,
-                         encrypt_out_buf, op->src_, FIXED_SIZE_FULL);
+      gpu_snapshot_tagged_buf(encrypt_out_buf, op->src_, xfer_stream_);
       err = nw_hipMemcpySync(plaintext, encrypt_out_buf, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
@@ -334,7 +339,7 @@ void SepMemcpyCommandScheduler::do_d2h_copies(void)
 
    if (op != &check_status) {
       /* if the tag matches the buffer was ready and we can stop looking for it */
-      if (BUF_TAG(plaintext) == op->tag_) {
+      if (*BUF_TAG(plaintext) == op->tag_) {
          memcpy(op->dst_, plaintext, op->size_);
          pending_d2h_.pop_front();
 
@@ -370,13 +375,12 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       memcpy(plaintext, src, size);
       sb1 = next_in_buf();
       tag = gen_tag();
-      BUF_TAG(plaintext) = tag;
 
       enqueue_device_copy(dst, sb1, size, tag, true);
       {
          std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
          pending_copy_commands.emplace_back(new CommandEntry(sb1, plaintext, FIXED_SIZE_FULL,
-                                                           kind));
+                                                           kind, tag));
          pending_copy_cv_.notify_all();
       }
       break;
@@ -395,7 +399,7 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
    }
    case hipMemcpyDeviceToDevice: {
       pending_commands_.emplace_front(new CommandEntry(
-               vector_copy_in, dim3(512), dim3(256), 0, stream_, dst, src, size, 0));
+               vector_copy, dim3(512), dim3(256), 0, stream_, dst, src, size));
       break;
    }
    default: {
@@ -431,8 +435,8 @@ void SepMemcpyCommandScheduler::MemcpyThread()
           param = pending_copy_commands[0]->memcpy_param;
        }
 
+		 sb2 = next_in_buf();
        if (memcpy_encryption_enabled()) {
-         sb2 = next_in_buf();
          lgmCPUEncrypt(ciphertext, param.src, FIXED_SIZE_FULL, xfer_stream_);
          err = nw_hipMemcpySync(sb2, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
                                 param.kind, xfer_stream_);
@@ -441,9 +445,12 @@ void SepMemcpyCommandScheduler::MemcpyThread()
          lgmDecryptAsync(param.dst, sb2, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
          lgmNextNonceAsync(xfer_stream_);
        } else {
-          err = nw_hipMemcpySync(param.dst, param.src, param.size, param.kind, xfer_stream_);
+          err = nw_hipMemcpySync(sb2, param.src, FIXED_SIZE_FULL, param.kind, xfer_stream_);
           assert(err == hipSuccess);
+			 hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, xfer_stream_, param.dst, sb2, FIXED_SIZE_B);
        }
+       hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, xfer_stream_,
+                    BUF_TAG(param.dst), param.tag);
        free((void *)param.src);
 
        pending_copy_mutex_.lock();
