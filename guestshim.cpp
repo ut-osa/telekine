@@ -323,8 +323,8 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
 {
    // This implementation assumes we use FIXED_SIZE_B buffers
    // make scratch buffer big enough to store encrypted (padded + MACed) data
-   uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
-   uint8_t plaintext[FIXED_SIZE_FULL];
+   static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+   static uint8_t plaintext[FIXED_SIZE_FULL];
    bool real_copy = false;
 
    hipError_t err;
@@ -378,8 +378,8 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
 void SepMemcpyCommandScheduler::do_next_h2d()
 {
     hipError_t err;
-    uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
-    uint8_t filler_buf[FIXED_SIZE_FULL];
+    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+    static uint8_t filler_buf[FIXED_SIZE_FULL];
     MemcpyParam param((void *)nop_buffer, (void *)filler_buf, FIXED_SIZE_FULL,
                       hipMemcpyHostToDevice, 0);
     bool real_copy = false;
