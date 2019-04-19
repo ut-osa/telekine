@@ -18,8 +18,6 @@
 #define DEFAULT_BATCH_SIZE 64
 #define DEFAULT_FIXED_RATE_INTERVAL_US -1
 
-typedef uint64_t tag_t;
-
 #define FIXED_SIZE_FULL (0x1UL << 20) // 1 MB
 #define FIXED_SIZE_B (FIXED_SIZE_FULL - sizeof(tag_t))
 #define BUF_TAG(buf) ((uint64_t *)(&(((uint8_t *)buf)[FIXED_SIZE_B])))
