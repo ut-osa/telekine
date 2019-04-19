@@ -72,6 +72,7 @@ def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, g
          hip_memcpy_fixed_size, hip_memcpy_encrypted, gpu_op_sep_memcpy,
          hip_check_complete, kernel_fr_interval_us, memcpy_fr_interval_us):
     global ava_ip
+    global ava_port
     if len(test_cmd) == 0:
         print("no command given exiting!")
         sys.exit(1)
