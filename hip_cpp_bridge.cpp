@@ -61,9 +61,15 @@ nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kin
           memcpy(dst, pinned_buf, sizeBytes);
           break;
        case hipMemcpyDeviceToDevice:
+          e = hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+          assert(e == hipSuccess);
+          e = hipStreamSynchronize(stream);
+          assert(e == hipSuccess);
+          break;
        case hipMemcpyHostToHost:
        case hipMemcpyDefault:
-       defatult:
+       default:
+          fprintf(stderr, "Invalid kind for nw_hipMemcpySync");
           assert("impossible");
     }
 #if 0
