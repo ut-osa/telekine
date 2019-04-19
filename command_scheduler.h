@@ -44,6 +44,12 @@ public:
 
     static std::shared_ptr<CommandScheduler> GetForStream(hipStream_t stream);
     static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
+    static hipStream_t GetDefStream() {
+       std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
+       auto it = command_scheduler_map_.begin();
+       assert(it != command_scheduler_map_.end());
+       return it->first;
+    };
 protected:
     bool destroy_stream;
     hipStream_t stream_;

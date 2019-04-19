@@ -654,6 +654,72 @@ nw_hsa_iterate_agents(
    return HSA_STATUS_SUCCESS;
 }
 
+template <uint32_t block_dim, typename RandomAccessIterator, typename N, typename T>
+__global__ void hip_fill_n(RandomAccessIterator f, N n, T value) {
+    const uint32_t grid_dim = gridDim.x * blockDim.x;
+
+    size_t idx = blockIdx.x * block_dim + threadIdx.x;
+    while (idx < n) {
+        f[idx] = value;
+        idx += grid_dim;
+    }
+}
+
+template <typename T, typename std::enable_if<std::is_integral<T>{}>::type* = nullptr>
+inline const T& clamp_integer(const T& x, const T& lower, const T& upper) {
+    assert(!(upper < lower));
+
+    return std::min(upper, std::max(x, lower));
+}
+
+template <typename T>
+void ihipMemsetKernel(hipStream_t stream, T* ptr, T val, size_t sizeBytes) {
+    static constexpr uint32_t block_dim = 256;
+
+    const uint32_t grid_dim = clamp_integer<size_t>(sizeBytes / block_dim, 1, UINT32_MAX);
+
+    hipLaunchKernelGGL(hip_fill_n<block_dim>, dim3(grid_dim), dim3{block_dim}, 0u, stream, ptr,
+                       sizeBytes, std::move(val));
+}
+
+hipError_t ihipMemset(void* dst, int  value, size_t sizeBytes,
+                      hipStream_t stream)
+{
+    hipError_t e = hipSuccess;
+
+    if ((sizeBytes & 0x3) == 0) {
+       // use a faster dword-per-workitem copy:
+       try {
+           value = value & 0xff;
+           uint32_t value32 = (value << 24) | (value << 16) | (value << 8) | (value) ;
+           ihipMemsetKernel<uint32_t> (stream, static_cast<uint32_t*> (dst), value32, sizeBytes/sizeof(uint32_t));
+       }
+       catch (std::exception &ex) {
+           e = hipErrorInvalidValue;
+       }
+    } else {
+       // use a slow byte-per-workitem copy:
+       try {
+           ihipMemsetKernel<char> (stream, static_cast<char*> (dst), value, sizeBytes);
+       }
+       catch (std::exception &ex) {
+           e = hipErrorInvalidValue;
+       }
+    }
+    return e;
+};
+
+hipError_t hipMemsetAsync(void* dst, int value, size_t sizeBytes, hipStream_t stream)
+{
+    return ihipMemset(dst, value, sizeBytes, stream);
+}
+
+hipError_t hipMemset(void* dst, int value, size_t sizeBytes)
+{
+    return hipMemsetAsync(dst, value, sizeBytes,
+                          CommandScheduler::GetDefStream());
+}
+
 namespace hip_impl
 {
     void hipLaunchKernelGGLImpl(
