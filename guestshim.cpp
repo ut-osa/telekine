@@ -316,10 +316,9 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
    tag_t tag;
    static uint8_t *plaintext;
 
-   assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
-
    switch (kind) {
    case hipMemcpyHostToDevice: {
+      assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
       plaintext = (uint8_t *)malloc(FIXED_SIZE_FULL);
       /* if buffer is too small, copy it to the plaintext buffer so that the
        * transfer is fixed size
@@ -338,6 +337,7 @@ void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t siz
       break;
    }
    case hipMemcpyDeviceToHost: {
+      assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
       tag = gen_tag();
       sb1 = next_out_buf();
       enqueue_device_copy(sb1, src, size, tag, false);
@@ -377,7 +377,7 @@ void SepMemcpyCommandScheduler::MemcpyThread()
        MemcpyParam param;
        {
           std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
-          pending_copy_cv_.wait_for(lk1, std::chrono::milliseconds(10), [this] () {
+          pending_copy_cv_.wait_for(lk1, std::chrono::milliseconds(1), [this] () {
               return pending_copy_commands.size() > 0 || pending_d2h_.size() > last_d2h_sz;
           });
           last_d2h_sz = pending_d2h_.size();

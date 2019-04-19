@@ -245,7 +245,9 @@ void lgm_register_gpu_ptr(void *ptr) {
 template <size_t SIZE = FIXED_SIZE_B>
 hipError_t lgmMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
     hipStream_t stream) {
-  if (memcpy_size_fixed()) {  // split memcpys into fixed size batches
+  if (memcpy_size_fixed() &&
+      (kind == hipMemcpyDeviceToHost || kind == hipMemcpyHostToDevice)) { 
+    // split memcpys into fixed size batches
     hipError_t ret;
     for (size_t i = 0; i < sizeBytes; i+= SIZE) {
       size_t memcpy_size = std::min(sizeBytes - i, SIZE);
