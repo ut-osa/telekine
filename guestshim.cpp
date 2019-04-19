@@ -203,9 +203,9 @@ hipError_t SepMemcpyCommandScheduler::AddMemcpyAsync(void* dst, const void* src,
          enqueue_device_copy(dst, sb1, size, tag, true);
 
          std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
-         pending_copy_commands.emplace_back(
+         pending_h2d_commands.emplace_back(
                new CommandEntry(sb1, plaintext, FIXED_SIZE_FULL, kind, tag));
-         pending_copy_cv_.notify_all();
+         pending_h2d_cv_.notify_all();
          break;
       }
       case hipMemcpyDeviceToHost: {
@@ -217,7 +217,7 @@ hipError_t SepMemcpyCommandScheduler::AddMemcpyAsync(void* dst, const void* src,
          std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
          pending_d2h_.emplace_back((void *)dst, (void *)sb1, size, tag);
          assert(pending_d2h_.size() <= N_STG_BUFS);
-         pending_copy_cv_.notify_all();
+         pending_h2d_cv_.notify_all();
          break;
       }
       case hipMemcpyDeviceToDevice: {
@@ -258,7 +258,7 @@ hipError_t SepMemcpyCommandScheduler::Wait(void)
                   return false;
                 return pending_commands_.size() == 0 &&
                        pending_d2h_.size() == 0 &&
-                       pending_copy_commands.size() == 0;
+                       pending_h2d_commands.size() == 0;
                 });
     }
     return hipSuccess; // TODO more accurate return value
@@ -374,12 +374,13 @@ void SepMemcpyCommandScheduler::do_next_h2d()
                       hipMemcpyHostToDevice, 0);
     bool real_copy = false;
 
-    if (pending_copy_commands.size() > 0) {
-       std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
-       assert(pending_copy_commands[0]->kind == MEMCPY);
-       param = pending_copy_commands[0]->memcpy_param;
+    pending_copy_mutex_.lock();
+    if (pending_h2d_commands.size() > 0) {
+       assert(pending_h2d_commands[0]->kind == MEMCPY);
+       param = pending_h2d_commands[0]->memcpy_param;
        real_copy = true;
     }
+    pending_copy_mutex_.unlock();
 
     if (memcpy_encryption_enabled()) {
       lgmCPUEncrypt(ciphertext, param.src, FIXED_SIZE_FULL, xfer_stream_);
@@ -399,7 +400,7 @@ void SepMemcpyCommandScheduler::do_next_h2d()
        free((void *)param.src);
 
        pending_copy_mutex_.lock();
-       pending_copy_commands.pop_front();
+       pending_h2d_commands.pop_front();
        pending_copy_mutex_.unlock();
 
        std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
@@ -416,10 +417,9 @@ void SepMemcpyCommandScheduler::MemcpyThread()
     while (this->running) {
        {
           std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
-          pending_copy_cv_.wait_for(lk1, std::chrono::milliseconds(1), [this] () {
-              return pending_copy_commands.size() > 0 || pending_d2h_.size() > last_d2h_sz;
+          pending_h2d_cv_.wait(lk1, [this] () {
+              return pending_h2d_commands.size() > 0 || pending_d2h_.size() > 0;
           });
-          last_d2h_sz = pending_d2h_.size();
        }
        do_next_h2d();
        do_next_d2h();

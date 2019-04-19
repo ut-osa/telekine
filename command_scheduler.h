@@ -66,7 +66,6 @@ public:
     virtual hipError_t Wait(void) override;
 protected:
     void ProcessThread();
-    virtual void do_d2h_copies(void){};
 
     struct KernelLaunchParam {
         hsa_kernel_dispatch_packet_t aql;
@@ -185,6 +184,7 @@ protected:
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
     void MemcpyThread();
     void do_next_h2d();
+    void do_next_d2h();
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= N_STG_BUFS)
@@ -221,8 +221,8 @@ protected:
     unsigned stg_in_idx;
     unsigned stg_out_idx;
     std::mutex pending_copy_mutex_;
-    std::condition_variable pending_copy_cv_;
-    std::deque<std::unique_ptr<CommandEntry>> pending_copy_commands;
+    std::condition_variable pending_h2d_cv_;
+    std::deque<std::unique_ptr<CommandEntry>> pending_h2d_commands;
     std::unique_ptr<std::thread> memcpy_thread_;
 
 	 /* fast way to get tags that won't likely be repeated */
