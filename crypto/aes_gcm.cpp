@@ -683,7 +683,7 @@ void AES_GCM_init(AES_GCM_engine** engine, const uint8_t* key, hipStream_t strea
 
   hipLaunchNOW(HIP_KERNEL_NAME(AES_key_expansion_kernel), 1, 1, 0, stream,
       e->sbox, e->Rcon, e->key, e->aes_roundkey);
-  HIP_CHECK(hipMemset(e->gcm_h, 0, 16)); // memset async isn't supported by HIP, so we block here
+  //HIP_CHECK(hipMemset(e->gcm_h, 0, 16)); // memset async isn't supported by HIP, so we block here
   AES_GCM_encrypt_one_block(e, e->gcm_h, stream);
   HIP_CHECK(nw_hipMemcpySync(e->gf_last4, gf_last4_host, sizeof(gf_last4_host), hipMemcpyHostToDevice, stream));
   hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_setup_gf_mult_table_kernel), 1, 1, 0, stream,

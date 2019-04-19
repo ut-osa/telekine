@@ -111,7 +111,6 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
                                                      int fixed_rate_interval_us)
    : status_buf(nullptr), last_real_batch(0),
      stg_in_idx(0), stg_out_idx(0), cur_batch_id(0), batches_finished(0),
-     memcpy_thread_(new std::thread(&SepMemcpyCommandScheduler::MemcpyThread, this)),
      BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
 {
    hipError_t ret;
@@ -129,6 +128,11 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
    assert(ret == hipSuccess);
    ret = hipMalloc(&out_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
    assert(ret == hipSuccess);
+   ret = hipMalloc(&in_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+   assert(ret == hipSuccess);
+   ret = hipMalloc(&nop_buffer, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+   assert(ret == hipSuccess);
+   memcpy_thread_.reset(new std::thread(&SepMemcpyCommandScheduler::MemcpyThread, this));
 }
 
 SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
@@ -361,46 +365,37 @@ void SepMemcpyCommandScheduler::do_d2h_copies(void)
    }
 }
 
-extern __thread int chan_no;
-void SepMemcpyCommandScheduler::MemcpyThread()
+void SepMemcpyCommandScheduler::do_next_h2d()
 {
     hipError_t err;
-    void *sb2;
-    chan_no = 1;
-    static size_t last_d2h_sz;
-    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+    uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+    uint8_t filler_buf[FIXED_SIZE_FULL];
+    MemcpyParam param((void *)nop_buffer, (void *)filler_buf, FIXED_SIZE_FULL,
+                      hipMemcpyHostToDevice, 0);
+    bool real_copy = false;
 
-    while (this->running) {
-       do_d2h_copies();
-       MemcpyParam param;
-       {
-          std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
-          pending_copy_cv_.wait_for(lk1, std::chrono::milliseconds(1), [this] () {
-              return pending_copy_commands.size() > 0 || pending_d2h_.size() > last_d2h_sz;
-          });
-          last_d2h_sz = pending_d2h_.size();
-          if (pending_copy_commands.size() == 0)
-             continue;
-          assert(pending_copy_commands[0]->kind == MEMCPY);
-          param = pending_copy_commands[0]->memcpy_param;
-       }
+    if (pending_copy_commands.size() > 0) {
+       std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
+       assert(pending_copy_commands[0]->kind == MEMCPY);
+       param = pending_copy_commands[0]->memcpy_param;
+       real_copy = true;
+    }
 
-		 sb2 = next_in_buf();
-       if (memcpy_encryption_enabled()) {
-         lgmCPUEncrypt(ciphertext, param.src, FIXED_SIZE_FULL, xfer_stream_);
-         err = nw_hipMemcpySync(sb2, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
-                                param.kind, xfer_stream_);
-         assert(err == hipSuccess);
-         // TODO for now we write back in to the sb buffer but this could be a different buffer
-         lgmDecryptAsync(param.dst, sb2, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
-         lgmNextNonceAsync(xfer_stream_);
-       } else {
-          err = nw_hipMemcpySync(sb2, param.src, FIXED_SIZE_FULL, param.kind, xfer_stream_);
-          assert(err == hipSuccess);
-			 hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, xfer_stream_, param.dst, sb2, FIXED_SIZE_B);
-       }
-       hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, xfer_stream_,
-                    BUF_TAG(param.dst), param.tag);
+    if (memcpy_encryption_enabled()) {
+      lgmCPUEncrypt(ciphertext, param.src, FIXED_SIZE_FULL, xfer_stream_);
+      err = nw_hipMemcpySync(in_stg_buf, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+                             param.kind, xfer_stream_);
+      assert(err == hipSuccess);
+      lgmDecryptAsync(param.dst, in_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
+      lgmNextNonceAsync(xfer_stream_);
+    } else {
+       err = nw_hipMemcpySync(in_stg_buf, param.src, FIXED_SIZE_FULL, param.kind, xfer_stream_);
+       assert(err == hipSuccess);
+	    hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, xfer_stream_, param.dst, in_stg_buf, FIXED_SIZE_B);
+    }
+    hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, xfer_stream_,
+                 BUF_TAG(param.dst), param.tag);
+    if (real_copy) {
        free((void *)param.src);
 
        pending_copy_mutex_.lock();
@@ -409,7 +404,26 @@ void SepMemcpyCommandScheduler::MemcpyThread()
 
        std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
        pending_commands_cv_.notify_all();
+    }
+}
 
+extern __thread int chan_no;
+void SepMemcpyCommandScheduler::MemcpyThread()
+{
+    chan_no = 1;
+    static size_t last_d2h_sz;
+
+    while (this->running) {
+       do_d2h_copies();
+       MemcpyParam param;
+       {
+          std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
+          pending_copy_cv_.wait_for(lk1, std::chrono::milliseconds(1), [this] () {
+              return pending_copy_commands.size() > 0 || pending_d2h_.size() > last_d2h_sz;
+          });
+          last_d2h_sz = pending_d2h_.size();
+       }
+       do_next_h2d();
     }
 }
 

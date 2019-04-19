@@ -22,7 +22,7 @@
 #define FIXED_SIZE_B (FIXED_SIZE_FULL - sizeof(tag_t))
 #define BUF_TAG(buf) ((uint64_t *)(&(((uint8_t *)buf)[FIXED_SIZE_B])))
 #define FIXED_EXTRA_SIZE 256
-
+#define N_STG_BUFS 256
 
 class CommandScheduler {
 public:
@@ -172,7 +172,6 @@ protected:
     std::unique_ptr<std::thread> process_thread_;
 };
 
-#define N_STG_BUFS 256
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
     SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
@@ -185,6 +184,7 @@ protected:
                              const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
     void MemcpyThread();
+    void do_next_h2d();
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= N_STG_BUFS)
@@ -216,6 +216,8 @@ protected:
     void *encrypt_out_buf;
     void *status_buf;
     void *out_stg_buf;
+    void *in_stg_buf;
+    void *nop_buffer;
     unsigned stg_in_idx;
     unsigned stg_out_idx;
     std::mutex pending_copy_mutex_;
