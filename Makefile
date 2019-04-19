@@ -36,7 +36,7 @@ CXXFLAGS = $(CFLAGS) -Wno-ignored-attributes -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) copy worker libguestlib.so guestshim.so manager
+all: $(EXECUTABLE) copy copy2 worker libguestlib.so guestshim.so manager
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden

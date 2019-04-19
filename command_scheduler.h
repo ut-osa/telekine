@@ -173,12 +173,12 @@ protected:
 
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
-    SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
+    SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us,
+                                                     int memcpy_fixed_rate_interval_us);
     ~SepMemcpyCommandScheduler(void);
     virtual hipError_t Wait(void) override;
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
 protected:
-    void do_d2h_copies(void) override;
     void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
@@ -196,20 +196,10 @@ protected:
          stg_out_idx = 0;
       return out_bufs[stg_out_idx++];
     }
-    struct d2h_cpy_op {
-       void *dst_;
-       void *src_;
-       size_t size_;
-       uint64_t tag_;
-       d2h_cpy_op(void *dst, void *src, size_t size, uint64_t tag) :
-          dst_(dst), src_(src), size_(size), tag_(tag) {} ;
-       d2h_cpy_op()  {};
-    };
 
     uint64_t cur_batch_id;
     uint64_t last_real_batch;
     uint64_t batches_finished;
-    std::deque<d2h_cpy_op> pending_d2h_;
     hipStream_t xfer_stream_;
     void *in_bufs[N_STG_BUFS];
     void *out_bufs[N_STG_BUFS];
@@ -223,7 +213,9 @@ protected:
     std::mutex pending_copy_mutex_;
     std::condition_variable pending_h2d_cv_;
     std::deque<std::unique_ptr<CommandEntry>> pending_h2d_commands;
+    std::deque<std::unique_ptr<CommandEntry>> pending_d2h_commands;
     std::unique_ptr<std::thread> memcpy_thread_;
+    std::unique_ptr<QuantumWaiter> memcpy_waiter_;
 
 	 /* fast way to get tags that won't likely be repeated */
 	 tag_t gen_tag(void) {          //period 2^96-1

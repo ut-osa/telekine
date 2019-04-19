@@ -51,13 +51,17 @@ std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t str
         int fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
         s = getenv("HIP_COMMAND_SCHEDULER_FR_INTERVAL_US");
         if (s) fixed_rate_interval_us = atoi(s);
+        int memcpy_fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
+        s = getenv("HIP_COMMAND_SCHEDULER_MEMCPY_FR_INTERVAL_US");
+        if (s) memcpy_fixed_rate_interval_us = atoi(s);
 
         if (fixed_rate_sep_memcpy_command_scheduler_enabled()) {
             fprintf(stderr, "Create new SepMemcpyCommandScheduler with stream = %p, "
                     "batch_size = %d, interval = %d\n",
                     (void*)stream, batch_size, fixed_rate_interval_us);
             command_scheduler_map_.emplace(stream, std::make_shared<SepMemcpyCommandScheduler>(
-                    stream, batch_size, fixed_rate_interval_us));
+                    stream, batch_size, fixed_rate_interval_us,
+                    memcpy_fixed_rate_interval_us));
         }
         else if (fixed_rate_command_scheduler_enabled()) {
             fprintf(stderr, "Create new BatchCommandScheduler with stream = %p, "
@@ -108,9 +112,12 @@ BatchCommandScheduler::~BatchCommandScheduler(void) {
 }
 
 SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int batch_size,
-                                                     int fixed_rate_interval_us)
+                                                     int fixed_rate_interval_us,
+                                                     int memcpy_fixed_rate_interval_us)
    : status_buf(nullptr), last_real_batch(0),
      stg_in_idx(0), stg_out_idx(0), cur_batch_id(0), batches_finished(0),
+     memcpy_waiter_((memcpy_fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
+           std::unique_ptr<QuantumWaiter>(new QuantumWaiter(memcpy_fixed_rate_interval_us))),
      BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
 {
    hipError_t ret;
@@ -215,8 +222,9 @@ hipError_t SepMemcpyCommandScheduler::AddMemcpyAsync(void* dst, const void* src,
          enqueue_device_copy(sb1, src, size, tag, false);
 
          std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
-         pending_d2h_.emplace_back((void *)dst, (void *)sb1, size, tag);
-         assert(pending_d2h_.size() <= N_STG_BUFS);
+         pending_d2h_commands.emplace_back(
+               new CommandEntry(dst, sb1, size, kind, tag));
+         assert(pending_d2h_commands.size() <= N_STG_BUFS);
          pending_h2d_cv_.notify_all();
          break;
       }
@@ -257,7 +265,7 @@ hipError_t SepMemcpyCommandScheduler::Wait(void)
                 if (check_batch_complete() && last_real_batch > batches_finished)
                   return false;
                 return pending_commands_.size() == 0 &&
-                       pending_d2h_.size() == 0 &&
+                       pending_d2h_commands.size() == 0 &&
                        pending_h2d_commands.size() == 0;
                 });
     }
@@ -300,8 +308,9 @@ void SepMemcpyCommandScheduler::add_extra_kernels(
 }
 
 
+template<typename T, typename V>
 static inline void
-gpu_snapshot_tagged_buf(void *dst, void *src, hipStream_t s)
+gpu_snapshot_tagged_buf(T *dst, V *src, hipStream_t s)
 {
    /* copy the tag first since the producer could complete in the middle and
     * depending on the interleaving we may have incorrect data in the buffer
@@ -314,27 +323,25 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
 {
    // This implementation assumes we use FIXED_SIZE_B buffers
    // make scratch buffer big enough to store encrypted (padded + MACed) data
-   static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
-   static uint8_t plaintext[FIXED_SIZE_FULL];
+   uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+   uint8_t plaintext[FIXED_SIZE_FULL];
+   bool real_copy = false;
+
    hipError_t err;
+   MemcpyParam param(nullptr, status_buf, 0, hipMemcpyDeviceToHost, 0);
 
-   /* TODO, do memcpy even if there aren't outstanding copies */
-   struct d2h_cpy_op check_status((void *)&batches_finished, status_buf, sizeof(batches_finished), 0);
-   struct d2h_cpy_op *op = &check_status;
-   struct d2h_cpy_op real;
-   if (pending_d2h_.size() != 0) {
-       real = pending_d2h_.at(0);
-       op = &real;
-   } else if (!check_batch_complete() || status_buf == nullptr) {
-      return;
+   pending_copy_mutex_.lock();
+   if (pending_d2h_commands.size() > 0) {
+      assert(pending_d2h_commands[0]->kind == MEMCPY);
+      param = pending_d2h_commands[0]->memcpy_param;
+      real_copy = true;
    }
+   pending_copy_mutex_.unlock();
 
-   assert(op->size_ <= FIXED_SIZE_B);
-
+   assert(param.size <= FIXED_SIZE_B);
    if (memcpy_encryption_enabled()) {
-      gpu_snapshot_tagged_buf(out_stg_buf, op->src_, xfer_stream_);
+      gpu_snapshot_tagged_buf(out_stg_buf, param.src, xfer_stream_);
       lgmEncryptAsync(encrypt_out_buf, out_stg_buf, FIXED_SIZE_FULL, xfer_stream_);
-      // copy data to the host
       err = nw_hipMemcpySync(ciphertext, encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
             hipMemcpyDeviceToHost, xfer_stream_);
       assert(err == hipSuccess);
@@ -342,17 +349,19 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
             xfer_stream_);
       lgmNextNonceAsync(xfer_stream_);
    } else {
-      gpu_snapshot_tagged_buf(encrypt_out_buf, op->src_, xfer_stream_);
+      gpu_snapshot_tagged_buf(encrypt_out_buf, param.src, xfer_stream_);
       err = nw_hipMemcpySync(plaintext, encrypt_out_buf, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
             xfer_stream_);
       assert(err == hipSuccess);
    }
 
-   if (op != &check_status) {
+   if (real_copy) {
       /* if the tag matches the buffer was ready and we can stop looking for it */
-      if (*BUF_TAG(plaintext) == op->tag_) {
-         memcpy(op->dst_, plaintext, op->size_);
-         pending_d2h_.pop_front();
+      if (*BUF_TAG(plaintext) == param.tag) {
+         memcpy(param.dst, plaintext, param.size);
+         pending_copy_mutex_.lock();
+         pending_d2h_commands.pop_front();
+         pending_copy_mutex_.unlock();
 
          std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
          pending_commands_cv_.notify_all();
@@ -360,7 +369,8 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
          /* if not... then we have to look for it next time */
       }
    } else {
-      memcpy(op->dst_, plaintext, op->size_);
+      std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
+      memcpy(&batches_finished, plaintext, sizeof(batches_finished));
       pending_commands_cv_.notify_all();
    }
 }
@@ -415,11 +425,13 @@ void SepMemcpyCommandScheduler::MemcpyThread()
     static size_t last_d2h_sz;
 
     while (this->running) {
-       {
+       if (!memcpy_waiter_) {
           std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
           pending_h2d_cv_.wait(lk1, [this] () {
-              return pending_h2d_commands.size() > 0 || pending_d2h_.size() > 0;
+              return pending_h2d_commands.size() > 0 || pending_d2h_commands.size() > 0;
           });
+       } else {
+          memcpy_waiter_->WaitNextQuantum();
        }
        do_next_h2d();
        do_next_d2h();

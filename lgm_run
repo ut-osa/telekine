@@ -40,7 +40,8 @@ extra_client_env = {
     'HIP_ENABLE_SEP_MEMCPY_COMMAND_SCHEDULER' : '0',
     'LGM_MEMCPY_FIX_SIZE' : '0',
     'LGM_MEMCPY_ENABLE_ENCRYPTION' : '0',
-    'HIP_COMMAND_SCHEDULER_FR_INTERVAL_US' : '-1'
+    'HIP_COMMAND_SCHEDULER_FR_INTERVAL_US' : '-1',
+    'HIP_COMMAND_SCHEDULER_MEMCPY_FR_INTERVAL_US' : '-1',
 }
 
 def ava_env_client():
@@ -60,10 +61,11 @@ click_option = functools.partial(click.option, show_default=True)
 @click_option('--hip-memcpy-fixed-size', is_flag=True)
 @click_option('--hip-memcpy-encrypted', is_flag=True)
 @click_option('--hip-check-complete', is_flag=True)
-@click_option('--kernel-fr-interval-us', type=int,help="if not set, kernel launches are not fixed rated takes place")
+@click_option('--kernel-fr-interval-us', type=int, help="if not set, kernel launches are not fixed rated")
+@click_option('--memcpy-fr-interval-us', type=int, help="if not set, memcpys are not fixed rated")
 def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size,
          hip_memcpy_fixed_size, hip_memcpy_encrypted, gpu_op_sep_memcpy,
-         hip_check_complete, kernel_fr_interval_us):
+         hip_check_complete, kernel_fr_interval_us, memcpy_fr_interval_us):
     global ava_ip
     if len(test_cmd) == 0:
         print("no command given exiting!")
@@ -89,6 +91,9 @@ def main(run_type, test_cmd, server, gpu_op_batching, gpu_op_batch_size,
     if kernel_fr_interval_us:
         extra_client_env['HIP_COMMAND_SCHEDULER_FR_INTERVAL_US'] = \
                 str(kernel_fr_interval_us)
+    if memcpy_fr_interval_us:
+        extra_client_env['HIP_COMMAND_SCHEDULER_MEMCPY_FR_INTERVAL_US'] = \
+                str(memcpy_fr_interval_us)
     sys.exit(run_test(test_cmd))
 
 if __name__ == '__main__':
