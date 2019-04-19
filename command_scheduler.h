@@ -62,11 +62,10 @@ public:
     ~BatchCommandScheduler(void);
     hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, uint8_t *extra,
             size_t extra_size, hipEvent_t start, hipEvent_t stop) override;
-    hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
+    virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
     virtual hipError_t Wait(void) override;
 protected:
     void ProcessThread();
-    virtual void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind);
     virtual void do_d2h_copies(void){};
 
     struct KernelLaunchParam {
@@ -179,8 +178,8 @@ public:
     SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
     ~SepMemcpyCommandScheduler(void);
     virtual hipError_t Wait(void) override;
+    virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
 protected:
-    void do_memcpy(void *dst, const void *src, size_t size, hipMemcpyKind kind) override;
     void do_d2h_copies(void) override;
     void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) override;

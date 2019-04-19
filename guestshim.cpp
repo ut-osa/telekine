@@ -173,6 +173,66 @@ hipError_t BatchCommandScheduler::AddMemcpyAsync(void* dst, const void* src, siz
     return hipSuccess; // TODO more accurate return value
 }
 
+
+hipError_t SepMemcpyCommandScheduler::AddMemcpyAsync(void* dst, const void* src, size_t size,
+        hipMemcpyKind kind)
+{
+   hipEvent_t event;
+   void *sb1;
+   hipError_t err;
+   tag_t tag;
+   static uint8_t *plaintext;
+
+
+   std::lock_guard<std::mutex> lk2(wait_mutex_);
+   switch (kind) {
+      case hipMemcpyHostToDevice: {
+         assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
+         tag = gen_tag();
+         sb1 = next_in_buf();
+         plaintext = (uint8_t *)malloc(FIXED_SIZE_FULL);
+         /* if buffer is too small, copy it to the plaintext buffer so that the
+         * transfer is fixed size
+         */
+         memcpy(plaintext, src, size);
+
+         enqueue_device_copy(dst, sb1, size, tag, true);
+
+         std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
+         pending_copy_commands.emplace_back(
+               new CommandEntry(sb1, plaintext, FIXED_SIZE_FULL, kind, tag));
+         pending_copy_cv_.notify_all();
+         break;
+      }
+      case hipMemcpyDeviceToHost: {
+         assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
+         tag = gen_tag();
+         sb1 = next_out_buf();
+         enqueue_device_copy(sb1, src, size, tag, false);
+
+         std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
+         pending_d2h_.emplace_back((void *)dst, (void *)sb1, size, tag);
+         assert(pending_d2h_.size() <= N_STG_BUFS);
+         pending_copy_cv_.notify_all();
+         break;
+      }
+      case hipMemcpyDeviceToDevice: {
+         std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
+         pending_commands_.emplace_back(
+               new CommandEntry(vector_copy, dim3(512), dim3(256), 0, stream_,
+                                dst, src, size));
+         pending_commands_cv_.notify_all();
+         break;
+      }
+      default: {
+         assert(false);
+         break;
+      }
+   }
+   pending_commands_cv_.notify_all();
+   return hipSuccess; // TODO more accurate return value
+}
+
 hipError_t BatchCommandScheduler::Wait(void) {
     std::lock_guard<std::mutex> lk2(wait_mutex_);
     {
@@ -200,30 +260,25 @@ hipError_t SepMemcpyCommandScheduler::Wait(void)
     return hipSuccess; // TODO more accurate return value
 }
 
-void BatchCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
-                                      hipMemcpyKind kind)
-{
-   auto ret = nw_hipMemcpySync(dst, src, size, kind, stream_);
-   assert(ret == hipSuccess);
-}
-
 void SepMemcpyCommandScheduler::enqueue_device_copy(void *dst, const void *src,
                                                     size_t size, tag_t tag,
                                                     bool in)
 {
    assert(size <= FIXED_SIZE_B);
-   if (!in) {
-      pending_commands_.emplace_front(new CommandEntry(
-          set_tag, dim3(1), dim3(1), 0, stream_, BUF_TAG(dst), tag));
-   }
-
-   pending_commands_.emplace_front(new CommandEntry(
-       vector_copy, dim3(512), dim3(256), 0, stream_, dst, src, size));
-
+   std::lock_guard<std::mutex> lk1(pending_commands_mutex_);
    if (in) {
-      pending_commands_.emplace_front(new CommandEntry(
+      pending_commands_.emplace_back(new CommandEntry(
           check_tag, dim3(1), dim3(1), 0, stream_, BUF_TAG(src), tag));
    }
+
+   pending_commands_.emplace_back(new CommandEntry(
+       vector_copy, dim3(512), dim3(256), 0, stream_, dst, src, size));
+
+   if (!in) {
+      pending_commands_.emplace_back(new CommandEntry(
+          set_tag, dim3(1), dim3(1), 0, stream_, BUF_TAG(dst), tag));
+   }
+   pending_commands_cv_.notify_all();
 }
 
 void SepMemcpyCommandScheduler::add_extra_kernels(
@@ -303,63 +358,6 @@ void SepMemcpyCommandScheduler::do_d2h_copies(void)
    } else {
       memcpy(op->dst_, plaintext, op->size_);
       pending_commands_cv_.notify_all();
-   }
-}
-
-
-void SepMemcpyCommandScheduler::do_memcpy(void *dst, const void *src, size_t size,
-                                          hipMemcpyKind kind)
-{
-   hipEvent_t event;
-   void *sb1;
-   hipError_t err;
-   tag_t tag;
-   static uint8_t *plaintext;
-
-   switch (kind) {
-   case hipMemcpyHostToDevice: {
-      assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
-      plaintext = (uint8_t *)malloc(FIXED_SIZE_FULL);
-      /* if buffer is too small, copy it to the plaintext buffer so that the
-       * transfer is fixed size
-       */
-      memcpy(plaintext, src, size);
-      sb1 = next_in_buf();
-      tag = gen_tag();
-
-      enqueue_device_copy(dst, sb1, size, tag, true);
-      {
-         std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
-         pending_copy_commands.emplace_back(new CommandEntry(sb1, plaintext, FIXED_SIZE_FULL,
-                                                           kind, tag));
-         pending_copy_cv_.notify_all();
-      }
-      break;
-   }
-   case hipMemcpyDeviceToHost: {
-      assert(size <= FIXED_SIZE_FULL && "enable hip-memcpy-fixed-size");
-      tag = gen_tag();
-      sb1 = next_out_buf();
-      enqueue_device_copy(sb1, src, size, tag, false);
-      {
-         std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
-         pending_d2h_.emplace_back((void *)dst, (void *)sb1, size, tag);
-         assert(pending_d2h_.size() <= N_STG_BUFS);
-         pending_copy_cv_.notify_all();
-      }
-      break;
-   }
-   case hipMemcpyDeviceToDevice: {
-      pending_commands_.emplace_front(new CommandEntry(
-               vector_copy, dim3(512), dim3(256), 0, stream_, dst, src, size));
-      break;
-   }
-   default: {
-      assert(false);
-      err = nw_hipMemcpySync(dst, src, size, kind, stream_);
-      assert(err == hipSuccess);
-      break;
-   }
    }
 }
 
@@ -445,7 +443,8 @@ void BatchCommandScheduler::ProcessThread() {
             if (pending_commands_[0]->kind == MEMCPY) {
                 MemcpyParam param = pending_commands_[0]->memcpy_param;
                 pending_commands_.pop_front();
-                do_memcpy(param.dst, param.src, param.size, param.kind);
+                auto ret = nw_hipMemcpySync(param.dst, param.src, param.size, param.kind, stream_);
+                assert(ret == hipSuccess);
                 pending_commands_cv_.notify_all();
                 continue;
             }
