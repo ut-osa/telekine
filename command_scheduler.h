@@ -28,8 +28,17 @@ typedef uint64_t tag_t;
 
 class CommandScheduler {
 public:
-    CommandScheduler(hipStream_t stream) : stream_(stream) {}
-    virtual ~CommandScheduler(void) {}
+    CommandScheduler(hipStream_t stream) : stream_(stream), destroy_stream(false){
+       if (!stream_) {
+          hipStreamCreate(&stream_);
+          destroy_stream = true;
+       }
+    }
+    virtual ~CommandScheduler(void) {
+       if (destroy_stream) {
+          hipStreamDestroy(stream_);
+       }
+    }
     virtual hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
             uint8_t* extra, size_t extra_size, hipEvent_t start, hipEvent_t stop) = 0;
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) = 0;
@@ -38,6 +47,7 @@ public:
     static std::shared_ptr<CommandScheduler> GetForStream(hipStream_t stream);
     static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
 protected:
+    bool destroy_stream;
     hipStream_t stream_;
     static std::mutex command_scheduler_map_mu_;
 };
