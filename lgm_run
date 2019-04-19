@@ -49,6 +49,7 @@ extra_client_env = {
 def ava_env_client():
     new_env = dict(os.environ)
     new_env['AVA_IP'] = ava_ip
+    new_env['AVA_PORT'] = str(ava_port)
     new_env.update(extra_client_env)
     return new_env
 
