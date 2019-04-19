@@ -54,14 +54,17 @@ std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t str
         int memcpy_fixed_rate_interval_us = DEFAULT_FIXED_RATE_INTERVAL_US;
         s = getenv("HIP_COMMAND_SCHEDULER_MEMCPY_FR_INTERVAL_US");
         if (s) memcpy_fixed_rate_interval_us = atoi(s);
+        int memcpy_n_staging_buffers = DEFAULT_N_STAGING_BUFFERS;
+        s = getenv("HIP_COMMAND_SCHEDULER_MEMCPY_N_STAGING_BUFFERS");
+        if (s) memcpy_n_staging_buffers = atoi(s);
 
         if (fixed_rate_sep_memcpy_command_scheduler_enabled()) {
             fprintf(stderr, "Create new SepMemcpyCommandScheduler with stream = %p, "
-                    "batch_size = %d, interval = %d\n",
-                    (void*)stream, batch_size, fixed_rate_interval_us);
+                    "batch_size = %d, interval = %d, n_staging_buffers = %d\n",
+                    (void*)stream, batch_size, fixed_rate_interval_us, memcpy_n_staging_buffers);
             command_scheduler_map_.emplace(stream, std::make_shared<SepMemcpyCommandScheduler>(
                     stream, batch_size, fixed_rate_interval_us,
-                    memcpy_fixed_rate_interval_us));
+                    memcpy_fixed_rate_interval_us, memcpy_n_staging_buffers));
         }
         else if (fixed_rate_command_scheduler_enabled()) {
             fprintf(stderr, "Create new BatchCommandScheduler with stream = %p, "
@@ -113,9 +116,10 @@ BatchCommandScheduler::~BatchCommandScheduler(void) {
 
 SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int batch_size,
                                                      int fixed_rate_interval_us,
-                                                     int memcpy_fixed_rate_interval_us)
-   : status_buf(nullptr), last_real_batch(0),
-     stg_in_idx(0), stg_out_idx(0), cur_batch_id(0), batches_finished(0),
+                                                     int memcpy_fixed_rate_interval_us,
+                                                     size_t n_staging_buffers)
+   : status_buf(nullptr), last_real_batch(0), stg_in_idx(0), stg_out_idx(0),
+     cur_batch_id(0), batches_finished(0), n_staging_buffers(n_staging_buffers),
      memcpy_waiter_((memcpy_fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
            std::unique_ptr<QuantumWaiter>(new QuantumWaiter(memcpy_fixed_rate_interval_us))),
      BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
@@ -123,7 +127,9 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
    hipError_t ret;
    ret = hipStreamCreate(&xfer_stream_);
    assert(ret == hipSuccess);
-   for (int i = 0; i < N_STG_BUFS; i++) {
+   in_bufs = static_cast<void**>(malloc(n_staging_buffers * sizeof(void*)));
+   out_bufs = static_cast<void**>(malloc(n_staging_buffers * sizeof(void*)));
+   for (int i = 0; i < n_staging_buffers; i++) {
       /* allocate space for the buffer plus an 8 byte tag plus the MAC */
       ret = hipMalloc(in_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
       assert(ret == hipSuccess);
@@ -147,7 +153,7 @@ SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
    running = false;
    memcpy_thread_->join();
    hipStreamDestroy(xfer_stream_);
-   for (int i = 0; i < N_STG_BUFS; i++) {
+   for (int i = 0; i < n_staging_buffers; i++) {
       hipFree(in_bufs[i]);
       hipFree(out_bufs[i]);
    }
@@ -224,7 +230,7 @@ hipError_t SepMemcpyCommandScheduler::AddMemcpyAsync(void* dst, const void* src,
          std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
          pending_d2h_commands.emplace_back(
                new CommandEntry(dst, sb1, size, kind, tag));
-         assert(pending_d2h_commands.size() <= N_STG_BUFS);
+         assert(pending_d2h_commands.size() <= n_staging_buffers);
          pending_h2d_cv_.notify_all();
          break;
       }

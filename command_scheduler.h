@@ -17,12 +17,12 @@
 
 #define DEFAULT_BATCH_SIZE 64
 #define DEFAULT_FIXED_RATE_INTERVAL_US -1
+#define DEFAULT_N_STAGING_BUFFERS 256
 
 #define FIXED_SIZE_FULL (0x1UL << 20) // 1 MB
 #define FIXED_SIZE_B (FIXED_SIZE_FULL - sizeof(tag_t))
 #define BUF_TAG(buf) ((uint64_t *)(&(((uint8_t *)buf)[FIXED_SIZE_B])))
 #define FIXED_EXTRA_SIZE 256
-#define N_STG_BUFS 256
 
 class CommandScheduler {
 public:
@@ -174,7 +174,7 @@ protected:
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
     SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us,
-                                                     int memcpy_fixed_rate_interval_us);
+                              int memcpy_fixed_rate_interval_us, size_t n_staging_buffers);
     ~SepMemcpyCommandScheduler(void);
     virtual hipError_t Wait(void) override;
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
@@ -187,12 +187,12 @@ protected:
     void do_next_d2h();
 
     inline void *next_in_buf(void) {
-      if (stg_in_idx >= N_STG_BUFS)
+      if (stg_in_idx >= n_staging_buffers)
          stg_in_idx = 0;
       return in_bufs[stg_in_idx++];
     }
     inline void *next_out_buf(void) {
-      if (stg_out_idx >= N_STG_BUFS)
+      if (stg_out_idx >= n_staging_buffers)
          stg_out_idx = 0;
       return out_bufs[stg_out_idx++];
     }
@@ -201,8 +201,9 @@ protected:
     uint64_t last_real_batch;
     uint64_t batches_finished;
     hipStream_t xfer_stream_;
-    void *in_bufs[N_STG_BUFS];
-    void *out_bufs[N_STG_BUFS];
+    size_t n_staging_buffers;
+    void **in_bufs;
+    void **out_bufs;
     void *encrypt_out_buf;
     void *status_buf;
     void *out_stg_buf;
