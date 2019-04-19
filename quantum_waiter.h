@@ -34,10 +34,10 @@ public:
             fprintf(stderr, "Failed to read from timer\n");
             exit(1);
         }
-        if (val > 1) {
-            fprintf(stderr, "[QuantumWaiter interval=%d] miss %d quanta\n",
-                    interval_us_, (int)(val-1));
-        }
+        // if (val > 1) {
+        //     fprintf(stderr, "[QuantumWaiter interval=%d] miss %d quanta\n",
+        //             interval_us_, (int)(val-1));
+        // }
     }
 
 private:
