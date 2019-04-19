@@ -310,7 +310,7 @@ gpu_snapshot_tagged_buf(void *dst, void *src, hipStream_t s)
    hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, s, dst, src, FIXED_SIZE_B);
 }
 
-void SepMemcpyCommandScheduler::do_d2h_copies(void)
+void SepMemcpyCommandScheduler::do_next_d2h(void)
 {
    // This implementation assumes we use FIXED_SIZE_B buffers
    // make scratch buffer big enough to store encrypted (padded + MACed) data
@@ -414,8 +414,6 @@ void SepMemcpyCommandScheduler::MemcpyThread()
     static size_t last_d2h_sz;
 
     while (this->running) {
-       do_d2h_copies();
-       MemcpyParam param;
        {
           std::unique_lock<std::mutex> lk1(pending_copy_mutex_);
           pending_copy_cv_.wait_for(lk1, std::chrono::milliseconds(1), [this] () {
@@ -424,6 +422,7 @@ void SepMemcpyCommandScheduler::MemcpyThread()
           last_d2h_sz = pending_d2h_.size();
        }
        do_next_h2d();
+       do_next_d2h();
     }
 }
 
