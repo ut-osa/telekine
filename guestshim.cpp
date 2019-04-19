@@ -428,6 +428,7 @@ extern __thread int chan_no;
 void SepMemcpyCommandScheduler::MemcpyThread()
 {
     chan_no = 1;
+    hipSetDevice(device_index);
     static size_t last_d2h_sz;
 
     while (this->running) {
@@ -455,6 +456,7 @@ void BatchCommandScheduler::ProcessThread() {
             fprintf(stderr, "Set nice value to %d\n", value);
         }
     }
+    hipSetDevice(device_index);
     while (this->running) {
         std::vector<KernelLaunchParam *> params;
         {

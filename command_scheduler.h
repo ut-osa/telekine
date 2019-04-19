@@ -27,6 +27,7 @@
 class CommandScheduler {
 public:
     CommandScheduler(hipStream_t stream) : stream_(stream), destroy_stream(false){
+       hipGetDevice(&device_index);
        if (!stream_) {
           hipStreamCreate(&stream_);
           destroy_stream = true;
@@ -51,6 +52,7 @@ public:
        return it->first;
     };
 protected:
+    int device_index;
     bool destroy_stream;
     hipStream_t stream_;
     static std::mutex command_scheduler_map_mu_;
