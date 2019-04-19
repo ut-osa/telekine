@@ -66,6 +66,9 @@ $(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so libcrypto.so
 copy: copy.o guestshim.so libguestlib.so libcrypto.so
 	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
 
+copy2: copy2.o guestshim.so libguestlib.so libcrypto.so
+	$(HIPCC) -O3 -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
+
 regen: hip.nw.cpp
 	$(NW_PATH)/nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
 .PHONY: regen
