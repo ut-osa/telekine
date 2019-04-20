@@ -40,6 +40,11 @@ static bool fixed_rate_sep_memcpy_command_scheduler_enabled() {
     return ret;
 }
 
+static bool memcpy_encryption_enabled(void) {
+  static bool ret = CHECK_ENV("LGM_MEMCPY_ENABLE_ENCRYPTION");
+  return ret;
+}
+
 std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t stream)
 {
     std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
@@ -57,7 +62,15 @@ std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t str
         s = getenv("HIP_MEMCPY_N_STAGING_BUFFERS");
         if (s) memcpy_n_staging_buffers = atoi(s);
 
-        if (fixed_rate_sep_memcpy_command_scheduler_enabled()) {
+        if (fixed_rate_sep_memcpy_command_scheduler_enabled() && memcpy_encryption_enabled()) {
+            fprintf(stderr, "Create new EncryptedSepMemcpyCommandScheduler with stream = %p, "
+                    "batch_size = %d, interval = %d, n_staging_buffers = %d\n",
+                    (void*)stream, batch_size, fixed_rate_interval_us, memcpy_n_staging_buffers);
+            command_scheduler_map_.emplace(stream,
+                    std::make_shared<EncryptedSepMemcpyCommandScheduler>(
+                    stream, batch_size, fixed_rate_interval_us,
+                    memcpy_fixed_rate_interval_us, memcpy_n_staging_buffers));
+        } else if (fixed_rate_sep_memcpy_command_scheduler_enabled()) {
             fprintf(stderr, "Create new SepMemcpyCommandScheduler with stream = %p, "
                     "batch_size = %d, interval = %d, n_staging_buffers = %d\n",
                     (void*)stream, batch_size, fixed_rate_interval_us, memcpy_n_staging_buffers);

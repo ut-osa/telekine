@@ -8,11 +8,6 @@ static bool memcpy_size_fixed(void) {
   return ret;
 }
 
-static bool memcpy_encryption_enabled(void) {
-  static bool ret = CHECK_ENV("LGM_MEMCPY_ENABLE_ENCRYPTION");
-  return ret;
-}
-
 EncryptionState::EncryptionState(hipStream_t stream) {
   randombytes_buf(key, AES_KEYLEN);
   AES_GCM_init(&engine_device, key, stream);
@@ -77,7 +72,7 @@ static hipError_t fixedSizeHipMemcpyAsync(void* dst, const void* src, size_t siz
 hipError_t hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
     hipStream_t stream) {
   if (memcpy_size_fixed() &&
-      (kind == hipMemcpyDeviceToHost || kind == hipMemcpyHostToDevice)) { 
+      (kind == hipMemcpyDeviceToHost || kind == hipMemcpyHostToDevice)) {
     return fixedSizeHipMemcpyAsync(dst, src, sizeBytes, kind, stream);
   } else {
     return CommandScheduler::GetForStream(stream)->AddMemcpyAsync(dst, src, sizeBytes, kind);
