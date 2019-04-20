@@ -61,7 +61,7 @@ static hipError_t fixedSizeHipMemcpyAsync(void* dst, const void* src, size_t siz
   hipError_t ret;
   for (size_t i = 0; i < sizeBytes; i+= FIXED_SIZE_B) {
     size_t memcpy_size = std::min(sizeBytes - i, FIXED_SIZE_B);
-    ret = CommandScheduler::GetForStream(nullptr)->AddMemcpyAsync(
+    ret = CommandScheduler::GetForStream(stream)->AddMemcpyAsync(
         static_cast<void*>(static_cast<char*>(dst) + i),
         static_cast<const void*>(static_cast<const char*>(src) + i), memcpy_size, kind);
     if (ret != hipSuccess) break;
