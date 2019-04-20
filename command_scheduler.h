@@ -188,9 +188,9 @@ protected:
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
     void MemcpyThread();
     void do_next_h2d();
-    void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
+    virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
     void do_next_d2h();
-    void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
+    virtual void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= n_staging_buffers)
