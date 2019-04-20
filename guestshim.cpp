@@ -157,6 +157,8 @@ SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
       hipFree(in_bufs[i]);
       hipFree(out_bufs[i]);
    }
+   free(in_bufs);
+   free(out_bufs);
    hipFree(encrypt_out_buf);
 }
 
