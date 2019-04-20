@@ -77,7 +77,7 @@ manager:
 	$(MAKE) -C nw/worker && ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
-guestshim.so: guestshim.o program_state.o code_object_bundle.o hip_function_info.o \
+guestshim.so: lgm_memcpy.o guestshim.o program_state.o code_object_bundle.o hip_function_info.o \
 				  lgm_kernels.o
 	$(HIPCC) -fPIC -shared $(includes) -o $@ $^ \
 	   -Wl,--no-allow-shlib-undefined \

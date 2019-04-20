@@ -12,6 +12,8 @@
 
 #include "hip/hip_runtime.h"
 #include "hip_function_info.hpp"
+#include "lgm_memcpy.hpp"
+#include "lgm_types.h"
 
 #include "quantum_waiter.h"
 
@@ -186,7 +188,9 @@ protected:
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
     void MemcpyThread();
     void do_next_h2d();
+    void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
     void do_next_d2h();
+    void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= n_staging_buffers)
@@ -235,6 +239,18 @@ protected:
 
 	    return z;
 	 }
+};
+
+class EncryptedSepMemcpyCommandScheduler : public SepMemcpyCommandScheduler {
+public:
+    EncryptedSepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us,
+                              int memcpy_fixed_rate_interval_us, size_t n_staging_buffers);
+    ~EncryptedSepMemcpyCommandScheduler(void);
+protected:
+    void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
+    void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
+private:
+    lgm::EncryptionState encryption_state;
 };
 
 class BaselineCommandScheduler : public CommandScheduler {

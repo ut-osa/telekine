@@ -52,7 +52,7 @@ vector_copy(T *C_d, T *A_d, size_t N)
 int main(int argc, char *argv[])
 {
     uint8_t *A_d, *C_d;
-    int deviceID = 0;
+    int deviceID = 1;
     hipDeviceProp_t props;
     CHECK(hipGetDeviceProperties(&props, deviceID));
     printf("info: running on device %s\n", props.name);

@@ -210,7 +210,7 @@ hipGetDevice(int* deviceId)
 {
    hipError_t ret = hipSuccess;
 
-   static std::once_flag f;
+   thread_local static std::once_flag f;
    std::call_once(f, [&ret] () {
       int id;
       ret = nw_hipGetDevice(&id);

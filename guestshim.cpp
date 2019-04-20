@@ -19,7 +19,6 @@
 
 #include "check_env.h"
 #include "./command_scheduler.h"
-#include "lgm_memcpy.hpp"
 #include "hip_function_info.hpp"
 
 #include <chrono>
@@ -55,7 +54,7 @@ std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t str
         s = getenv("HIP_COMMAND_SCHEDULER_MEMCPY_FR_INTERVAL_US");
         if (s) memcpy_fixed_rate_interval_us = atoi(s);
         int memcpy_n_staging_buffers = DEFAULT_N_STAGING_BUFFERS;
-        s = getenv("HIP_COMMAND_SCHEDULER_MEMCPY_N_STAGING_BUFFERS");
+        s = getenv("HIP_MEMCPY_N_STAGING_BUFFERS");
         if (s) memcpy_n_staging_buffers = atoi(s);
 
         if (fixed_rate_sep_memcpy_command_scheduler_enabled()) {
@@ -331,7 +330,6 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
 {
    // This implementation assumes we use FIXED_SIZE_B buffers
    // make scratch buffer big enough to store encrypted (padded + MACed) data
-   static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
    static uint8_t plaintext[FIXED_SIZE_FULL];
    bool real_copy = false;
 
@@ -347,21 +345,7 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
    pending_copy_mutex_.unlock();
 
    assert(param.size <= FIXED_SIZE_B);
-   if (memcpy_encryption_enabled()) {
-      gpu_snapshot_tagged_buf(out_stg_buf, param.src, xfer_stream_);
-      lgmEncryptAsync(encrypt_out_buf, out_stg_buf, FIXED_SIZE_FULL, xfer_stream_);
-      err = nw_hipMemcpySync(ciphertext, encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
-            hipMemcpyDeviceToHost, xfer_stream_);
-      assert(err == hipSuccess);
-      lgmCPUDecrypt(plaintext, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
-            xfer_stream_);
-      lgmNextNonceAsync(xfer_stream_);
-   } else {
-      gpu_snapshot_tagged_buf(encrypt_out_buf, param.src, xfer_stream_);
-      err = nw_hipMemcpySync(plaintext, encrypt_out_buf, FIXED_SIZE_FULL, hipMemcpyDeviceToHost,
-            xfer_stream_);
-      assert(err == hipSuccess);
-   }
+   d2h(plaintext, param.src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost, xfer_stream_);
 
    if (real_copy) {
       /* if the tag matches the buffer was ready and we can stop looking for it */
@@ -383,10 +367,17 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
    }
 }
 
+void SepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t sizeBytes,
+        hipMemcpyKind kind, hipStream_t stream) {
+   gpu_snapshot_tagged_buf(encrypt_out_buf, src, stream);
+   hipError_t err = nw_hipMemcpySync(dst, encrypt_out_buf, sizeBytes, hipMemcpyDeviceToHost,
+         stream);
+   assert(err == hipSuccess);
+}
+
 void SepMemcpyCommandScheduler::do_next_h2d()
 {
     hipError_t err;
-    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
     static uint8_t filler_buf[FIXED_SIZE_FULL];
     MemcpyParam param((void *)nop_buffer, (void *)filler_buf, FIXED_SIZE_FULL,
                       hipMemcpyHostToDevice, 0);
@@ -400,18 +391,9 @@ void SepMemcpyCommandScheduler::do_next_h2d()
     }
     pending_copy_mutex_.unlock();
 
-    if (memcpy_encryption_enabled()) {
-      lgmCPUEncrypt(ciphertext, param.src, FIXED_SIZE_FULL, xfer_stream_);
-      err = nw_hipMemcpySync(in_stg_buf, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
-                             param.kind, xfer_stream_);
-      assert(err == hipSuccess);
-      lgmDecryptAsync(param.dst, in_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, xfer_stream_);
-      lgmNextNonceAsync(xfer_stream_);
-    } else {
-       err = nw_hipMemcpySync(in_stg_buf, param.src, FIXED_SIZE_FULL, param.kind, xfer_stream_);
-       assert(err == hipSuccess);
-	    hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, xfer_stream_, param.dst, in_stg_buf, FIXED_SIZE_B);
-    }
+    // XXX overloaded by subclasses to add encryption, etc.
+    h2d(param.dst, param.src, FIXED_SIZE_FULL, param.kind, xfer_stream_);
+
     hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, xfer_stream_,
                  BUF_TAG(param.dst), param.tag);
     if (real_copy) {
@@ -424,6 +406,15 @@ void SepMemcpyCommandScheduler::do_next_h2d()
        std::unique_lock<std::mutex> lk1(pending_commands_mutex_);
        pending_commands_cv_.notify_all();
     }
+}
+
+void SepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes,
+        hipMemcpyKind kind, hipStream_t stream) {
+   // XXX in_stg_buf is global for scheduler
+   hipError_t ret(nw_hipMemcpySync(in_stg_buf, src, sizeBytes, kind, stream));
+   assert(ret == hipSuccess);
+   hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, stream, dst, in_stg_buf, sizeBytes);
+   // XXX check launch dimensions, for optimality 
 }
 
 extern __thread int chan_no;
@@ -446,6 +437,43 @@ void SepMemcpyCommandScheduler::MemcpyThread()
        do_next_d2h();
     }
 }
+
+EncryptedSepMemcpyCommandScheduler::EncryptedSepMemcpyCommandScheduler(hipStream_t stream,
+      int batch_size, int fixed_rate_interval_us, int memcpy_fixed_rate_interval_us,
+      size_t n_staging_buffers) : SepMemcpyCommandScheduler(stream, batch_size,
+          fixed_rate_interval_us, memcpy_fixed_rate_interval_us, n_staging_buffers),
+      encryption_state(stream) {}
+
+EncryptedSepMemcpyCommandScheduler::~EncryptedSepMemcpyCommandScheduler(void) {}
+
+void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes,
+        hipMemcpyKind kind, hipStream_t stream) {
+   static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+   assert(sizeBytes == FIXED_SIZE_FULL && "encryption needs fixed size buffers");
+   // we need fixed size buffers because we have this statically allocated ciphertext buffer
+   lgm::CPUEncrypt(ciphertext, src, sizeBytes, encryption_state);
+   hipError_t err = nw_hipMemcpySync(in_stg_buf, ciphertext,
+      sizeBytes + crypto_aead_aes256gcm_ABYTES, kind, stream);
+   assert(err == hipSuccess);
+   lgm::DecryptAsync(dst, in_stg_buf, sizeBytes + crypto_aead_aes256gcm_ABYTES, stream,
+           encryption_state);
+   encryption_state.nextNonceAsync(stream);
+}
+
+void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t sizeBytes,
+        hipMemcpyKind kind, hipStream_t stream) {
+   static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+   assert(sizeBytes == FIXED_SIZE_FULL && "encryption needs fixed size buffers");
+   // we need fixed size buffers because we have this statically allocated ciphertext buffer
+   gpu_snapshot_tagged_buf(out_stg_buf, src, stream);
+   lgm::EncryptAsync(encrypt_out_buf, out_stg_buf, sizeBytes, stream, encryption_state);
+   hipError_t err = nw_hipMemcpySync(ciphertext, encrypt_out_buf,
+        sizeBytes + crypto_aead_aes256gcm_ABYTES, hipMemcpyDeviceToHost, stream);
+   assert(err == hipSuccess);
+   lgm::CPUDecrypt(dst, ciphertext, sizeBytes + crypto_aead_aes256gcm_ABYTES, encryption_state);
+   encryption_state.nextNonceAsync(stream);
+}
+
 
 void BatchCommandScheduler::ProcessThread() {
     const char* nice_str = getenv("HIP_SCHEDULER_THREAD_NICE");
@@ -569,13 +597,13 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
 extern "C" hipError_t
 hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream) {
-    return lgmMemcpyAsync(dst, src, sizeBytes, kind, stream);
+    return lgm::hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
 }
 
 extern "C" hipError_t
 hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
 {
-    return lgmMemcpy(dst, src, sizeBytes, kind);
+    return lgm::hipMemcpy(dst, src, sizeBytes, kind);
 }
 
 extern "C" hipError_t
