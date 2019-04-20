@@ -250,7 +250,7 @@ protected:
     void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
     void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
 private:
-    lgm::EncryptionState encryption_state;
+    std::unique_ptr<lgm::EncryptionState> encryption_state;
 };
 
 class BaselineCommandScheduler : public CommandScheduler {
