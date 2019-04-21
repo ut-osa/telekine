@@ -532,6 +532,88 @@ void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t 
    d2h_encryption_state->nextNonceCPU();
 }
 
+void EncryptedSepMemcpyCommandScheduler::D2HMemcpyThread()
+{
+    SetThreadPriority();
+    chan_no = 2;
+    hipSetDevice(device_index);
+
+    static uint8_t plaintext[FIXED_SIZE_FULL];
+    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
+    if (d2h_encryption_state == nullptr) {
+        d2h_encryption_state.reset(new lgm::EncryptionState(d2h_xfer_stream_));
+    }
+
+    MemcpyParam last_param;
+    bool last_real_copy = false;
+    bool first = true;
+
+    while (this->running) {
+        if (!d2h_memcpy_waiter_) {
+            std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
+            pending_d2h_cv_.wait(lk1, [this] () {
+                return pending_d2h_commands_.size() > 0;
+            });
+        } else {
+            d2h_memcpy_waiter_->WaitNextQuantum();
+        }
+
+        // This implementation assumes we use FIXED_SIZE_B buffers
+        // make scratch buffer big enough to store encrypted (padded + MACed) data
+
+        bool real_copy = false;
+        hipError_t err;
+        MemcpyParam param(nullptr, status_buf, 0, hipMemcpyDeviceToHost, 0);
+
+        pending_d2h_mutex_.lock();
+        int index = 0;
+        if (last_real_copy) index = 1;
+        if (pending_d2h_commands_.size() > index) {
+            assert(pending_d2h_commands_[index]->kind == MEMCPY);
+            param = pending_d2h_commands_[index]->memcpy_param;
+            real_copy = true;
+        }
+        pending_d2h_mutex_.unlock();
+
+        assert(param.size <= FIXED_SIZE_B);
+        hip_launch_batch_t batch;
+        // we need fixed size buffers because we have this statically allocated ciphertext buffer
+        gpu_snapshot_tagged_buf_on_batch(&batch, out_stg_buf, param.src, d2h_xfer_stream_);
+        lgm::EncryptAsync(&batch, encrypt_out_buf, out_stg_buf, FIXED_SIZE_FULL, d2h_xfer_stream_, *d2h_encryption_state.get());
+        d2h_encryption_state->nextNonceGPU(&batch, d2h_xfer_stream_);
+        hipLaunchBatchNOW(&batch, d2h_xfer_stream_);
+        
+        if (!first) {
+            lgm::CPUDecrypt(plaintext, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, *d2h_encryption_state.get());
+            d2h_encryption_state->nextNonceCPU();
+
+            if (last_real_copy) {
+                /* if the tag matches the buffer was ready and we can stop looking for it */
+                if (*BUF_TAG(plaintext) == last_param.tag) {
+                    memcpy(last_param.dst, plaintext, last_param.size);
+                    pending_d2h_mutex_.lock();
+                    pending_d2h_commands_.pop_front();
+                    pending_d2h_mutex_.unlock();
+
+                    pending_commands_cv_.notify_all();
+                } else {
+                    /* if not... then we have to look for it next time */
+                }
+            } else {
+                memcpy(&batches_finished, plaintext, sizeof(batches_finished));
+                pending_commands_cv_.notify_all();
+            }
+        }
+
+        err = nw_hipMemcpySync(ciphertext, encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
+                               hipMemcpyDeviceToHost, d2h_xfer_stream_);
+        assert(err == hipSuccess);
+        last_real_copy = real_copy;
+        last_param = param;
+        first = false;
+    }
+}
+
 void BatchCommandScheduler::ProcessThread() {
     SetThreadPriority();
     hipSetDevice(device_index);

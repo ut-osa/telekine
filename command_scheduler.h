@@ -198,8 +198,8 @@ protected:
     void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
-    void H2DMemcpyThread();
-    void D2HMemcpyThread();
+    virtual void H2DMemcpyThread();
+    virtual void D2HMemcpyThread();
     void do_next_h2d();
     virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
     void do_next_d2h();
@@ -269,6 +269,7 @@ public:
 protected:
     void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
     void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
+    void D2HMemcpyThread() override;
 private:
     std::unique_ptr<lgm::EncryptionState> h2d_encryption_state;
     std::unique_ptr<lgm::EncryptionState> d2h_encryption_state;
