@@ -45,6 +45,14 @@ EXPORTED_WEAKLY void nw_init_guestlib(intptr_t api_id)
     api_init_command1->base.command_id = COMMAND_HANDLER_INITIALIZE_API;
     api_init_command1->new_api_id = api_id;
     command_channel_send_command(nw_global_command_channel[1], (struct command_base*)api_init_command1);
+
+    struct command_handler_initialize_api_command* api_init_command2 =
+        (struct command_handler_initialize_api_command*)command_channel_new_command(
+            nw_global_command_channel[2], sizeof(struct command_handler_initialize_api_command), 0);
+    api_init_command2->base.api_id = COMMAND_HANDLER_API;
+    api_init_command2->base.command_id = COMMAND_HANDLER_INITIALIZE_API;
+    api_init_command2->new_api_id = api_id;
+    command_channel_send_command(nw_global_command_channel[2], (struct command_base*)api_init_command2);
 }
 
 EXPORTED_WEAKLY void nw_destroy_guestlib(void)
