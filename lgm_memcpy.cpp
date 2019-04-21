@@ -21,21 +21,24 @@ EncryptionState::~EncryptionState(void) {
   AES_GCM_destroy(engine_device);
 }
 
-void EncryptionState::nextNonceAsync(hipStream_t stream) {
-  sodium_increment(nonce_host, crypto_aead_aes256gcm_NPUBBYTES); // TODO this is blocking
-  AES_GCM_next_nonce(nonce_device, stream);
+void EncryptionState::nextNonceCPU() {
+  sodium_increment(nonce_host, crypto_aead_aes256gcm_NPUBBYTES);
 }
 
-void DecryptAsync(void* plaintext, const void* ciphertext, size_t ciphertext_len,
+void EncryptionState::nextNonceGPU(hip_launch_batch_t* batch, hipStream_t stream) {
+  AES_GCM_next_nonce(batch, nonce_device, stream);
+}
+
+void DecryptAsync(hip_launch_batch_t* batch, void* plaintext, const void* ciphertext, size_t ciphertext_len,
     hipStream_t stream, EncryptionState& state) {
-  AES_GCM_decrypt(static_cast<uint8_t*>(plaintext), state.engine_device,
+  AES_GCM_decrypt(batch, static_cast<uint8_t*>(plaintext), state.engine_device,
       state.nonce_device, static_cast<const uint8_t*>(ciphertext),
       ciphertext_len - crypto_aead_aes256gcm_ABYTES, stream);
 }
 
-void EncryptAsync(void* ciphertext, const void* plaintext, size_t sizeBytes,
+void EncryptAsync(hip_launch_batch_t* batch, void* ciphertext, const void* plaintext, size_t sizeBytes,
     hipStream_t stream, EncryptionState& state) {
-  AES_GCM_encrypt(static_cast<uint8_t*>(ciphertext), state.engine_device,
+  AES_GCM_encrypt(batch, static_cast<uint8_t*>(ciphertext), state.engine_device,
       state.nonce_device, static_cast<const uint8_t*>(plaintext), sizeBytes, stream);
 }
 

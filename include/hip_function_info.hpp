@@ -5,6 +5,7 @@
 
 #include <hip/hip_runtime.h>
 #include "hip_cpp_bridge.h"
+#include <vector>
 
 hipFunction_t hip_function_lookup(uintptr_t function_address,
                                   hipStream_t stream);
@@ -36,6 +37,12 @@ void hip_function_to_aql(hsa_kernel_dispatch_packet_t *aql, hipFunction_t f,
             (HSA_FENCE_SCOPE_AGENT << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE);
 }
 
+struct hip_launch_batch_t {
+    std::vector<hsa_kernel_dispatch_packet_t> aqls;
+    std::vector<size_t> kernarg_sizes;
+    std::vector<char> all_kernarg;
+};
+
 /* TODO double check this .... */
 #define DIM3_TO_AQL(blocks, threads) \
    (blocks.x * threads.x), (threads.y * blocks.y), (threads.z * blocks.z), \
@@ -54,6 +61,37 @@ inline void hipLaunchNOW(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
 
     __do_c_hipHccModuleLaunchKernel(&aql, stream, nullptr, (char *)kernarg.data(),
                                     kernarg.size(), nullptr, nullptr);
+}
+
+template <typename... Args, typename F = void (*)(Args...)>
+inline void hipLaunchAddToBatch(hip_launch_batch_t* batch, F kernel, const dim3& numBlocks, const dim3& dimBlocks,
+                         std::uint32_t sharedMemBytes, hipStream_t stream, Args... args)
+{
+    hsa_kernel_dispatch_packet_t aql = {0};
+    auto kernarg = hip_impl::make_kernarg(std::move(args)...);
+    std::size_t kernarg_size = kernarg.size();
+
+    auto fun = hip_function_lookup((uintptr_t)kernel, stream);
+    hip_function_to_aql(&aql, fun, DIM3_TO_AQL(numBlocks, dimBlocks), 0);
+
+    batch->aqls.push_back(aql);
+    batch->kernarg_sizes.push_back(kernarg.size());
+    batch->all_kernarg.resize(batch->all_kernarg.size() + kernarg.size());
+    memcpy(batch->all_kernarg.data() + batch->all_kernarg.size() - kernarg.size(),
+           kernarg.data(), kernarg.size());
+}
+
+inline void hipLaunchBatchNOW(hip_launch_batch_t* batch, hipStream_t stream)
+{
+    int n_kernels = batch->aqls.size();
+    std::vector<hipEvent_t> null_events;
+    for (int i = 0; i < n_kernels; i++) {
+        null_events.push_back(nullptr);
+    }
+    __do_c_hipHccModuleLaunchMultiKernel(
+        n_kernels, batch->aqls.data(), stream,
+        batch->all_kernarg.data(), batch->all_kernarg.size(),
+        batch->kernarg_sizes.data(), null_events.data(), null_events.data());
 }
 
 

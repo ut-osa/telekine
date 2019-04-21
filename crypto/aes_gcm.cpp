@@ -1,5 +1,4 @@
 #include "hip_cpp_bridge.h"
-#include "hip_function_info.hpp"
 #include "aes_gcm.h"
 
 namespace {
@@ -643,10 +642,10 @@ __global__ void AES_GCM_next_nonce_kernel(uint8_t* nonce) {
   }
 }
 
-void AES_GCM_xcrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+void AES_GCM_xcrypt(hip_launch_batch_t* batch, uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
     const uint8_t* src, uint32_t size, hipStream_t stream) {
   int num_block = (size / 16 + kBaseThreadNum-1) / kBaseThreadNum;
-  hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_xcrypt_kernel), num_block, kBaseThreadNum, 0, stream,
+  hipLaunchAddToBatch(batch, HIP_KERNEL_NAME(AES_GCM_xcrypt_kernel), num_block, kBaseThreadNum, 0, stream,
       dst, engine->sbox, engine->aes_roundkey, nonce, src, size);
 }
 
@@ -655,17 +654,17 @@ void AES_GCM_encrypt_one_block(const AES_GCM_engine* engine, uint8_t* data, hipS
       engine->sbox, engine->aes_roundkey, data);
 }
 
-void AES_GCM_compute_mac(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+void AES_GCM_compute_mac(hip_launch_batch_t* batch, uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
     const uint8_t* src, uint32_t size, hipStream_t stream) {
-  hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_kernel), AES_GCM_STEP, AES_GCM_STEP, 0, stream,
+  hipLaunchAddToBatch(batch, HIP_KERNEL_NAME(AES_GCM_mac_kernel), AES_GCM_STEP, AES_GCM_STEP, 0, stream,
       engine->gf_last4, engine->HL_sqr_long, engine->HH_sqr_long, AES_GCM_STEP * AES_GCM_STEP,
       src, size / 16, engine->buffer1);
-  hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_kernel), AES_GCM_STEP / 8, 8, 0, stream,
+  hipLaunchAddToBatch(batch, HIP_KERNEL_NAME(AES_GCM_mac_kernel), AES_GCM_STEP / 8, 8, 0, stream,
       engine->gf_last4, engine->HL_long, engine->HH_long, AES_GCM_STEP,
       engine->buffer1, AES_GCM_STEP * AES_GCM_STEP, engine->buffer2);
-  hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_kernel), 1, 1, 0, stream,
+  hipLaunchAddToBatch(batch, HIP_KERNEL_NAME(AES_GCM_mac_kernel), 1, 1, 0, stream,
       engine->gf_last4, engine->HL, engine->HH, 1, engine->buffer2, AES_GCM_STEP, dst);
-  hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_mac_final_kernel), 1, 1, 0, stream,
+  hipLaunchAddToBatch(batch, HIP_KERNEL_NAME(AES_GCM_mac_final_kernel), 1, 1, 0, stream,
       engine->gf_last4, engine->HL, engine->HH, engine->sbox, engine->aes_roundkey,
       nonce, dst, size, dst);
 }
@@ -696,22 +695,22 @@ void AES_GCM_destroy(AES_GCM_engine* engine) {
 }
 
 // dst buffer should be of size: size + crypto_aead_aes256gcm_ABYTES
-void AES_GCM_encrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+void AES_GCM_encrypt(hip_launch_batch_t* batch, uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
     const uint8_t* src, uint32_t size, hipStream_t stream) {
   assert(size % AES_BLOCKLEN == 0);
-  AES_GCM_xcrypt(dst, engine, nonce, src, size, stream);
-  AES_GCM_compute_mac(&dst[size], engine, nonce, dst, size, stream);
+  AES_GCM_xcrypt(batch, dst, engine, nonce, src, size, stream);
+  AES_GCM_compute_mac(batch, &dst[size], engine, nonce, dst, size, stream);
 }
 
 // src buffer should be of size: size + crypto_aead_aes256gcm_ABYTES
-void AES_GCM_decrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+void AES_GCM_decrypt(hip_launch_batch_t* batch, uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
     const uint8_t* src, uint32_t size, hipStream_t stream) {
   assert(size % AES_BLOCKLEN == 0);
-  AES_GCM_compute_mac(dst, engine, nonce, src, size, stream);
+  AES_GCM_compute_mac(batch, dst, engine, nonce, src, size, stream);
   // TODO verify mac for i in crypto_aead_aes256gcm_ABYTES: (dst == src[size])
-  AES_GCM_xcrypt(dst, engine, nonce, src, size, stream);
+  AES_GCM_xcrypt(batch, dst, engine, nonce, src, size, stream);
 }
 
-void AES_GCM_next_nonce(uint8_t* nonce, hipStream_t stream) {
-  hipLaunchNOW(HIP_KERNEL_NAME(AES_GCM_next_nonce_kernel), 1, 1, 0, stream, nonce);
+void AES_GCM_next_nonce(hip_launch_batch_t* batch, uint8_t* nonce, hipStream_t stream) {
+  hipLaunchAddToBatch(batch, HIP_KERNEL_NAME(AES_GCM_next_nonce_kernel), 1, 1, 0, stream, nonce);
 }

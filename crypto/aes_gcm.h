@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "common.h"
+#include "hip_function_info.hpp"
 
 #define SBOX_SIZE 256
 #define RCON_SIZE 11
@@ -32,12 +33,12 @@ void AES_GCM_init(AES_GCM_engine** engine, const uint8_t* key, hipStream_t strea
 
 void AES_GCM_destroy(AES_GCM_engine* engine);
 
-void AES_GCM_encrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+void AES_GCM_encrypt(hip_launch_batch_t* batch, uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
         const uint8_t* src, uint32_t size, hipStream_t stream);
 
-void AES_GCM_decrypt(uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
+void AES_GCM_decrypt(hip_launch_batch_t* batch, uint8_t* dst, const AES_GCM_engine* engine, const uint8_t* nonce,
         const uint8_t* src, uint32_t size, hipStream_t stream);
 
-void AES_GCM_next_nonce(uint8_t* nonce, hipStream_t stream);
+void AES_GCM_next_nonce(hip_launch_batch_t* batch, uint8_t* nonce, hipStream_t stream);
 
 #endif

@@ -23,15 +23,16 @@ struct EncryptionState {
 
   EncryptionState(hipStream_t stream);
   ~EncryptionState(void);
-  void nextNonceAsync(hipStream_t stream);
+  void nextNonceCPU();
+  void nextNonceGPU(hip_launch_batch_t* batch, hipStream_t stream);
 };
 
 // ciphertext_len includes MAC
-void DecryptAsync(void* plaintext, const void* ciphertext, size_t ciphertext_len,
+void DecryptAsync(hip_launch_batch_t* batch, void* plaintext, const void* ciphertext, size_t ciphertext_len,
     hipStream_t stream, EncryptionState& state);
 
 // sizes are padded
-void EncryptAsync(void* ciphertext, const void* plaintext, size_t sizeBytes,
+void EncryptAsync(hip_launch_batch_t* batch, void* ciphertext, const void* plaintext, size_t sizeBytes,
     hipStream_t stream, EncryptionState& state);
 
 // provide a ciphertext buffer of size FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES
