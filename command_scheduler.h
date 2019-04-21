@@ -186,7 +186,8 @@ protected:
     void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
-    void MemcpyThread();
+    void H2DMemcpyThread();
+    void D2HMemcpyThread();
     void do_next_h2d();
     virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
     void do_next_d2h();
@@ -206,7 +207,6 @@ protected:
     uint64_t cur_batch_id;
     uint64_t last_real_batch;
     uint64_t batches_finished;
-    hipStream_t xfer_stream_;
     size_t n_staging_buffers;
     void **in_bufs;
     void **out_bufs;
@@ -217,12 +217,20 @@ protected:
     void *nop_buffer;
     unsigned stg_in_idx;
     unsigned stg_out_idx;
-    std::mutex pending_copy_mutex_;
+
+    hipStream_t h2d_xfer_stream_;
+    std::mutex pending_h2d_mutex_;
     std::condition_variable pending_h2d_cv_;
-    std::deque<std::unique_ptr<CommandEntry>> pending_h2d_commands;
-    std::deque<std::unique_ptr<CommandEntry>> pending_d2h_commands;
-    std::unique_ptr<std::thread> memcpy_thread_;
-    std::unique_ptr<QuantumWaiter> memcpy_waiter_;
+    std::deque<std::unique_ptr<CommandEntry>> pending_h2d_commands_;
+    std::unique_ptr<std::thread> h2d_memcpy_thread_;
+    std::unique_ptr<QuantumWaiter> h2d_memcpy_waiter_;
+
+    hipStream_t d2h_xfer_stream_;
+    std::mutex pending_d2h_mutex_;
+    std::condition_variable pending_d2h_cv_;
+    std::deque<std::unique_ptr<CommandEntry>> pending_d2h_commands_;
+    std::unique_ptr<std::thread> d2h_memcpy_thread_;
+    std::unique_ptr<QuantumWaiter> d2h_memcpy_waiter_;
 
 	 /* fast way to get tags that won't likely be repeated */
 	 tag_t gen_tag(void) {          //period 2^96-1
@@ -250,7 +258,8 @@ protected:
     void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
     void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
 private:
-    std::unique_ptr<lgm::EncryptionState> encryption_state;
+    std::unique_ptr<lgm::EncryptionState> h2d_encryption_state;
+    std::unique_ptr<lgm::EncryptionState> d2h_encryption_state;
 };
 
 class BaselineCommandScheduler : public CommandScheduler {

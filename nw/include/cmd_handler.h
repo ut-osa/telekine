@@ -19,7 +19,7 @@ void register_command_handler(int api_id, void (*handle_command)(struct command_
 void handle_commands_until_api(int api_id, int chan_no);
 
 void _internal_handle_commands_until_api(int api_id, int chan_no);
-extern pthread_mutex_t nw_handler_lock[2];
+extern pthread_mutex_t nw_handler_lock[3];
 
 /**
  * Block until a command with the specified API is executed and the
@@ -53,7 +53,7 @@ void wait_for_command_handler();
  * The global channel used by this process (either the guestlib or the
  * worker).
  */
-extern struct command_channel* nw_global_command_channel[2];
+extern struct command_channel* nw_global_command_channel[3];
 
 #define MAX_API_ID 256
 

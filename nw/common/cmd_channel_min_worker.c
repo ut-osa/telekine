@@ -265,7 +265,7 @@ void command_channel_min_free_command(struct command_channel* c, struct command_
     free(cmd);
 }
 
-void set_up_ports(int listen_port, int listen_fds[2])
+void set_up_ports(int listen_port, int listen_fds[3])
 {
     /* connect guestlib */
     struct sockaddr_in address;
@@ -273,7 +273,7 @@ void set_up_ports(int listen_port, int listen_fds[2])
     int opt = 1;
     struct command_base msg, response;
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
        if ((listen_fds[i] = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
            perror("socket");
        }
@@ -294,7 +294,7 @@ void set_up_ports(int listen_port, int listen_fds[2])
        }
 
        printf("[worker#%d] waiting for guestlib connection\n", listen_port);
-       listen_port += CHANNEL_1_OFFSET;
+       listen_port += CHANNEL_OFFSET;
     }
 }
 

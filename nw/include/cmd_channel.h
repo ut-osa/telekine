@@ -346,6 +346,6 @@ void command_channel_free_command(struct command_channel* chan, struct command_b
 
 */
 
-void set_up_ports(int port, int listen_fds[2]);
+void set_up_ports(int port, int listen_fds[3]);
 
 #endif // ndef __VGPU_CMD_CHANNEL_H__

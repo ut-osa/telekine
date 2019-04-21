@@ -313,7 +313,7 @@ struct command_channel* command_channel_min_new(int chan_no)
 
     chan->pfd.fd = chan->sock_fd;
     chan->pfd.events = POLLIN | POLLRDHUP;
-    worker_port += CHANNEL_1_OFFSET;
+    worker_port += CHANNEL_OFFSET;
 
     if (ssl_enabled()) {
         fprintf(stderr, "Init SSL connection\n");

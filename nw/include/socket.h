@@ -20,7 +20,7 @@
 
 #include "devconf.h"
 
-#define CHANNEL_1_OFFSET 666
+#define CHANNEL_OFFSET 333
 
 typedef enum {
     MSG_UNDEFINED,
