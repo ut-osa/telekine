@@ -448,6 +448,7 @@ void SepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes
 extern __thread int chan_no;
 void SepMemcpyCommandScheduler::H2DMemcpyThread()
 {
+    SetThreadPriority();
     chan_no = 1;
     hipSetDevice(device_index);
 
@@ -466,6 +467,7 @@ void SepMemcpyCommandScheduler::H2DMemcpyThread()
 
 void SepMemcpyCommandScheduler::D2HMemcpyThread()
 {
+    SetThreadPriority();
     chan_no = 2;
     hipSetDevice(device_index);
 
@@ -531,16 +533,7 @@ void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t 
 }
 
 void BatchCommandScheduler::ProcessThread() {
-    const char* nice_str = getenv("HIP_SCHEDULER_THREAD_NICE");
-    if (nice_str != NULL) {
-        int value = atoi(nice_str);
-        int ret = nice(value);
-        if (ret == -1 && errno != 0) {
-            fprintf(stderr, "Failed to set nice value\n");
-        } else {
-            fprintf(stderr, "Set nice value to %d\n", value);
-        }
-    }
+    SetThreadPriority();
     hipSetDevice(device_index);
     while (this->running) {
         std::vector<KernelLaunchParam *> params;

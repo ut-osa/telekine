@@ -70,6 +70,18 @@ public:
     virtual hipError_t Wait(void) override;
 protected:
     void ProcessThread();
+    void SetThreadPriority() {
+      const char* nice_str = getenv("HIP_SCHEDULER_THREAD_NICE");
+      if (nice_str != NULL) {
+         int value = atoi(nice_str);
+         int ret = nice(value);
+         if (ret == -1 && errno != 0) {
+           fprintf(stderr, "Failed to set nice value\n");
+         } else {
+           fprintf(stderr, "Set nice value to %d\n", value);
+         }
+      }
+    }
 
     struct KernelLaunchParam {
         hsa_kernel_dispatch_packet_t aql;
