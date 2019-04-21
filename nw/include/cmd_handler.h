@@ -41,7 +41,7 @@ void init_command_handler(struct command_channel* (*channel_create)(), int chan_
  * Terminate the handler and close the channel and release other
  * resources.
  */
-void destroy_command_handler();
+void destroy_command_handler(int chan_no);
 
 /**
  * Block until the command handler thread exits. This may never

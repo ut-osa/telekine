@@ -174,7 +174,7 @@ struct command_base* command_channel_min_receive_command(struct command_channel*
     ret = poll(&chan->pfd, 1, -1);
     if (ret < 0) {
         fprintf(stderr, "failed to poll\n");
-        exit(-1);
+        abort();
     }
 
     DEBUG_PRINT("revents=%d\n", chan->pfd.revents);
