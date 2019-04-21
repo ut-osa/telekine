@@ -455,7 +455,7 @@ void SepMemcpyCommandScheduler::H2DMemcpyThread()
 
 void SepMemcpyCommandScheduler::D2HMemcpyThread()
 {
-    chan_no = 1;
+    chan_no = 2;
     hipSetDevice(device_index);
 
     while (this->running) {
