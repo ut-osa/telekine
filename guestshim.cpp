@@ -819,15 +819,24 @@ hipError_t ihipMemset(void* dst, int  value, size_t sizeBytes,
     return e;
 };
 
+extern "C"
 hipError_t hipMemsetAsync(void* dst, int value, size_t sizeBytes, hipStream_t stream)
 {
     return ihipMemset(dst, value, sizeBytes, stream);
 }
 
+extern "C"
 hipError_t hipMemset(void* dst, int value, size_t sizeBytes)
 {
-    return hipMemsetAsync(dst, value, sizeBytes,
+    hipMemsetAsync(dst, value, sizeBytes,
                           CommandScheduler::GetDefStream());
+    return hipDeviceSynchronize();
+}
+
+extern "C"
+hipError_t hipDeviceSynchronize(void)
+{
+    return hipStreamSynchronize(CommandScheduler::GetDefStream());
 }
 
 namespace hip_impl

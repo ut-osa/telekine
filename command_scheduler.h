@@ -37,7 +37,7 @@ public:
     }
     virtual ~CommandScheduler(void) {
        if (destroy_stream) {
-          hipStreamDestroy(stream_);
+          nw_hipStreamDestroy(stream_);
        }
     }
     virtual hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
@@ -91,7 +91,7 @@ protected:
         KernelLaunchParam(const hsa_kernel_dispatch_packet_t *_aql,
                           uint8_t *kern_arg, size_t kern_arg_size,
                           hipEvent_t _start, hipEvent_t _stop) :
-           aql(*_aql), kernArgSize(FIXED_EXTRA_SIZE), start(_start), stop(_stop)
+           aql(*_aql), kernArgSize(FIXED_EXTRA_SIZE), kernArg{0}, start(_start), stop(_stop)
         {
            assert(kern_arg_size < FIXED_EXTRA_SIZE);
            memcpy(kernArg, kern_arg, kern_arg_size);
@@ -99,7 +99,7 @@ protected:
         template <typename... Args, typename F = void (*)(Args...)>
         KernelLaunchParam(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
                           std::uint32_t sharedMemBytes, hipStream_t stream,
-                          Args... args) : aql{0}, kernArgSize(FIXED_EXTRA_SIZE),
+                          Args... args) : aql{0}, kernArg{0}, kernArgSize(FIXED_EXTRA_SIZE),
             start(nullptr), stop(nullptr)
         {
            auto kern_args = hip_impl::make_kernarg(std::move(args)...);
@@ -121,7 +121,7 @@ protected:
         MemcpyParam(void *_dst, const void *_src, size_t _size, hipMemcpyKind _kind,
                     tag_t _tag) :
            dst(_dst), src(_src), size(_size), kind(_kind), tag(_tag) {}
-        MemcpyParam() : dst(nullptr), src(nullptr), size(0) {}
+        MemcpyParam() : dst(nullptr), src(nullptr), size(0), tag(0) {}
     };
 
     enum CommandKind {
@@ -142,12 +142,12 @@ protected:
         }
         CommandEntry(const hsa_kernel_dispatch_packet_t *aql, uint8_t *kern_arg,
                      size_t kern_arg_size) :
-           kind(KERNEL_LAUNCH),
+           kind(KERNEL_LAUNCH), done(),
            kernel_launch_param(aql, kern_arg, kern_arg_size, nullptr, nullptr) {};
 
         CommandEntry(const hsa_kernel_dispatch_packet_t *aql, uint8_t *kern_arg,
                      size_t kern_arg_size, hipEvent_t start, hipEvent_t stop) :
-           kind(KERNEL_LAUNCH),
+           kind(KERNEL_LAUNCH), done(),
            kernel_launch_param(aql, kern_arg, kern_arg_size, start, stop) {};
 
         CommandEntry(const hsa_kernel_dispatch_packet_t *aql, uint8_t *kern_arg,
@@ -157,19 +157,19 @@ protected:
            kernel_launch_param(aql, kern_arg, kern_arg_size, start, stop) {};
 
         CommandEntry(void *dst, const void *src, size_t size, hipMemcpyKind mkind) :
-           kind(MEMCPY),
+           kind(MEMCPY), done(),
            memcpy_param(dst, src, size, mkind, 0) {};
 
         CommandEntry(void *dst, const void *src, size_t size, hipMemcpyKind mkind,
                      tag_t tag) :
-           kind(MEMCPY),
+           kind(MEMCPY), done(),
            memcpy_param(dst, src, size, mkind, tag) {};
 
         template <typename... Args, typename F = void (*)(Args...)>
         CommandEntry(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
                           std::uint32_t sharedMemBytes, hipStream_t stream,
                           Args... args) :
-           kind(KERNEL_LAUNCH),
+           kind(KERNEL_LAUNCH), done(),
            kernel_launch_param(std::move(kernel), numBlocks, dimBlocks, sharedMemBytes,
                                stream, std::move(args)...) {};
     };
