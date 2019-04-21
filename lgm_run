@@ -55,6 +55,9 @@ def ava_env_client():
 
 click_option = functools.partial(click.option, show_default=True)
 @click.command()
+@click_option('--exec-xfer-stream', '-3', is_flag=True, help="Bar 3 in our graphs")
+@click_option('--data-encryption', '-4', is_flag=True, help="Bar 4 in our graphs")
+@click_option('--data-obv-scheduling', '-5', is_flag=True, help="Bar 5 in our graphs, Requires tuning --kernel-fr-interval-us, --memcpy-fr-interval-us, and --gpu-op-batch-size")
 @click.argument('run-type', type=click.Choice(['baseline','ava']))
 @click.argument('test-cmd', nargs=-1)
 @click_option('--server', default="localhost")
@@ -72,9 +75,25 @@ click_option = functools.partial(click.option, show_default=True)
 def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, gpu_op_batch_size,
          hip_memcpy_fixed_size, hip_memcpy_encrypted, gpu_op_sep_memcpy,
          hip_check_complete, kernel_fr_interval_us, memcpy_fr_interval_us,
-         hip_memcpy_n_staging_buffers):
+         hip_memcpy_n_staging_buffers, exec_xfer_stream, data_encryption,
+         data_obv_scheduling):
     global ava_ip
     global ava_port
+
+    if data_obv_scheduling:
+        data_encryption = True
+        if not kernel_fr_interval_us:
+            print("You must set --kernel-fr-interval-us")
+            return
+        if not memcpy_fr_interval_us:
+            print("You must set --memcpy-fr-interval-us")
+            return
+    if data_encryption:
+        exec_xfer_stream = True
+        hip_memcpy_encrypted = True
+    if exec_xfer_stream:
+        gpu_op_sep_memcpy = True
+        hip_memcpy_fixed_size = True
     if len(test_cmd) == 0:
         print("no command given exiting!")
         sys.exit(1)
@@ -85,9 +104,11 @@ def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, g
         print("SSL on")
         extra_client_env["AVA_ENABLE_SSL"] = "1"
     if gpu_op_batching:
+        print("BATCHING on")
         extra_client_env["HIP_ENABLE_COMMAND_SCHEDULER"] = "1"
         extra_client_env["HIP_COMMAND_SCHEDULER_BATCH_SIZE"] = str(gpu_op_batch_size)
     if gpu_op_sep_memcpy:
+        print("SPLIT stream on")
         extra_client_env["HIP_ENABLE_SEP_MEMCPY_COMMAND_SCHEDULER"] = "1"
         extra_client_env["HIP_COMMAND_SCHEDULER_BATCH_SIZE"] = str(gpu_op_batch_size)
     if hip_memcpy_fixed_size:
