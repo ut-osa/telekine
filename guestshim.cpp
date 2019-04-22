@@ -563,7 +563,6 @@ void EncryptedSepMemcpyCommandScheduler::D2HMemcpyThread()
          pending_d2h_mutex_.unlock();
 
          assert(param.size <= FIXED_SIZE_B);
-         d2h(plaintext, param.src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost, d2h_xfer_stream_);
 
          hip_launch_batch_t batch;
          // we need fixed size buffers because we have this statically allocated ciphertext buffer
