@@ -549,6 +549,29 @@ void EncryptedSepMemcpyCommandScheduler::D2HMemcpyThread()
     bool first = true;
 
     while (this->running) {
+         bool real_copy = false;
+
+         hipError_t err;
+         MemcpyParam param(nullptr, status_buf, 0, hipMemcpyDeviceToHost, 0);
+
+         pending_d2h_mutex_.lock();
+         if (pending_d2h_commands_.size() > 0) {
+            assert(pending_d2h_commands_[0]->kind == MEMCPY);
+            param = pending_d2h_commands_[0]->memcpy_param;
+            real_copy = true;
+         }
+         pending_d2h_mutex_.unlock();
+
+         assert(param.size <= FIXED_SIZE_B);
+         d2h(plaintext, param.src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost, d2h_xfer_stream_);
+
+         hip_launch_batch_t batch;
+         // we need fixed size buffers because we have this statically allocated ciphertext buffer
+         gpu_snapshot_tagged_buf_on_batch(&batch, out_stg_buf, param.src, d2h_xfer_stream_);
+         lgm::EncryptAsync(&batch, encrypt_out_buf, out_stg_buf, FIXED_SIZE_FULL, d2h_xfer_stream_, *d2h_encryption_state.get());
+         d2h_encryption_state->nextNonceGPU(&batch, d2h_xfer_stream_);
+         hipLaunchBatchNOW(&batch, d2h_xfer_stream_);
+
         if (!d2h_memcpy_waiter_) {
             std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
             pending_d2h_cv_.wait(lk1, [this] () {
@@ -558,59 +581,28 @@ void EncryptedSepMemcpyCommandScheduler::D2HMemcpyThread()
             d2h_memcpy_waiter_->WaitNextQuantum();
         }
 
-        // This implementation assumes we use FIXED_SIZE_B buffers
-        // make scratch buffer big enough to store encrypted (padded + MACed) data
+         err = nw_hipMemcpySync(ciphertext, encrypt_out_buf,
+              FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, hipMemcpyDeviceToHost, d2h_xfer_stream_);
+         assert(err == hipSuccess);
+         lgm::CPUDecrypt(plaintext, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, *d2h_encryption_state.get());
+         d2h_encryption_state->nextNonceCPU();
 
-        bool real_copy = false;
-        hipError_t err;
-        MemcpyParam param(nullptr, status_buf, 0, hipMemcpyDeviceToHost, 0);
+         if (real_copy) {
+            /* if the tag matches the buffer was ready and we can stop looking for it */
+            if (*BUF_TAG(plaintext) == param.tag) {
+               memcpy(param.dst, plaintext, param.size);
+               pending_d2h_mutex_.lock();
+               pending_d2h_commands_.pop_front();
+               pending_d2h_mutex_.unlock();
 
-        pending_d2h_mutex_.lock();
-        int index = 0;
-        if (last_real_copy) index = 1;
-        if (pending_d2h_commands_.size() > index) {
-            assert(pending_d2h_commands_[index]->kind == MEMCPY);
-            param = pending_d2h_commands_[index]->memcpy_param;
-            real_copy = true;
-        }
-        pending_d2h_mutex_.unlock();
-
-        assert(param.size <= FIXED_SIZE_B);
-        hip_launch_batch_t batch;
-        // we need fixed size buffers because we have this statically allocated ciphertext buffer
-        gpu_snapshot_tagged_buf_on_batch(&batch, out_stg_buf, param.src, d2h_xfer_stream_);
-        lgm::EncryptAsync(&batch, encrypt_out_buf, out_stg_buf, FIXED_SIZE_FULL, d2h_xfer_stream_, *d2h_encryption_state.get());
-        d2h_encryption_state->nextNonceGPU(&batch, d2h_xfer_stream_);
-        hipLaunchBatchNOW(&batch, d2h_xfer_stream_);
-        
-        if (!first) {
-            lgm::CPUDecrypt(plaintext, ciphertext, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES, *d2h_encryption_state.get());
-            d2h_encryption_state->nextNonceCPU();
-
-            if (last_real_copy) {
-                /* if the tag matches the buffer was ready and we can stop looking for it */
-                if (*BUF_TAG(plaintext) == last_param.tag) {
-                    memcpy(last_param.dst, plaintext, last_param.size);
-                    pending_d2h_mutex_.lock();
-                    pending_d2h_commands_.pop_front();
-                    pending_d2h_mutex_.unlock();
-
-                    pending_commands_cv_.notify_all();
-                } else {
-                    /* if not... then we have to look for it next time */
-                }
+               pending_commands_cv_.notify_all();
             } else {
-                memcpy(&batches_finished, plaintext, sizeof(batches_finished));
-                pending_commands_cv_.notify_all();
+               /* if not... then we have to look for it next time */
             }
-        }
-
-        err = nw_hipMemcpySync(ciphertext, encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES,
-                               hipMemcpyDeviceToHost, d2h_xfer_stream_);
-        assert(err == hipSuccess);
-        last_real_copy = real_copy;
-        last_param = param;
-        first = false;
+         } else {
+            memcpy(&batches_finished, plaintext, sizeof(batches_finished));
+            pending_commands_cv_.notify_all();
+         }
     }
 }
 
