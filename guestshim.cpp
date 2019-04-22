@@ -123,6 +123,7 @@ BatchCommandScheduler::BatchCommandScheduler(hipStream_t stream, int batch_size,
 
 BatchCommandScheduler::~BatchCommandScheduler(void) {
     running = false;
+    pending_commands_cv_.notify_all();
     process_thread_->join();
 }
 
@@ -168,7 +169,9 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
 SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
 {
    running = false;
+   pending_h2d_cv_.notify_all();
    h2d_memcpy_thread_->join();
+   pending_d2h_cv_.notify_all();
    d2h_memcpy_thread_->join();
    hipStreamDestroy(h2d_xfer_stream_);
    hipStreamDestroy(d2h_xfer_stream_);
@@ -456,8 +459,9 @@ void SepMemcpyCommandScheduler::H2DMemcpyThread()
        if (!h2d_memcpy_waiter_) {
           std::unique_lock<std::mutex> lk1(pending_h2d_mutex_);
           pending_h2d_cv_.wait(lk1, [this] () {
-              return pending_h2d_commands_.size() > 0;
+              return pending_h2d_commands_.size() > 0 || !this->running;
           });
+          if (!this->running) break;
        } else {
           h2d_memcpy_waiter_->WaitNextQuantum();
        }
@@ -475,8 +479,9 @@ void SepMemcpyCommandScheduler::D2HMemcpyThread()
        if (!d2h_memcpy_waiter_) {
           std::unique_lock<std::mutex> lk1(pending_d2h_mutex_);
           pending_d2h_cv_.wait(lk1, [this] () {
-              return pending_d2h_commands_.size() > 0;
+              return pending_d2h_commands_.size() > 0 || !this->running;
           });
+          if (!this->running) break;
        } else {
           d2h_memcpy_waiter_->WaitNextQuantum();
        }
@@ -618,8 +623,9 @@ void BatchCommandScheduler::ProcessThread() {
                 // if we're not fixed-rating the communication, wait 10 ms
                 // or until we have at least half a batch of commands, then continue
                 pending_commands_cv_.wait_for(lk1, std::chrono::milliseconds(10), [this] () {
-                    return pending_commands_.size() > batch_size_ * 0.5;
+                    return pending_commands_.size() > batch_size_ * 0.5 || !this->running;
                 });
+                if (!this->running) break;
             } else {
                 lk1.unlock();
                 quantum_waiter_->WaitNextQuantum();
