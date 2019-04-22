@@ -129,6 +129,10 @@ def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, g
                 str(memcpy_fr_interval_us)
     if hip_memcpy_n_staging_buffers:
       extra_client_env["HIP_MEMCPY_N_STAGING_BUFFERS"] = str(hip_memcpy_n_staging_buffers)
+
+    for k,v in sorted(extra_client_env.items()):
+        print(k, "=", v)
+    print("TEST CMD:", " ".join(test_cmd))
     sys.exit(run_test(test_cmd))
 
 if __name__ == '__main__':
