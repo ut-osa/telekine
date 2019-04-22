@@ -26,6 +26,7 @@ atexit.register(clean_up)
 def run_test(test_cmd):
     try:
         print("Running test")
+        sys.stdout.flush()
         return sp.run(test_cmd, env=ava_env_client()).returncode
     except Exception as e:
         print("ERROR:", e)
