@@ -36,6 +36,7 @@ guest_lib=os.path.join(script_dir, 'libguestlib.so')
 shim=os.path.join(script_dir, 'guestshim.so')
 
 extra_client_env = {
+    'MARS_NO_WAIT': '1',
     'AVA_LOCAL'   : '1',
     'AVA_ENABLE_SSL': '0',
     'HCC_LAZYINIT': '1',
