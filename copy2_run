@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+
+import os
+import click
+import subprocess as sp
+import functools
+
+click_option = functools.partial(click.option, show_default=True)
+@click.command()
+@click_option('--output-dir', default='')
+@click_option('--local', is_flag=True)
+@click_option('--start-pow2', type=int, default=16)
+@click_option('--stop-pow2', type=int, default=23)
+@click_option('--tag', default='empty')
+@click.argument('lgm-cmd', nargs=-1)
+def main(output_dir, local, start_pow2, stop_pow2, tag, lgm_cmd):
+    if local:
+        for p in range(start_pow2, stop_pow2+1):
+            val = 2**p
+            output_path = os.path.join(output_dir, 'local_%d.txt' % val)
+            sp.run(['./copy2', str(val), '1', output_path])
+    else:
+        print(lgm_cmd)
+        for p in range(start_pow2, stop_pow2+1):
+            val = 2**p
+            output_path = os.path.join(output_dir, '%s_%d.txt' % (tag, val))
+            while True:
+                sp.run(list(lgm_cmd) + ['--', './copy2', str(val), '0', output_path])
+                output_size = os.path.getsize(output_path)
+                if output_size > 0:
+                    break
+
+if __name__ == '__main__':
+    main()
