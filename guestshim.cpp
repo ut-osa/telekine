@@ -532,6 +532,7 @@ void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t 
    d2h_encryption_state->nextNonceCPU();
 }
 
+#if 0
 void EncryptedSepMemcpyCommandScheduler::D2HMemcpyThread()
 {
     SetThreadPriority();
@@ -604,6 +605,7 @@ void EncryptedSepMemcpyCommandScheduler::D2HMemcpyThread()
          }
     }
 }
+#endif
 
 void BatchCommandScheduler::ProcessThread() {
     SetThreadPriority();
