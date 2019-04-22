@@ -55,6 +55,7 @@ def ava_env_client():
 
 click_option = functools.partial(click.option, show_default=True)
 @click.command()
+@click_option('--batching', '-2', is_flag=True, help="Bar 2 in our graphs")
 @click_option('--exec-xfer-stream', '-3', is_flag=True, help="Bar 3 in our graphs")
 @click_option('--data-encryption', '-4', is_flag=True, help="Bar 4 in our graphs")
 @click_option('--data-obv-scheduling', '-5', is_flag=True, help="Bar 5 in our graphs, Requires tuning --kernel-fr-interval-us, --memcpy-fr-interval-us, and --gpu-op-batch-size")
@@ -63,7 +64,7 @@ click_option = functools.partial(click.option, show_default=True)
 @click_option('--server', default="localhost")
 @click_option('--server-port', type=int, default=4000)
 @click_option('--enable-ssl', is_flag=True)
-@click_option('--gpu-op-batch-size', default=64)
+@click_option('--gpu-op-batch-size', default=32)
 @click_option('--gpu-op-batching/--no-gpu-op-batching', default=False)
 @click_option('--gpu-op-sep-memcpy', is_flag=True)
 @click_option('--hip-memcpy-fixed-size', is_flag=True)
@@ -76,7 +77,7 @@ def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, g
          hip_memcpy_fixed_size, hip_memcpy_encrypted, gpu_op_sep_memcpy,
          hip_check_complete, kernel_fr_interval_us, memcpy_fr_interval_us,
          hip_memcpy_n_staging_buffers, exec_xfer_stream, data_encryption,
-         data_obv_scheduling):
+         data_obv_scheduling, batching):
     global ava_ip
     global ava_port
 
@@ -94,6 +95,8 @@ def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, g
     if exec_xfer_stream:
         gpu_op_sep_memcpy = True
         hip_memcpy_fixed_size = True
+    if batching:
+        gpu_op_batching = True
     if len(test_cmd) == 0:
         print("no command given exiting!")
         sys.exit(1)
