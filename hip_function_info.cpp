@@ -1,4 +1,5 @@
 #include "hip_function_info.hpp"
+#include "current_device.h"
 
 #include <libhsakmt/hsakmttypes.h>
 #include <hip/hip_runtime_api.h>
@@ -15,7 +16,6 @@
 static pthread_mutex_t stream_agent_lock = PTHREAD_MUTEX_INITIALIZER;
 static std::unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
 
-thread_local int current_device = 0;
 thread_local hipCtx_t current_ctx = nullptr;
 thread_local hipDevice_t current_ctx_device = -1;
 
@@ -226,11 +226,12 @@ hipError_t
 hipSetDevice(int deviceId)
 {
    hipError_t ret = hipSuccess;
-
+   int previous_device = current_device;
    if (current_device != deviceId) {
+      current_device = deviceId; // set this early to pass the value to initialization
       ret = nw_hipSetDevice(deviceId);
-      if (!ret)
-         current_device = deviceId;
+      if (ret) // error
+         current_device = previous_device;
    }
    return ret;
 }

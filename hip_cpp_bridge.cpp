@@ -1,6 +1,6 @@
 #include "hip/hcc_detail/code_object_bundle.hpp"
 #include "hip_cpp_bridge.h"
-
+#include "check_env.h"
 
 #include "hip_hcc_internal.h"
 #include "trace_helper.h"
@@ -30,6 +30,8 @@ inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {
 static void *allocate_pinned_buf()
 {
    void *pinned;
+   static int device = GET_ENV_INT("NW_WORKER_HIP_DEVICE_ID");
+   assert(hipSetDevice(device) == hipSuccess);
    unsigned int flags = hipHostMallocPortable|hipHostMallocCoherent|hipHostMallocMapped;
    assert(hipHostMalloc(&pinned, pinned_buf_size, flags) == hipSuccess);
    return pinned;

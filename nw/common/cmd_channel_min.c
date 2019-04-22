@@ -2,6 +2,8 @@
 #include "common/devconf.h"
 #include "common/debug.h"
 #include "common/guest_mem.h"
+#include "hip_cpp_bridge.h"
+#include "current_device.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -103,6 +105,7 @@ struct command_base* command_channel_min_new_command(struct command_channel* c, 
 
     memset(cmd, 0, command_struct_size + data_region_size);
     cmd->vm_id = 1;
+    cmd->device_id = current_device;
     cmd->command_size = command_struct_size;
     cmd->data_region = (void *)command_struct_size;
     cmd->region_size = data_region_size;

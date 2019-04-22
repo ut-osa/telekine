@@ -10,4 +10,7 @@ static inline bool CHECK_ENV(const char *key) {
   return val && strcmp("0", val);
 }
 
+static inline int GET_ENV_INT(const char *key) {
+  return atoi(getenv(key));
+}
 #endif

@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
 {
     uint8_t *A_d, *C_d;
     int deviceID = 1;
+    CHECK(hipSetDevice(deviceID));
     hipDeviceProp_t props;
     CHECK(hipGetDeviceProperties(&props, deviceID));
     printf("info: running on device %s\n", props.name);
@@ -69,7 +70,6 @@ int main(int argc, char *argv[])
       for (size_t i = 0; i < N; i++) A_h[i] = i;
 
       //printf("info: allocate device mem (0x%0zx B)\n", Nbytes);
-      CHECK(hipSetDevice(deviceID));
       CHECK(hipMalloc(&A_d, Nbytes));
       CHECK(hipMalloc(&C_d, Nbytes));
 

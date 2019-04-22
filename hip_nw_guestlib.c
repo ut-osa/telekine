@@ -5,6 +5,7 @@
 
 #include "common/endpoint_lib.h"
 #include "common/linkage.h"
+#include "current_device.h"
 
 // Must be included before hip_nw.h, so that API
 // functions are declared properly.
@@ -182,6 +183,8 @@ static bool was_initted;
 static pthread_once_t guestlib_init = PTHREAD_ONCE_INIT;
 
 EXPORTED __thread int chan_no;
+EXPORTED __thread int current_device = 0;
+
 #define __chan nw_global_command_channel[chan_no]
 
 /* DON'T CALL DIRECTLY! must be protected by pthread_once */

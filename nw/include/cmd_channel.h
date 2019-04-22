@@ -84,6 +84,10 @@ struct command_base {
    */
   size_t command_size;
   /**
+   * Device id for worker.
+   */
+  int device_id;
+  /**
    * A reference to the data region associated with this command. It
    * may be a pointer, but can also be an offset or something else.
    */

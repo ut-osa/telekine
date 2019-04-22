@@ -202,19 +202,23 @@ int main(int argc, char *argv[])
     char str_port[10];
     char str_pb_offset[10];
     char str_pb_size[10];
+    char str_device_id[10];
     pb_info = (struct param_block_info *)msg.reserved_area;
     sprintf(str_vm_id, "%d", msg.vm_id);
     sprintf(str_rt_type, "%d", msg.api_id);
     sprintf(str_port, "%d", worker_id + manager_port);
     sprintf(str_pb_offset, "%lu", pb_info->param_local_offset);
     sprintf(str_pb_size, "%lu", pb_info->param_block_size);
+    sprintf(str_device_id, "%d", msg.device_id);
     char * argv_list[] = {worker_bin,
                          str_vm_id, str_rt_type, str_port,
                          str_pb_offset, str_pb_size, NULL};
-    printf("[manager] %s vm_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx",
-           worker_bin, msg.vm_id, msg.api_id, str_port,
+    printf("[manager] %s vm_id=%d, device_id=%d, rt_type=%d, port=%s, pb_offset=%lx, pb_size=%lx",
+           worker_bin, msg.vm_id, msg.device_id, msg.api_id, str_port,
            pb_info->param_local_offset,
            pb_info->param_block_size);
+    if (setenv("NW_WORKER_HIP_DEVICE_ID", str_device_id, 1))
+       perror("setenv NW_WORKER_HIP_DEVICE_ID");
     if (execv(worker_bin, argv_list) < 0) {
         perror("execv worker");
     }
