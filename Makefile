@@ -60,13 +60,13 @@ libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
 	$(CC) -O3 -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -lssl -lcrypto -o $@
 
 
-$(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so libcrypto.so
+$(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so libgpucrypto.so
 	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
 
-copy: copy.o guestshim.so libguestlib.so libcrypto.so
+copy: copy.o guestshim.so libguestlib.so libgpucrypto.so
 	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
 
-copy2: copy2.o guestshim.so libguestlib.so libcrypto.so
+copy2: copy2.o guestshim.so libguestlib.so libgpucrypto.so
 	$(HIPCC) -O3 -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
 
 regen: hip.nw.cpp
@@ -81,11 +81,11 @@ guestshim.so: lgm_memcpy.o guestshim.o program_state.o code_object_bundle.o hip_
 				  lgm_kernels.o
 	$(HIPCC) -fPIC -shared $(includes) -o $@ $^ \
 	   -Wl,--no-allow-shlib-undefined \
-		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread -lsodium -lcrypto
-guestshim.so: libguestlib.so libcrypto.so
+		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread -lssl -lcrypto -lgpucrypto
+guestshim.so: libguestlib.so libgpucrypto.so
 
-libcrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
-	$(HIPCC) $(includes) -shared -O3 -fPIC crypto/aes_gcm.cpp -o $@ -lsodium -ldl
+libgpucrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
+	$(HIPCC) $(includes) -shared -O3 -fPIC crypto/aes_gcm.cpp -o $@ -ldl
 
 clean:
 	rm -rf hip_nw *.o *.so manager_tcp MatrixTranspose copy

@@ -9,8 +9,15 @@
 #include <map>
 #include <memory>
 #include <stdio.h>
-#include <sodium.h>
+#include <openssl/evp.h>
 #include <unistd.h>
+
+#ifndef crypto_aead_aes256gcm_ABYTES
+#define crypto_aead_aes256gcm_ABYTES 16U
+#endif
+#ifndef crypto_aead_aes256gcm_NPUBBYTES
+#define crypto_aead_aes256gcm_NPUBBYTES 12U
+#endif
 
 namespace lgm {
 
@@ -20,6 +27,8 @@ struct EncryptionState {
   uint8_t nonce_host[crypto_aead_aes256gcm_NPUBBYTES];
   uint8_t* nonce_device;
   AES_GCM_engine* engine_device;
+  EVP_CIPHER_CTX* encrypt_ctx;
+  EVP_CIPHER_CTX* decrypt_ctx;
 
   EncryptionState(hipStream_t stream);
   ~EncryptionState(void);
