@@ -162,8 +162,8 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
    assert(ret == hipSuccess);
    ret = hipMalloc(&nop_buffer, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
    assert(ret == hipSuccess);
-   h2d_memcpy_thread_.reset(new std::thread(&SepMemcpyCommandScheduler::H2DMemcpyThread, this));
-   d2h_memcpy_thread_.reset(new std::thread(&SepMemcpyCommandScheduler::D2HMemcpyThread, this));
+   h2d_memcpy_thread_ = std::make_unique<std::thread>(&SepMemcpyCommandScheduler::H2DMemcpyThread, this);
+   d2h_memcpy_thread_ = std::make_unique<std::thread>(&SepMemcpyCommandScheduler::D2HMemcpyThread, this);
 }
 
 SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)

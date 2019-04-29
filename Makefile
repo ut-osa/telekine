@@ -32,7 +32,7 @@ includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include \
 clangargs = -D__HIP_PLATFORM_HCC__=1
 
 CFLAGS = -g -Og -fPIC $(includes)
-CXXFLAGS = $(CFLAGS) -Wno-ignored-attributes -Wno-deprecated-declarations \
+CXXFLAGS = $(CFLAGS) -std=c++14 -Wno-ignored-attributes -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
@@ -61,13 +61,13 @@ libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
 
 
 $(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so libgpucrypto.so
-	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
+	$(HIPCC) -std=c++14 $^ -o $@ -Wl,-rpath=$(PWD)
 
 copy: copy.o guestshim.so libguestlib.so libgpucrypto.so
-	$(HIPCC) -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
+	$(HIPCC) -std=c++14 $^ -o $@ -Wl,-rpath=$(PWD)
 
 copy2: copy2.o guestshim.so libguestlib.so libgpucrypto.so
-	$(HIPCC) -O3 -std=c++11 $^ -o $@ -Wl,-rpath=$(PWD)
+	$(HIPCC) -O3 -std=c++14 $^ -o $@ -Wl,-rpath=$(PWD)
 
 regen: hip.nw.cpp
 	$(NW_PATH)/nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
