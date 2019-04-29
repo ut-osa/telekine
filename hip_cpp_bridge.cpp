@@ -26,7 +26,7 @@ inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {
 }
 }
 
-#define pinned_buf_size (1UL << 29)
+#define pinned_buf_size (1UL << 30)
 static void *allocate_pinned_buf()
 {
    void *pinned;
