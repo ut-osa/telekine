@@ -182,10 +182,9 @@ ava_add_dependency(void *a, void *b)
 static bool was_initted;
 static pthread_once_t guestlib_init = PTHREAD_ONCE_INIT;
 
-EXPORTED __thread int chan_no;
 EXPORTED __thread int current_device = 0;
 
-#define __chan nw_global_command_channel[chan_no]
+#define __chan nw_global_command_channel[get_ava_chan_no()]
 
 /* DON'T CALL DIRECTLY! must be protected by pthread_once */
 void init_hip_guestlib(void)
@@ -238,7 +237,7 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
 {
     int ava_is_in,
      ava_is_out;
-    chan_no = _chan_no;
+    set_ava_chan_no(_chan_no);
     switch (__cmd->command_id) {
     case RET_HIP_HIP_DEVICE_SYNCHRONIZE:{
         ava_is_in = 0;

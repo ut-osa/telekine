@@ -1,4 +1,17 @@
 #include "common/cmd_channel_impl.h"
+#include "common/linkage.h"
+
+static __thread int cur_ava_channel;
+
+EXPORTED void set_ava_chan_no(int ava_channel)
+{
+   cur_ava_channel = ava_channel;
+}
+
+EXPORTED int get_ava_chan_no(void)
+{
+   return cur_ava_channel;
+}
 
 void command_channel_free(struct command_channel* chan)  {
   ((struct command_channel_base*)chan)->vtable->command_channel_free(chan);

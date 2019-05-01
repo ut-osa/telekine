@@ -19,16 +19,16 @@ void register_command_handler(int api_id, void (*handle_command)(struct command_
 void handle_commands_until_api(int api_id, int chan_no);
 
 void _internal_handle_commands_until_api(int api_id, int chan_no);
-extern pthread_mutex_t nw_handler_lock[3];
+extern pthread_mutex_t nw_handler_lock[N_AVA_CHANNELS];
 
 /**
  * Block until a command with the specified API is executed and the
  * predicate is true.
  */
 #define handle_commands_until(api_id, predicate)               \
-    pthread_mutex_lock(&nw_handler_lock[chan_no]);                      \
-    while(!(predicate)) _internal_handle_commands_until_api(api_id, chan_no);\
-    pthread_mutex_unlock(&nw_handler_lock[chan_no]);
+    pthread_mutex_lock(&nw_handler_lock[get_ava_chan_no()]);   \
+    while(!(predicate)) _internal_handle_commands_until_api(api_id, get_ava_chan_no());\
+    pthread_mutex_unlock(&nw_handler_lock[get_ava_chan_no()]);
 
 /**
  * Initialize and start the command handler thread.
@@ -53,7 +53,7 @@ void wait_for_command_handler();
  * The global channel used by this process (either the guestlib or the
  * worker).
  */
-extern struct command_channel* nw_global_command_channel[3];
+extern struct command_channel* nw_global_command_channel[N_AVA_CHANNELS];
 
 #define MAX_API_ID 256
 

@@ -1,6 +1,7 @@
 #include "hip/hcc_detail/code_object_bundle.hpp"
 #include "hip_cpp_bridge.h"
 #include "check_env.h"
+#include "nw/include/n_ava_channels.h"
 
 #include "hip_hcc_internal.h"
 #include "trace_helper.h"
@@ -38,30 +39,29 @@ static void *allocate_pinned_buf()
 }
 
 
-void *pinned_buf_h2d = allocate_pinned_buf();
-void *pinned_buf_d2h = allocate_pinned_buf();
-std::once_flag pinned_f;
+void *pinned_bufs[N_AVA_CHANNELS] = {REP_N_CHANNELS(allocate_pinned_buf())};
 
 extern "C" hipError_t
 nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream)
 {
+    void *pin_buf = pinned_bufs[get_ava_chan_no()];
     hipError_t e = hipSuccess;
     assert(sizeBytes < pinned_buf_size);
     switch (kind) {
        case hipMemcpyHostToDevice:
-          memcpy(pinned_buf_h2d, src, sizeBytes);
-          e = hipMemcpyAsync(dst, pinned_buf_h2d, sizeBytes, kind, stream);
+          memcpy(pin_buf, src, sizeBytes);
+          e = hipMemcpyAsync(dst, pin_buf, sizeBytes, kind, stream);
           assert(e == hipSuccess);
           e = hipStreamSynchronize(stream);
           assert(e == hipSuccess);
           break;
        case hipMemcpyDeviceToHost:
-          e = hipMemcpyAsync(pinned_buf_d2h, src, sizeBytes, kind, stream);
+          e = hipMemcpyAsync(pin_buf, src, sizeBytes, kind, stream);
           assert(e == hipSuccess);
           e = hipStreamSynchronize(stream);
           assert(e == hipSuccess);
-          memcpy(dst, pinned_buf_d2h, sizeBytes);
+          memcpy(dst, pin_buf, sizeBytes);
           break;
        case hipMemcpyDeviceToDevice:
           e = hipMemcpyAsync(dst, src, sizeBytes, kind, stream);

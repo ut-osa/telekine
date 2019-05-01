@@ -265,7 +265,7 @@ void command_channel_min_free_command(struct command_channel* c, struct command_
     free(cmd);
 }
 
-void set_up_ports(int listen_port, int listen_fds[3])
+void set_up_ports(int listen_port, int listen_fds[N_AVA_CHANNELS])
 {
     /* connect guestlib */
     struct sockaddr_in address;
@@ -273,7 +273,7 @@ void set_up_ports(int listen_port, int listen_fds[3])
     int opt = 1;
     struct command_base msg, response;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < N_AVA_CHANNELS; i++) {
        if ((listen_fds[i] = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
            perror("socket");
        }

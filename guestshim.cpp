@@ -20,6 +20,7 @@
 #include "check_env.h"
 #include "./command_scheduler.h"
 #include "hip_function_info.hpp"
+#include "nw/include/n_ava_channels.h"
 
 #include <chrono>
 
@@ -448,11 +449,10 @@ void SepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes
    // XXX check launch dimensions, for optimality 
 }
 
-extern __thread int chan_no;
 void SepMemcpyCommandScheduler::H2DMemcpyThread()
 {
     SetThreadPriority();
-    chan_no = 1;
+    set_ava_chan_no(1);
     hipSetDevice(device_index);
 
     while (this->running) {
@@ -472,7 +472,7 @@ void SepMemcpyCommandScheduler::H2DMemcpyThread()
 void SepMemcpyCommandScheduler::D2HMemcpyThread()
 {
     SetThreadPriority();
-    chan_no = 2;
+    set_ava_chan_no(2);
     hipSetDevice(device_index);
 
     while (this->running) {

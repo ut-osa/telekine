@@ -7,16 +7,16 @@
 #include <stdio.h>
 
 // Internal flag set by the first call to init_command_handler
-EXPORTED_WEAKLY volatile int init_command_handler_executed[3];
+EXPORTED_WEAKLY volatile int init_command_handler_executed[N_AVA_CHANNELS];
 
-EXPORTED_WEAKLY struct command_channel* nw_global_command_channel[3];
-EXPORTED_WEAKLY pthread_mutex_t nw_handler_lock[3] = {
-   PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER};
+EXPORTED_WEAKLY struct command_channel* nw_global_command_channel[N_AVA_CHANNELS];
+EXPORTED_WEAKLY pthread_mutex_t nw_handler_lock[N_AVA_CHANNELS] = {
+   REP_N_CHANNELS(PTHREAD_MUTEX_INITIALIZER)};
 
 EXPORTED_WEAKLY void (*nw_api_handlers[MAX_API_ID])(struct command_base* cmd, int) = {0, };
-EXPORTED_WEAKLY pthread_cond_t nw_api_conds_0[MAX_API_ID] = {PTHREAD_COND_INITIALIZER, };
-EXPORTED_WEAKLY pthread_cond_t nw_api_conds_1[MAX_API_ID] = {PTHREAD_COND_INITIALIZER, };
-EXPORTED_WEAKLY pthread_cond_t nw_api_conds_2[MAX_API_ID] = {PTHREAD_COND_INITIALIZER, };
+EXPORTED_WEAKLY pthread_cond_t nw_api_conds[N_AVA_CHANNELS][MAX_API_ID] = {
+   REP_N_CHANNELS({REP_N(MAX_API_ID, PTHREAD_COND_INITIALIZER)})
+};
 EXPORTED_WEAKLY pthread_t nw_handler_thread;
 
 static void _handle_commands_until_api_loop(struct command_channel* chan, int until_api_id, int chan_no);
@@ -37,12 +37,7 @@ EXPORTED_WEAKLY void _internal_handle_commands_until_api(int api_id, int chan_no
         _handle_commands_until_api_loop(nw_global_command_channel[chan_no], api_id, chan_no);
         pthread_mutex_lock(&nw_handler_lock[chan_no]);
     } else {
-       if (chan_no == 0)
-           pthread_cond_wait(&nw_api_conds_0[api_id], &nw_handler_lock[chan_no]);
-       else if (chan_no == 1)
-           pthread_cond_wait(&nw_api_conds_1[api_id], &nw_handler_lock[chan_no]);
-       else
-           pthread_cond_wait(&nw_api_conds_2[api_id], &nw_handler_lock[chan_no]);
+       pthread_cond_wait(&nw_api_conds[chan_no][api_id], &nw_handler_lock[chan_no]);
     }
 }
 
@@ -65,12 +60,7 @@ static void _handle_commands_until_api_loop(struct command_channel* chan, int un
         // TODO: handle internal APIs (api_id = 0).
         if (api_id > 0) {
             nw_api_handlers[api_id](cmd, chan_no);
-            if (chan_no == 0)
-               pthread_cond_broadcast(&nw_api_conds_0[api_id]);
-            else if (chan_no == 1)
-               pthread_cond_broadcast(&nw_api_conds_1[api_id]);
-            else
-               pthread_cond_broadcast(&nw_api_conds_2[api_id]);
+            pthread_cond_broadcast(&nw_api_conds[chan_no][api_id]);
         }
         pthread_mutex_unlock(&nw_handler_lock[chan_no]);
         if (until_api_id != -1 && api_id == until_api_id) {

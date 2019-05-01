@@ -7,6 +7,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <assert.h>
+#include <stdbool.h>
 
 #include <sys/mman.h>
 
@@ -18,15 +20,13 @@
 #include "common/register.h"
 #include "common/socket.h"
 
-struct command_channel *chan0;
-struct command_channel *chan1;
-struct command_channel *chan2;
+struct command_channel *chans[N_AVA_CHANNELS];
 
 void sig_handler(int signo)
 {
-    command_channel_free(chan0);
-    command_channel_free(chan1);
-    command_channel_free(chan2);
+    int i;
+    for (i = 0; i < N_AVA_CHANNELS; i++)
+       command_channel_free(chans[i]);
     exit(0);
 }
 
@@ -38,26 +38,21 @@ void sigsegv_handler(int signo, siginfo_t *info, void *data)
 
 void nw_report_storage_resource_allocation(const char* const name, ssize_t amount)
 {
-    command_channel_report_storage_resource_allocation(chan0, name, amount);
-    command_channel_report_storage_resource_allocation(chan1, name, amount);
-    command_channel_report_storage_resource_allocation(chan2, name, amount);
+    int i;
+    for (i = 0; i < N_AVA_CHANNELS; i++)
+       command_channel_report_storage_resource_allocation(chans[i], name, amount);
 }
 
 void nw_report_throughput_resource_consumption(const char* const name, ssize_t amount)
 {
-    command_channel_report_throughput_resource_consumption(chan0, name, amount);
-    command_channel_report_throughput_resource_consumption(chan1, name, amount);
-    command_channel_report_throughput_resource_consumption(chan2, name, amount);
+    int i;
+    for (i = 0; i < N_AVA_CHANNELS; i++)
+       command_channel_report_throughput_resource_consumption(chans[i], name, amount);
 }
 
 static struct command_channel* channel_create(int chan_no)
 {
-   if (chan_no == 0)
-    return chan0;
-   else if (chan_no == 1)
-    return chan1;
-   else
-    return chan2;
+   return chans[chan_no];
 }
 
 void notify_manager()
@@ -103,47 +98,34 @@ int main(int argc, char *argv[])
 #endif
 
     if (!getenv("AVA_CHANNEL") || !strcmp(getenv("AVA_CHANNEL"), "LOCAL")) {
-        int listen_fds[3];
+        int i;
+        int listen_fds[N_AVA_CHANNELS];
         int port = atoi(argv[3]);
         set_up_ports(port, listen_fds);
 
         notify_manager();
-        chan0 = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), listen_fds[0], port, atoi(argv[5]));
-        chan1 = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), listen_fds[1], port + CHANNEL_OFFSET, atoi(argv[5]));
-        chan2 = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), listen_fds[2], port + CHANNEL_OFFSET * 2, atoi(argv[5]));
-    }
-    else if (!strcmp(getenv("AVA_CHANNEL"), "SHM")) {
-        chan0 = command_channel_shm_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
-        chan1 = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]) + CHANNEL_OFFSET, atoi(argv[4]), atoi(argv[5]));
-        chan2 = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]) + CHANNEL_OFFSET * 2, atoi(argv[4]), atoi(argv[5]));
-    }
-    else if (!strcmp(getenv("AVA_CHANNEL"), "VSOCK")) {
-        chan0 = command_channel_socket_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
-        chan1 = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]) + CHANNEL_OFFSET, atoi(argv[4]), atoi(argv[5]));
-        chan2 = command_channel_min_worker_new(
-                atoi(argv[1]), atoi(argv[2]), atoi(argv[3]) + CHANNEL_OFFSET * 2, atoi(argv[4]), atoi(argv[5]));
+        for (i = 0; i < N_AVA_CHANNELS; i++) {
+            chans[i] = command_channel_min_worker_new(atoi(argv[1]),
+                  atoi(argv[2]), listen_fds[i], port + (i * CHANNEL_OFFSET),
+                  atoi(argv[5]));
+        }
+    } else if (!strcmp(getenv("AVA_CHANNEL"), "SHM")) {
+       assert(false && "SHM worker not supported\n");
+    } else if (!strcmp(getenv("AVA_CHANNEL"), "VSOCK")) {
+       assert(false && "VSOCK worker not supported\n");
     }
     else {
         printf("Unsupported AVA_CHANNEL type (export AVA_CHANNEL=[LOCAL | SHM | VSOCK]\n");
         return 0;
     }
 
-    init_command_handler(channel_create, 0);
-    init_command_handler(channel_create, 1);
-    init_command_handler(channel_create, 2);
+    int i;
+    for (i = 0; i < N_AVA_CHANNELS; i++)
+       init_command_handler(channel_create, i);
     DEBUG_PRINT("[worker#%s] start polling tasks\n", argv[3]);
     wait_for_command_handler();
-    command_channel_free(chan0);
-    command_channel_free(chan1);
-    command_channel_free(chan2);
+    for (i = 0; i < N_AVA_CHANNELS; i++)
+       command_channel_free(chans[i]);
 
     return 0;
 }

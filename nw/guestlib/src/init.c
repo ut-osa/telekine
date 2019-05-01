@@ -8,25 +8,19 @@
 
 EXPORTED_WEAKLY void nw_init_guestlib(intptr_t api_id)
 {
+    int i;
     /* Create connection to worker and start command handler thread */
-    if (!getenv("AVA_CHANNEL") || !strcmp(getenv("AVA_CHANNEL"), "LOCAL")) {
-        init_command_handler(command_channel_min_new, 0);
-        init_command_handler(command_channel_min_new, 1);
-        init_command_handler(command_channel_min_new, 2);
-    }
-    else if (!strcmp(getenv("AVA_CHANNEL"), "SHM")) {
-        init_command_handler(command_channel_shm_new, 0);
-        init_command_handler(command_channel_shm_new, 1);
-        init_command_handler(command_channel_shm_new, 1);
-    }
-    else if (!strcmp(getenv("AVA_CHANNEL"), "VSOCK")) {
-        init_command_handler(command_channel_socket_new, 0);
-        init_command_handler(command_channel_socket_new, 1);
-        init_command_handler(command_channel_socket_new, 2);
-    }
-    else {
-        printf("Unsupported AVA_CHANNEL type (export AVA_CHANNEL=[LOCAL | SHM | VSOCK]\n");
-        return;
+    for (i = 0; i < N_AVA_CHANNELS; i++) {
+       if (!getenv("AVA_CHANNEL") || !strcmp(getenv("AVA_CHANNEL"), "LOCAL"))
+           init_command_handler(command_channel_min_new, i);
+       else if (!strcmp(getenv("AVA_CHANNEL"), "SHM"))
+           init_command_handler(command_channel_shm_new, i);
+       else if (!strcmp(getenv("AVA_CHANNEL"), "VSOCK"))
+           init_command_handler(command_channel_socket_new, i);
+       else {
+           printf("Unsupported AVA_CHANNEL type (export AVA_CHANNEL=[LOCAL | SHM | VSOCK]\n");
+           return;
+       }
     }
 
     /* Send initialize API command to the worker */

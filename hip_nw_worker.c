@@ -990,14 +990,13 @@ __handle_command_hip_destroy()
 }
 
 __thread struct command_channel *__chan;
-__thread int chan_no;
 
 void
-__handle_command_hip(struct command_base *__cmd, int _chan_no)
+__handle_command_hip(struct command_base *__cmd, int chan_no)
 {
     int ava_is_in,
      ava_is_out;
-    chan_no = _chan_no;
+    set_ava_chan_no(chan_no);
     __chan = nw_global_command_channel[chan_no];
     switch (__cmd->command_id) {
 
