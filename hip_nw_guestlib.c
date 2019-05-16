@@ -522,14 +522,14 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;
     }
-    case RET_HIP_HIP_MEMCPY_PEER_ASYNC:{
+    case RET_HIP_NW_HIP_MEMCPY_PEER_ASYNC:{
         ava_is_in = 0;
         ava_is_out = 1;
-        struct hip_hip_memcpy_peer_async_ret *__ret = (struct hip_hip_memcpy_peer_async_ret *)__cmd;
+        struct hip_nw_hip_memcpy_peer_async_ret *__ret = (struct hip_nw_hip_memcpy_peer_async_ret *)__cmd;
         assert(__ret->base.api_id == HIP_API);
-        assert(__ret->base.command_size == sizeof(struct hip_hip_memcpy_peer_async_ret));
-        struct hip_hip_memcpy_peer_async_call_record *__local =
-            (struct hip_hip_memcpy_peer_async_call_record *)ava_remove_call(__ret->__call_id);
+        assert(__ret->base.command_size == sizeof(struct hip_nw_hip_memcpy_peer_async_ret));
+        struct hip_nw_hip_memcpy_peer_async_call_record *__local =
+            (struct hip_nw_hip_memcpy_peer_async_call_record *)ava_remove_call(__ret->__call_id);
 
         {
 
@@ -2892,20 +2892,20 @@ nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
 }
 
 EXPORTED hipError_t
-hipMemcpyPeerAsync(void *dst, int dstDeviceId, const void *src, int srcDevice, size_t sizeBytes, hipStream_t stream)
+nw_hipMemcpyPeerAsync(void *dst, int dstDeviceId, const void *src, int srcDevice, size_t sizeBytes, hipStream_t stream)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
     pthread_once(&guestlib_init, init_hip_guestlib);
-    GPtrArray *__ava_alloc_list_hipMemcpyPeerAsync = g_ptr_array_new_full(0, free);
+    GPtrArray *__ava_alloc_list_nw_hipMemcpyPeerAsync = g_ptr_array_new_full(0, free);
 
     size_t __total_buffer_size = 0; {
     }
-    struct hip_hip_memcpy_peer_async_call *__cmd =
-        (struct hip_hip_memcpy_peer_async_call *)command_channel_new_command(__chan,
-        sizeof(struct hip_hip_memcpy_peer_async_call), __total_buffer_size);
+    struct hip_nw_hip_memcpy_peer_async_call *__cmd =
+        (struct hip_nw_hip_memcpy_peer_async_call *)command_channel_new_command(__chan,
+        sizeof(struct hip_nw_hip_memcpy_peer_async_call), __total_buffer_size);
     __cmd->base.api_id = HIP_API;
-    __cmd->base.command_id = CALL_HIP_HIP_MEMCPY_PEER_ASYNC;
+    __cmd->base.command_id = CALL_HIP_NW_HIP_MEMCPY_PEER_ASYNC;
 
     intptr_t __call_id = ava_get_call_id();
     __cmd->__call_id = __call_id;
@@ -2926,8 +2926,9 @@ hipMemcpyPeerAsync(void *dst, int dstDeviceId, const void *src, int srcDevice, s
         __cmd->stream = stream;
     }
 
-    struct hip_hip_memcpy_peer_async_call_record *__call_record =
-        (struct hip_hip_memcpy_peer_async_call_record *)calloc(1, sizeof(struct hip_hip_memcpy_peer_async_call_record));
+    struct hip_nw_hip_memcpy_peer_async_call_record *__call_record =
+        (struct hip_nw_hip_memcpy_peer_async_call_record *)calloc(1,
+        sizeof(struct hip_nw_hip_memcpy_peer_async_call_record));
 
     __call_record->dst = dst;
 
@@ -2947,7 +2948,7 @@ hipMemcpyPeerAsync(void *dst, int dstDeviceId, const void *src, int srcDevice, s
 
     command_channel_send_command(__chan, (struct command_base *)__cmd);
 
-    g_ptr_array_unref(__ava_alloc_list_hipMemcpyPeerAsync);     /* Deallocate all memory in the alloc list */
+    g_ptr_array_unref(__ava_alloc_list_nw_hipMemcpyPeerAsync);  /* Deallocate all memory in the alloc list */
 
     handle_commands_until(HIP_API, __call_record->__call_complete);
     hipError_t ret;

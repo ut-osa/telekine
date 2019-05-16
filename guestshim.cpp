@@ -730,6 +730,13 @@ hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
 }
 
 extern "C" hipError_t
+hipMemcpyPeerAsync(void* dst, int dstDeviceId, const void* src, int srcDevice,
+                   size_t sizeBytes, hipStream_t stream)
+{
+    return nw_hipMemcpyPeerAsync(dst, dstDeviceId, src, srcDevice, sizeBytes, stream);
+}
+
+extern "C" hipError_t
 hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
 {
     return lgm::hipMemcpy(dst, src, sizeBytes, kind);

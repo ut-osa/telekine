@@ -83,8 +83,8 @@ nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
    }
 }
 
-hipError_t hipMemcpyPeerAsync(void* dst, int dstDeviceId, const void* src, int srcDevice,
-                              size_t sizeBytes, hipStream_t stream)
+hipError_t nw_hipMemcpyPeerAsync(void* dst, int dstDeviceId, const void* src, int srcDevice,
+                                 size_t sizeBytes, hipStream_t stream)
 {
    ava_argument(dst) ava_opaque;
    ava_argument(src) ava_opaque;

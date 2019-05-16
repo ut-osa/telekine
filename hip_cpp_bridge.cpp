@@ -86,6 +86,13 @@ nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kin
     return e;
 }
 
+extern "C" hipError_t
+nw_hipMemcpyPeerAsync(void* dst, int dstDeviceId, const void* src, int srcDevice,
+                      size_t sizeBytes, hipStream_t stream)
+{
+   return hipMemcpyPeerAsync(dst, dstDeviceId, src, srcDevice, sizeBytes, stream);
+}
+
 hipError_t
 nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
 {
