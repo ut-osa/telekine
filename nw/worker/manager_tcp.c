@@ -27,7 +27,7 @@ void sig_handler(int signo)
 {
     if (listen_fd > 0)
         close(listen_fd);
-    exit(0);
+    abort();
 }
 
 #define MAX_PATH 4096

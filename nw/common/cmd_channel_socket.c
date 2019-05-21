@@ -140,7 +140,7 @@ struct command_base* command_channel_socket_receive_command(struct command_chann
     ret = poll(&chan->pfd, 1, -1);
     if (ret < 0) {
         fprintf(stderr, "failed to poll\n");
-        exit(-1);
+        abort();
     }
 
     DEBUG_PRINT("revents=%d\n", chan->pfd.revents);
@@ -151,7 +151,7 @@ struct command_base* command_channel_socket_receive_command(struct command_chann
     if (chan->pfd.revents & POLLRDHUP) {
         DEBUG_PRINT("worker shutdown\n");
         close(chan->pfd.fd);
-        exit(-1);
+        abort();
     }
 
     if (chan->pfd.revents & POLLIN) {

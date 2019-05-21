@@ -188,7 +188,7 @@ struct command_base* command_channel_min_receive_command(struct command_channel*
     if (chan->pfd.revents & POLLRDHUP) {
         DEBUG_PRINT("worker shutdown\n");
         close(chan->pfd.fd);
-        exit(-1);
+        abort();
     }
 
     if (chan->pfd.revents & POLLIN) {
@@ -298,7 +298,7 @@ struct command_channel* command_channel_min_new(int chan_no)
     sprintf(port_buf, "%lu", worker_port);
     if (getaddrinfo(ip_str, port_buf, &hints, &result)) {
        perror(ip_str);
-       exit(1);
+       abort();
     }
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
@@ -311,7 +311,7 @@ struct command_channel* command_channel_min_new(int chan_no)
     }
     if (rp == NULL) {
        fprintf(stderr, "%s:%d couldn't connect!\n", __FILE__, __LINE__);
-       exit(1);
+       abort();
     }
 
     chan->pfd.fd = chan->sock_fd;

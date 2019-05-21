@@ -18,7 +18,7 @@ constexpr int kBaseThreadNum  = 1 << kBaseThreadBits;
         if (error != hipSuccess) {                                                                 \
             fprintf(stderr, "error: '%s'(%d) at %s:%d\n", hipGetErrorString(error), error,         \
                     __FILE__, __LINE__);                                                           \
-            exit(EXIT_FAILURE);                                                                    \
+            abort();                                                                    \
         }                                                                                          \
     }
 

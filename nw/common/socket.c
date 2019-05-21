@@ -19,7 +19,7 @@ int init_netlink_socket(struct sockaddr_nl *src_addr, struct sockaddr_nl *dst_ad
     int sock_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_USERSOCK);
     if (sock_fd < 0) {
         perror("ERROR opening netlink socket");
-        exit(0);
+        abort();
     }
     if (setsockopt(sock_fd, SOL_NETLINK, NETLINK_NO_ENOBUFS, (int[]){1}, sizeof(int)) != 0) {
         perror("ERROR setsockopt SOL_NETLINK");
@@ -32,7 +32,7 @@ int init_netlink_socket(struct sockaddr_nl *src_addr, struct sockaddr_nl *dst_ad
     if (bind(sock_fd, (struct sockaddr *)src_addr, sizeof(struct sockaddr_nl)) != 0) {
         perror("ERROR bind netlink socket");
         close(sock_fd);
-        exit(0);
+        abort();
     }
 
     memset(dst_addr, 0, sizeof(struct sockaddr_nl));
@@ -87,7 +87,7 @@ int init_vm_socket(struct sockaddr_vm *sa, int cid, int port)
     sockfd = socket(AF_VSOCK, SOCK_STREAM, 0);
     if (sockfd < 0) {
         perror("ERROR opening socket");
-        exit(0);
+        abort();
     }
 
     return sockfd;
@@ -98,13 +98,13 @@ void listen_vm_socket(int listen_fd, struct sockaddr_vm *sa_listen)
     if (bind(listen_fd, (struct sockaddr *)sa_listen, sizeof(*sa_listen)) != 0) {
         perror("ERROR bind");
         close(listen_fd);
-        exit(0);
+        abort();
     }
 
     if (listen(listen_fd, 10) != 0) {
         perror("ERROR listen");
         close(listen_fd);
-        exit(0);
+        abort();
     }
     printf("start vm socket listening at %d\n", sa_listen->svm_port);
 }
@@ -120,7 +120,7 @@ int accept_vm_socket(int listen_fd)
     if (client_fd < 0) {
         perror("ERROR accept");
         close(listen_fd);
-        exit(0);
+        abort();
     }
     printf("connection from cid %u port %u\n", sa_client.svm_cid, sa_client.svm_port);
 
@@ -140,7 +140,7 @@ int conn_vm_socket(int sockfd, struct sockaddr_vm *sa)
         DEBUG_PRINT("socket was non-blocking\n");
         if (fcntl(sockfd, F_SETFL, sock_flags & (~O_NONBLOCK)) < 0) {
             perror("fcntl blocking");
-            exit(0);
+            abort();
         }
     }
     */
@@ -167,7 +167,7 @@ int conn_vm_socket(int sockfd, struct sockaddr_vm *sa)
         DEBUG_PRINT("socket was blocking\n");
         if (fcntl(sockfd, F_SETFL, sock_flags | O_NONBLOCK) < 0) {
             perror("fcntl non-blocking");
-            exit(0);
+            abort();
         }
     }
 
@@ -195,7 +195,7 @@ int conn_vm_socket(int sockfd, struct sockaddr_vm *sa)
 connect_exit:
     if (fcntl(sockfd, F_SETFL, sock_flags & (~O_NONBLOCK)) < 0) {
         perror("fcntl blocking");
-        exit(0);
+        abort();
     }
 
     return ret;
@@ -225,7 +225,7 @@ int recv_socket(int sockfd, void *buf, size_t size)
         if ((ret = recv(sockfd, buf, size, 0)) <= 0) {
             perror("ERROR receiving from socket");
             close(sockfd);
-            exit(0);
+            abort();
         }
         buf += ret;
         size -= ret;
@@ -250,18 +250,18 @@ void* create_ssl_server_context(const char* cert_file, const char* key_file)
     if (ctx == NULL) {
         perror("Cannot create SSL server context");
         ERR_print_errors_fp(stderr);
-        exit(0);
+        abort();
     }
     SSL_CTX_set_ecdh_auto(ctx, 1);
     if (SSL_CTX_use_certificate_file(ctx, cert_file, SSL_FILETYPE_PEM) <= 0) {
         perror("Failed to set cert file for SSL context");
         ERR_print_errors_fp(stderr);
-	    exit(0);
+	    abort();
     }
     if (SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM) <= 0 ) {
         perror("Failed to set key file for SSL context");
         ERR_print_errors_fp(stderr);
-	    exit(EXIT_FAILURE);
+	    abort();
     }
     return ctx;
 }
@@ -272,7 +272,7 @@ void* create_ssl_client_context(void)
     if (ctx == NULL) {
         perror("Cannot create SSL client context");
         ERR_print_errors_fp(stderr);
-        exit(0);
+        abort();
     }
     return ctx;
 }
@@ -283,7 +283,7 @@ void* create_ssl_session(void* ssl_ctx, int sockfd)
     if (ssl == NULL) {
         perror("Cannot create SSL session");
         ERR_print_errors_fp(stderr);
-        exit(0);
+        abort();
     }
     SSL_set_fd(ssl, sockfd);
     SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
@@ -296,7 +296,7 @@ int ssl_accept(void* ssl)
     if (SSL_accept((SSL*)ssl) <= 0) {
         perror("SSL accept failed");
         ERR_print_errors_fp(stderr);
-        exit(0);
+        abort();
     }
     return 0;
 }
@@ -306,7 +306,7 @@ int ssl_connect(void* ssl)
     if (SSL_connect((SSL*)ssl) <= 0) {
         perror("SSL connect failed");
         ERR_print_errors_fp(stderr);
-        exit(0);
+        abort();
     }
     return 0;
 }
@@ -318,7 +318,7 @@ int recv_ssl_socket(void* ssl, void *buf, size_t size)
         if ((ret = SSL_read((SSL*)ssl, buf, size)) <= 0) {
             perror("ERROR receiving from socket");
             ERR_print_errors_fp(stderr);
-            exit(0);
+            abort();
         }
         size -= ret;
         buf += ret;
@@ -333,7 +333,7 @@ int send_ssl_socket(void* ssl, void *buf, size_t size)
         if ((ret = SSL_write((SSL*)ssl, buf, size)) <= 0) {
             perror("ERROR sending to socket");
             ERR_print_errors_fp(stderr);
-            exit(0);
+            abort();
         }
         buf += ret;
         size -= ret;

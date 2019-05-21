@@ -8,7 +8,7 @@
     hipError_t error  = cmd;\
     if (error != hipSuccess) { \
         fprintf(stderr, "error: '%s'(%d) at %s:%d\n", hipGetErrorString(error), error,__FILE__, __LINE__); \
-        exit(EXIT_FAILURE);\
+        abort();\
 	  }\
 }
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 {
     if (argc != 4) {
         fprintf(stderr, "Usage: %s n_round local out_file\n", argv[0]);
-        exit(1);
+        abort();
     }
 
     int n_round = atoi(argv[1]);

@@ -180,7 +180,7 @@ static struct command_base* command_channel_shm_receive_command(struct command_c
     ret = poll(&chan->pfd, 1, -1);
     if (ret < 0) {
         fprintf(stderr, "failed to poll\n");
-        exit(-1);
+        abort();
     }
 
     DEBUG_PRINT("revents=%d\n", chan->pfd.revents);
@@ -191,7 +191,7 @@ static struct command_base* command_channel_shm_receive_command(struct command_c
     if (chan->pfd.revents & POLLRDHUP) {
         DEBUG_PRINT("worker shutdown\n");
         close(chan->pfd.fd);
-        exit(-1);
+        abort();
     }
 
     if (chan->pfd.revents & POLLIN) {
@@ -249,14 +249,14 @@ struct command_channel* command_channel_shm_new()
     chan->shm_fd = open(dev_filename, O_RDWR);
     if (chan->shm_fd < 0) {
         printf("failed to open device %s\n", dev_filename);
-        exit(-1);
+        abort();
     }
 
     /* acquire vm id */
     chan->vm_id = ioctl(chan->shm_fd, IOCTL_GET_VGPU_ID);
     if (chan->vm_id <= 0) {
         printf("failed to retrieve vm id: %d\n", chan->vm_id);
-        exit(-1);
+        abort();
     }
     DEBUG_PRINT("assigned vm_id=%d\n", chan->vm_id);
 

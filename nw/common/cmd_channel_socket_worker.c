@@ -154,7 +154,7 @@ struct command_base* command_channel_socket_receive_command(struct command_chann
     ret = poll(&chan->pfd, 1, -1);
     if (ret < 0) {
         fprintf(stderr, "failed to poll\n");
-        exit(-1);
+        abort();
     }
 
     DEBUG_PRINT("revents=%d\n", chan->pfd.revents);
@@ -165,7 +165,7 @@ struct command_base* command_channel_socket_receive_command(struct command_chann
     if (chan->pfd.revents & POLLRDHUP) {
         DEBUG_PRINT("guestlib shutdown\n");
         close(chan->pfd.fd);
-        exit(-1);
+        abort();
     }
 
     if (chan->pfd.revents & POLLIN) {
@@ -226,12 +226,12 @@ struct command_channel* command_channel_socket_worker_new(int dummy1, int rt_typ
     /*
     if ((chan->shm_fd = open("/dev/kvm-vgpu", O_RDWR | O_NONBLOCK)) < 0) {
         printf("failed to open /dev/kvm-vgpu\n");
-        exit(0);
+        abort();
     }
 
     if (ioctl(chan->shm_fd, KVM_NOTIFY_EXEC_SPAWN, (unsigned long)chan->vm_id) < 0) {
         printf("failed to notify FIFO address\n");
-        exit(0);
+        abort();
     }
     printf("[worker#%d] kvm-vgpu notified\n", chan->vm_id);
     */

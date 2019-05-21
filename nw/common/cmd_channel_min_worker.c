@@ -199,7 +199,8 @@ struct command_base* command_channel_min_receive_command(struct command_channel*
     ret = poll(&chan->pfd, 1, -1);
     if (ret < 0) {
         fprintf(stderr, "failed to poll\n");
-        exit(-1);
+        fflush(stderr);
+        abort();
     }
 
     DEBUG_PRINT("revents=%d\n", chan->pfd.revents);
@@ -208,9 +209,11 @@ struct command_base* command_channel_min_receive_command(struct command_channel*
 
     /* terminate guestlib when worker exits */
     if (chan->pfd.revents & POLLRDHUP) {
+        fprintf(stderr, "poll HUP\n");
+        fflush(stderr);
         DEBUG_PRINT("guestlib shutdown\n");
         close(chan->pfd.fd);
-        exit(-1);
+        abort();
     }
 
     if (chan->pfd.revents & POLLIN) {
@@ -324,7 +327,7 @@ struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, 
         const char* key_file = getenv("AVA_SSL_KEY_FILE");
         if (cert_file == NULL || key_file == NULL) {
             fprintf(stderr, "Empty AVA_SSL_CERT_FILE or AVA_SSL_KEY_FILE!\n");
-            exit(0);
+            abort();
         }
         chan->ssl_ctx = create_ssl_server_context(cert_file, key_file);
         chan->ssl = create_ssl_session(chan->ssl_ctx, chan->guestlib_fd);

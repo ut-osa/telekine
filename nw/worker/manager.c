@@ -24,7 +24,7 @@ void sig_handler(int signo)
 {
     if (listen_fd > 0)
         close(listen_fd);
-    exit(0);
+    abort();
 }
 
 int main(int argc, char *argv[])

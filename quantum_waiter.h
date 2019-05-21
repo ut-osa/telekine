@@ -15,24 +15,24 @@ public:
             struct itimerspec new_value;
             if (clock_gettime(CLOCK_REALTIME, &new_value.it_value) != 0) {
                 fprintf(stderr, "clock_gettime failed\n");
-                exit(1);
+                abort();
             }
             new_value.it_interval.tv_sec = interval_us_ / 1000000;
             new_value.it_interval.tv_nsec = interval_us_ % 1000000 * 1000;
             timer_fd_ = timerfd_create(CLOCK_REALTIME, 0);
             if (timer_fd_ == -1) {
                 fprintf(stderr, "timerfd_create failed\n");
-                exit(1);
+                abort();
             }
             if (timerfd_settime(timer_fd_, TFD_TIMER_ABSTIME, &new_value, NULL) != 0) {
                 fprintf(stderr, "timerfd_settime failed\n");
-                exit(1);
+                abort();
             }
         }
         uint64_t val;
         if (read(timer_fd_, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
             fprintf(stderr, "Failed to read from timer\n");
-            exit(1);
+            abort();
         }
         // if (val > 1) {
         //     fprintf(stderr, "[QuantumWaiter interval=%d] miss %d quanta\n",

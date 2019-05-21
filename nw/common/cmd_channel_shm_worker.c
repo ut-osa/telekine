@@ -223,7 +223,7 @@ static struct command_base* command_channel_shm_receive_command(struct command_c
     ret = poll(&chan->pfd, 1, -1);
     if (ret < 0) {
         fprintf(stderr, "failed to poll\n");
-        exit(-1);
+        abort();
     }
 
     DEBUG_PRINT("revents=%d\n", chan->pfd.revents);
@@ -234,7 +234,7 @@ static struct command_base* command_channel_shm_receive_command(struct command_c
     if (chan->pfd.revents & POLLRDHUP) {
         printf("[worker#%d] guestlib shutdown\n", chan->listen_port);
         close(chan->pfd.fd);
-        exit(-1);
+        abort();
     }
 
     if (chan->pfd.revents & POLLIN) {
@@ -310,14 +310,14 @@ struct command_channel* command_channel_shm_worker_new(int vm_id, int rt_type, i
     /* setup shared memory */
     if ((chan->shm_fd = open("/dev/kvm-vgpu", O_RDWR | O_NONBLOCK)) < 0) {
         printf("failed to open /dev/kvm-vgpu\n");
-        exit(0);
+        abort();
     }
     chan->fifo.addr = mmap(NULL, chan->fifo.size + chan->dstore.size,
                            PROT_READ | PROT_WRITE, MAP_SHARED, chan->shm_fd, 0);
     if (chan->fifo.addr == MAP_FAILED) {
         printf("mmap shared memory failed: %s\n", strerror(errno));
         // TODO: add exit labels
-        exit(0);
+        abort();
     }
     else
         printf("mmap shared memory to 0x%lx\n", (uintptr_t)chan->fifo.addr);
@@ -335,7 +335,7 @@ struct command_channel* command_channel_shm_worker_new(int vm_id, int rt_type, i
 
     if (ioctl(chan->shm_fd, KVM_NOTIFY_EXEC_SPAWN, (unsigned long)chan->vm_id) < 0) {
         printf("failed to notify FIFO address\n");
-        exit(0);
+        abort();
     }
     printf("[worker#%d] kvm-vgpu notified\n", chan->vm_id);
 
@@ -362,7 +362,7 @@ struct command_channel* command_channel_shm_worker_new(int vm_id, int rt_type, i
     retsize = sendmsg(chan->netlink_fd, chan->nl_msg, 0);
     if (retsize < 0) {
         printf("sendmsg failed with errcode %s\n", strerror(errno));
-        exit(-1);
+        abort();
     }
     else
         printf("[worker#%d] kvm-vgpu netlink notified\n", chan->vm_id);

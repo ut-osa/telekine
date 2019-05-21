@@ -27,13 +27,13 @@ void sig_handler(int signo)
     int i;
     for (i = 0; i < N_AVA_CHANNELS; i++)
        command_channel_free(chans[i]);
-    exit(0);
+    abort();
 }
 
 void sigsegv_handler(int signo, siginfo_t *info, void *data)
 {
     DEBUG_PRINT("segfault in thread pid = %lx\n", (long)pthread_self());
-    exit(0);
+    abort();
 }
 
 void nw_report_storage_resource_allocation(const char* const name, ssize_t amount)

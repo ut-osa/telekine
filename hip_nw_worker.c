@@ -184,6 +184,11 @@ void __attribute__ ((constructor)) init_hip_worker(void)
     __handle_command_hip_init();
 }
 
+void __attribute__ ((destructor)) fini_hip_worker(void)
+{
+   __handle_command_hip_destroy();
+}
+
 static struct nw_handle_pool *handle_pool = NULL;
 
 static hipError_t

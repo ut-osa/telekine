@@ -76,13 +76,13 @@ static void* handle_commands(void* userdata) {
     // set cancellation state
     if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL)) {
         perror("pthread_setcancelstate failed\n");
-        exit(0);
+        abort();
     }
 
     // PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join
     if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL)) {
         perror("pthread_setcanceltype failed\n");
-        exit(0);
+        abort();
     }
 
     _handle_commands_until_api_loop(chan, -1, chan_no);
