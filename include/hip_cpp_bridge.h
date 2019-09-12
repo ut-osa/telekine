@@ -58,6 +58,11 @@ size_t __do_c_get_kerenel_symbols(
       size_t symbols_len);
 
 hipError_t
+__do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *symbols,
+                        hsa_symbol_kind_t *types, unsigned *offsets, char *pool,
+                        size_t pool_size);
+
+hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(
       int numKernels, hsa_kernel_dispatch_packet_t *aql,
       hipStream_t stream,

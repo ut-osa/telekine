@@ -62,6 +62,11 @@ size_t __do_c_get_kerenel_symbols(
       size_t symbols_len);
 
 hipError_t
+__do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *symbols,
+                        hsa_symbol_kind_t *types, unsigned *offsets, char *pool,
+                        size_t pool_size);
+
+hipError_t
 __do_c_hipHccModuleLaunchMultiKernel(
       int numKernels, hsa_kernel_dispatch_packet_t *aql,
       hipStream_t stream,
@@ -74,6 +79,10 @@ nw_hipMemcpySync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kin
 
 hipError_t
 nw_hipMemcpy(void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind);
+
+hipError_t
+nw_hipMemcpyPeerAsync(void* dst, int dstDeviceId, const void* src, int srcDevice,
+                      size_t sizeBytes, hipStream_t stream);
 
 hipError_t
 nw_hipCtxGetDevice(hipDevice_t* device);

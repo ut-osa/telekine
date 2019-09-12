@@ -223,6 +223,36 @@ __do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
 }
 
 
+extern "C" hipError_t
+__do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *syms,
+                        hsa_symbol_kind_t *types, unsigned *offsets, char *pool,
+                        size_t pool_size)
+{
+   char *pool_cursor = pool, *pool_end = pool + pool_size;
+   for (unsigned i = 0; i < n; i++) {
+      hsa_executable_symbol_get_info(syms[i],
+                                     HSA_EXECUTABLE_SYMBOL_INFO_TYPE,
+                                     &types[i]);
+      uint32_t name_sz = 0;
+      hsa_executable_symbol_get_info(syms[i],
+                                     HSA_EXECUTABLE_SYMBOL_INFO_NAME_LENGTH,
+                                     &name_sz);
+      if (name_sz > (pool_end - 1) - pool_cursor) {
+         fprintf(stderr, "%s:%d: symbol name pool not large enough\n", __FILE__, __LINE__);
+         abort();
+      }
+
+      hsa_executable_symbol_get_info(syms[i],
+                                     HSA_EXECUTABLE_SYMBOL_INFO_NAME,
+                                     pool_cursor);
+      pool_cursor[name_sz] = '\0';
+      offsets[i] = pool_cursor - pool;
+      pool_cursor += name_sz + 1;
+   }
+   return hipSuccess;
+}
+
+
 extern "C"
 hsa_status_t HSA_API __do_c_hsa_executable_symbol_get_info(
     hsa_executable_symbol_t executable_symbol,

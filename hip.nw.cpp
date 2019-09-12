@@ -629,3 +629,23 @@ nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info *info)
       ava_out; ava_buffer(1);
    }
 }
+
+
+hipError_t
+__do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *syms,
+                        hsa_symbol_kind_t *types, unsigned *offsets, char *pool,
+                        size_t pool_size)
+{
+   ava_argument(syms) {
+      ava_in; ava_buffer(n);
+   }
+   ava_argument(types) {
+      ava_out; ava_buffer(n);
+   }
+   ava_argument(offsets) {
+      ava_out; ava_buffer(n);
+   }
+   ava_argument(pool) {
+      ava_out; ava_buffer(pool_size);
+   }
+}

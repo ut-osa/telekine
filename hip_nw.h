@@ -49,7 +49,7 @@ enum hip_functions {
         CALL_HIP___DO_C_GET_KERENEL_SYMBOLS, RET_HIP___DO_C_GET_KERENEL_SYMBOLS, CALL_HIP___DO_C_QUERY_HOST_ADDRESS,
         RET_HIP___DO_C_QUERY_HOST_ADDRESS, CALL_HIP___DO_C_GET_KERNEL_DESCRIPTOR, RET_HIP___DO_C_GET_KERNEL_DESCRIPTOR,
         CALL_HIP_NW_HIP_CTX_GET_DEVICE, RET_HIP_NW_HIP_CTX_GET_DEVICE, CALL_HIP_NW_LOOKUP_KERN_INFO,
-        RET_HIP_NW_LOOKUP_KERN_INFO
+        RET_HIP_NW_LOOKUP_KERN_INFO, CALL_HIP___DO_C_MASS_SYMBOL_INFO, RET_HIP___DO_C_MASS_SYMBOL_INFO
 };
 
 #include "hip_nw_utility_types.h"
@@ -1282,6 +1282,38 @@ struct hip_nw_lookup_kern_info_ret {
 struct hip_nw_lookup_kern_info_call_record {
     hipFunction_t f;
     struct nw_kern_info *info;
+    hipError_t ret;
+    char __handler_deallocate;
+    volatile char __call_complete;
+};
+
+struct hip___do_c_mass_symbol_info_call {
+    struct command_base base;
+    intptr_t __call_id;
+    size_t n;
+    unsigned int *offsets;
+    hsa_executable_symbol_t *syms;
+    size_t pool_size;
+    hsa_symbol_kind_t *types;
+    char *pool;
+};
+
+struct hip___do_c_mass_symbol_info_ret {
+    struct command_base base;
+    intptr_t __call_id;
+    unsigned int *offsets;
+    hsa_symbol_kind_t *types;
+    char *pool;
+    hipError_t ret;
+};
+
+struct hip___do_c_mass_symbol_info_call_record {
+    size_t n;
+    unsigned int *offsets;
+    hsa_executable_symbol_t *syms;
+    size_t pool_size;
+    hsa_symbol_kind_t *types;
+    char *pool;
     hipError_t ret;
     char __handler_deallocate;
     volatile char __call_complete;

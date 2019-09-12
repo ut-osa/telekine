@@ -982,6 +982,22 @@ __wrapper_nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info *info)
     return ret;
 }
 
+static hipError_t
+__wrapper___do_c_mass_symbol_info(size_t n, unsigned int *offsets, const hsa_executable_symbol_t * syms,
+    size_t pool_size, hsa_symbol_kind_t * types, char *pool)
+{
+    hipError_t ret;
+    ret = __do_c_mass_symbol_info(n, syms, types, offsets, pool, pool_size);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
 void
 __handle_command_hip_init()
 {
@@ -5549,6 +5565,180 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list_nw_lookup_kern_info);        /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP___DO_C_MASS_SYMBOL_INFO:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list___do_c_mass_symbol_info = g_ptr_array_new_full(0, free);
+        struct hip___do_c_mass_symbol_info_call *__call = (struct hip___do_c_mass_symbol_info_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size == sizeof(struct hip___do_c_mass_symbol_info_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: size_t n */
+        size_t n;
+        n = __call->n;
+        n = __call->n;
+
+        /* Input: unsigned int * offsets */
+        unsigned int *offsets;
+        offsets =
+            ((__call->offsets) != (NULL)) ? (((unsigned int *)command_channel_get_buffer(__chan, __cmd,
+                    __call->offsets))) : (__call->offsets);
+        if (__call->offsets != NULL) {
+            const size_t __size = ((size_t) n);
+            offsets = (unsigned int *)calloc(__size, sizeof(unsigned int));
+            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, offsets);
+        } else {
+            offsets = NULL;
+        }
+
+        /* Input: const hsa_executable_symbol_t * syms */
+        hsa_executable_symbol_t *syms;
+        syms =
+            ((__call->syms) != (NULL)) ? (((const hsa_executable_symbol_t *)command_channel_get_buffer(__chan, __cmd,
+                    __call->syms))) : (__call->syms);
+        if (__call->syms != NULL) {
+            const size_t __size = ((size_t) n);
+            syms = (hsa_executable_symbol_t *) calloc(__size, sizeof(const hsa_executable_symbol_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, syms);
+            hsa_executable_symbol_t *__tmp_syms_0;
+            __tmp_syms_0 =
+                ((__call->syms) != (NULL)) ? (((const hsa_executable_symbol_t *)command_channel_get_buffer(__chan,
+                        __cmd, __call->syms))) : (__call->syms);
+            const size_t __syms_size_0 = (__size);
+            for (size_t __syms_index_0 = 0; __syms_index_0 < __syms_size_0; __syms_index_0++) {
+                const size_t ava_index = __syms_index_0;
+
+                hsa_executable_symbol_t *__syms_a_0;
+                __syms_a_0 = (syms) + __syms_index_0;
+
+                hsa_executable_symbol_t *__syms_b_0;
+                __syms_b_0 = (__tmp_syms_0) + __syms_index_0;
+
+                hsa_executable_symbol_t *ava_self;
+                ava_self = &*__syms_a_0;
+                uint64_t *__syms_a_1_handle;
+                __syms_a_1_handle = &(*__syms_a_0).handle;
+                uint64_t *__syms_b_1_handle;
+                __syms_b_1_handle = &(*__syms_b_0).handle;
+                *__syms_a_1_handle = *__syms_b_1_handle;
+                *__syms_a_1_handle = *__syms_b_1_handle;
+            }
+        } else {
+            syms = NULL;
+        }
+
+        /* Input: size_t pool_size */
+        size_t pool_size;
+        pool_size = __call->pool_size;
+        pool_size = __call->pool_size;
+
+        /* Input: hsa_symbol_kind_t * types */
+        hsa_symbol_kind_t *types;
+        types =
+            ((__call->types) != (NULL)) ? (((hsa_symbol_kind_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->types))) : (__call->types);
+        if (__call->types != NULL) {
+            const size_t __size = ((size_t) n);
+            types = (hsa_symbol_kind_t *) calloc(__size, sizeof(hsa_symbol_kind_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, types);
+        } else {
+            types = NULL;
+        }
+
+        /* Input: char * pool */
+        char *pool;
+        pool =
+            ((__call->pool) != (NULL)) ? (((char *)command_channel_get_buffer(__chan, __cmd,
+                    __call->pool))) : (__call->pool);
+        if (__call->pool != NULL) {
+            const size_t __size = ((size_t) pool_size);
+            pool = (char *)calloc(__size, sizeof(char));
+            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, pool);
+        } else {
+            pool = NULL;
+        }
+
+        /* Perform Call */
+        hipError_t ret;
+        ret = __wrapper___do_c_mass_symbol_info(n, offsets, syms, pool_size, types, pool);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+            /* Size: unsigned int * offsets */
+            if ((offsets) != (NULL) && (n) > (0)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (n) * sizeof(unsigned int));
+            }
+
+            /* Size: hsa_symbol_kind_t * types */
+            if ((types) != (NULL) && (n) > (0)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (n) * sizeof(hsa_symbol_kind_t));
+            }
+
+            /* Size: char * pool */
+            if ((pool) != (NULL) && (pool_size) > (0)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (pool_size) * sizeof(char));
+            }
+        }
+        struct hip___do_c_mass_symbol_info_ret *__ret =
+            (struct hip___do_c_mass_symbol_info_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip___do_c_mass_symbol_info_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP___DO_C_MASS_SYMBOL_INFO;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+        /* Output: unsigned int * offsets */
+        if ((offsets) != (NULL) && (n) > (0)) {
+            __ret->offsets =
+                (unsigned int *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, offsets,
+                (n) * sizeof(unsigned int));
+        } else {
+            __ret->offsets = NULL;
+        }
+
+        /* Output: hsa_symbol_kind_t * types */
+        if ((types) != (NULL) && (n) > (0)) {
+            __ret->types =
+                (hsa_symbol_kind_t *) command_channel_attach_buffer(__chan, (struct command_base *)__ret, types,
+                (n) * sizeof(hsa_symbol_kind_t));
+        } else {
+            __ret->types = NULL;
+        }
+
+        /* Output: char * pool */
+        if ((pool) != (NULL) && (pool_size) > (0)) {
+            __ret->pool =
+                (char *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, pool,
+                (pool_size) * sizeof(char));
+        } else {
+            __ret->pool = NULL;
+        }
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list___do_c_mass_symbol_info);    /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;

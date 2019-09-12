@@ -47,6 +47,23 @@ struct hash<hsa_isa_t> {
 
 namespace hip_impl {
 
+inline hipError_t get_mass_symbol_info(size_t n,
+                                const hsa_executable_symbol_t *symbols,
+                                hsa_symbol_kind_t *types,
+                                char **names, char *name_string_pool,
+                                size_t pool_size)
+{
+   hipError_t r;
+   vector<unsigned> offsets(n);
+   r = __do_c_mass_symbol_info(n, symbols, types, offsets.data(), name_string_pool, pool_size);
+
+   if (r == hipSuccess) {
+      for (unsigned i = 0; i < n; i++)
+         names[i] = name_string_pool + offsets[i];
+   }
+   return r;
+}
+
 inline hsa_symbol_kind_t type(hsa_executable_symbol_t x) {
     hsa_symbol_kind_t r = {};
     hsa_executable_symbol_get_info(x, HSA_EXECUTABLE_SYMBOL_INFO_TYPE, &r);
@@ -297,8 +314,19 @@ const unordered_map<string, vector<hsa_executable_symbol_t>>& kernels() {
                n_symbols = __do_c_get_kerenel_symbols(&executable,
                                                       &agent_executables.first,
                                                       symbols, MAX_SYMBOLS);
+               vector<char *> names(n_symbols);
+               vector<hsa_symbol_kind_t> types(n_symbols);
+               vector<char> name_string_pool(n_symbols * 256);
+
+               get_mass_symbol_info(n_symbols, symbols, types.data(),
+                                    names.data(), name_string_pool.data(),
+                                    name_string_pool.size());
+               /*
                for (auto s = symbols; s < symbols + n_symbols; s++)
                   if (type(*s) == HSA_SYMBOL_KIND_KERNEL) r[name(*s)].push_back(*s);
+                  */
+               for (unsigned i = 0; i < n_symbols; i++)
+                  if(types[i] == HSA_SYMBOL_KIND_KERNEL) r[string(names[i])].push_back(symbols[i]);
 
             }
         }
