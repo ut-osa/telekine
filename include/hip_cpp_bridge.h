@@ -59,7 +59,9 @@ size_t __do_c_get_kerenel_symbols(
 
 hipError_t
 __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *symbols,
-                        hsa_symbol_kind_t *types, unsigned *offsets, char *pool,
+                        hsa_symbol_kind_t *types, hipFunction_t *descriptors,
+                        uint8_t *agents, /* uint8 to ensure ava works properly */
+                        unsigned *offsets, char *pool,
                         size_t pool_size);
 
 hipError_t

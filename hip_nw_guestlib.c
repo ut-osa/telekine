@@ -2452,8 +2452,14 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
             size_t pool_size;
             pool_size = __local->pool_size;
 
+            uint8_t *agents;
+            agents = __local->agents;
+
             hsa_symbol_kind_t *types;
             types = __local->types;
+
+            hipFunction_t *descriptors;
+            descriptors = __local->descriptors;
 
             char *pool;
             pool = __local->pool;
@@ -2468,11 +2474,24 @@ __handle_command_hip(struct command_base *__cmd, int _chan_no)
                                 __ret->offsets))) : (__ret->offsets), (n) * sizeof(unsigned int));
             }
 
+            /* Output: uint8_t * agents */
+            if (__local->agents != NULL && __ret->agents != NULL) {
+                memcpy(__local->agents, ((__ret->agents) != (NULL)) ? (((uint8_t *) command_channel_get_buffer(__chan,
+                                __cmd, __ret->agents))) : (__ret->agents), (n * sizeof(agents)) * sizeof(uint8_t));
+            }
+
             /* Output: hsa_symbol_kind_t * types */
             if (__local->types != NULL && __ret->types != NULL) {
                 memcpy(__local->types,
                     ((__ret->types) != (NULL)) ? (((hsa_symbol_kind_t *) command_channel_get_buffer(__chan, __cmd,
                                 __ret->types))) : (__ret->types), (n) * sizeof(hsa_symbol_kind_t));
+            }
+
+            /* Output: hipFunction_t * descriptors */
+            if (__local->descriptors != NULL && __ret->descriptors != NULL) {
+                memcpy(__local->descriptors,
+                    ((__ret->descriptors) != (NULL)) ? (((hipFunction_t *) command_channel_get_buffer(__chan, __cmd,
+                                __ret->descriptors))) : (__ret->descriptors), (n) * sizeof(hipFunction_t));
             }
 
             /* Output: char * pool */
@@ -5939,7 +5958,7 @@ nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info * info)
 
 EXPORTED hipError_t
 __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t * syms, hsa_symbol_kind_t * types,
-    unsigned int *offsets, char *pool, size_t pool_size)
+    hipFunction_t * descriptors, uint8_t * agents, unsigned int *offsets, char *pool, size_t pool_size)
 {
     const int ava_is_in = 1,
         ava_is_out = 0;
@@ -6000,6 +6019,18 @@ __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t * syms, hsa_symb
         } else {
             __cmd->types = NULL;
         }
+        /* Input: hipFunction_t * descriptors */
+        if ((descriptors) != (NULL) && (n) > (0)) {
+            __cmd->descriptors = HAS_OUT_BUFFER_SENTINEL;
+        } else {
+            __cmd->descriptors = NULL;
+        }
+        /* Input: uint8_t * agents */
+        if ((agents) != (NULL) && (n * sizeof(agents)) > (0)) {
+            __cmd->agents = HAS_OUT_BUFFER_SENTINEL;
+        } else {
+            __cmd->agents = NULL;
+        }
         /* Input: unsigned int * offsets */
         if ((offsets) != (NULL) && (n) > (0)) {
             __cmd->offsets = HAS_OUT_BUFFER_SENTINEL;
@@ -6028,7 +6059,11 @@ __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t * syms, hsa_symb
 
     __call_record->pool_size = pool_size;
 
+    __call_record->agents = agents;
+
     __call_record->types = types;
+
+    __call_record->descriptors = descriptors;
 
     __call_record->pool = pool;
 

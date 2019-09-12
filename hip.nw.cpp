@@ -633,7 +633,8 @@ nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info *info)
 
 hipError_t
 __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *syms,
-                        hsa_symbol_kind_t *types, unsigned *offsets, char *pool,
+                        hsa_symbol_kind_t *types, hipFunction_t *descriptors,
+                        uint8_t * agents, unsigned *offsets, char *pool,
                         size_t pool_size)
 {
    ava_argument(syms) {
@@ -641,6 +642,13 @@ __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *syms,
    }
    ava_argument(types) {
       ava_out; ava_buffer(n);
+   }
+   ava_argument(descriptors) {
+      ava_out; ava_buffer(n);
+      ava_element { ava_opaque; }
+   }
+   ava_argument(agents) {
+      ava_out; ava_buffer(n * sizeof(agents));
    }
    ava_argument(offsets) {
       ava_out; ava_buffer(n);

@@ -50,12 +50,15 @@ namespace hip_impl {
 inline hipError_t get_mass_symbol_info(size_t n,
                                 const hsa_executable_symbol_t *symbols,
                                 hsa_symbol_kind_t *types,
+                                hipFunction_t *descriptors,
+                                hsa_agent_t *agents,
                                 char **names, char *name_string_pool,
                                 size_t pool_size)
 {
    hipError_t r;
    vector<unsigned> offsets(n);
-   r = __do_c_mass_symbol_info(n, symbols, types, offsets.data(), name_string_pool, pool_size);
+   r = __do_c_mass_symbol_info(n, symbols, types, descriptors, (uint8_t *)agents,
+                               offsets.data(), name_string_pool, pool_size);
 
    if (r == hipSuccess) {
       for (unsigned i = 0; i < n; i++)
@@ -301,8 +304,17 @@ const vector<pair<uintptr_t, string>>& function_names_for_process() {
 }
 
 #define MAX_SYMBOLS 4096
-const unordered_map<string, vector<hsa_executable_symbol_t>>& kernels() {
-    static unordered_map<string, vector<hsa_executable_symbol_t>> r;
+struct kernel_info {
+   hsa_executable_symbol_t symbol;
+   hipFunction_t descriptor;
+   hsa_agent_t  agent;
+
+   kernel_info(hsa_executable_symbol_t s, hipFunction_t f, hsa_agent_t a) :
+      symbol(s), descriptor(f), agent(a) {}
+};
+
+const unordered_map<string, vector<kernel_info>>& kernels() {
+    static unordered_map<string, vector<kernel_info>> r;
     static once_flag f;
 
     call_once(f, []() {
@@ -317,8 +329,13 @@ const unordered_map<string, vector<hsa_executable_symbol_t>>& kernels() {
                vector<char *> names(n_symbols);
                vector<hsa_symbol_kind_t> types(n_symbols);
                vector<char> name_string_pool(n_symbols * 256);
+               vector<hipFunction_t> descriptors(n_symbols);
+               vector<hsa_agent_t> agents(n_symbols);
+               for (unsigned i = 0; i < n_symbols; i++)
+                  agents[i].handle = -1;
 
                get_mass_symbol_info(n_symbols, symbols, types.data(),
+                                    descriptors.data(), agents.data(),
                                     names.data(), name_string_pool.data(),
                                     name_string_pool.size());
                /*
@@ -326,7 +343,8 @@ const unordered_map<string, vector<hsa_executable_symbol_t>>& kernels() {
                   if (type(*s) == HSA_SYMBOL_KIND_KERNEL) r[name(*s)].push_back(*s);
                   */
                for (unsigned i = 0; i < n_symbols; i++)
-                  if(types[i] == HSA_SYMBOL_KIND_KERNEL) r[string(names[i])].push_back(symbols[i]);
+                  if(types[i] == HSA_SYMBOL_KIND_KERNEL)
+                     r[string(names[i])].push_back(kernel_info(symbols[i], descriptors[i], agents[i]));
 
             }
         }
@@ -494,12 +512,14 @@ const unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>& functi
 
             if (it != kernels().cend()) {
                 for (auto&& kernel_symbol : it->second) {
+                /*
                     hipFunction_t func;
-                    __do_c_get_kernel_descriptor(&kernel_symbol, it->first.c_str(),
+                    __do_c_get_kernel_descriptor(&kernel_symbol.symbol, it->first.c_str(),
                                                  &func);
+                                                 */
                     r[function.first].emplace_back(
-                        agent(kernel_symbol),
-                        func);
+                        kernel_symbol.agent /*agent(kernel_symbol.symbol)*/,
+                        kernel_symbol.descriptor/* func */);
 #if 0
                         Kernel_descriptor{kernel_object(kernel_symbol), it->first});
 #endif

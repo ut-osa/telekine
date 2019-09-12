@@ -225,14 +225,17 @@ __do_c_get_kernel_descriptor(const hsa_executable_symbol_t *symbol,
 
 extern "C" hipError_t
 __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *syms,
-                        hsa_symbol_kind_t *types, unsigned *offsets, char *pool,
+                        hsa_symbol_kind_t *types, hipFunction_t *descriptors,
+                        uint8_t *_agents, unsigned *offsets, char *pool,
                         size_t pool_size)
 {
+   hsa_agent_t *agents = (hsa_agent_t *)_agents;
    char *pool_cursor = pool, *pool_end = pool + pool_size;
    for (unsigned i = 0; i < n; i++) {
       hsa_executable_symbol_get_info(syms[i],
                                      HSA_EXECUTABLE_SYMBOL_INFO_TYPE,
                                      &types[i]);
+      hsa_executable_symbol_get_info(syms[i], HSA_EXECUTABLE_SYMBOL_INFO_AGENT, &agents[i]);
       uint32_t name_sz = 0;
       hsa_executable_symbol_get_info(syms[i],
                                      HSA_EXECUTABLE_SYMBOL_INFO_NAME_LENGTH,
@@ -246,6 +249,15 @@ __do_c_mass_symbol_info(size_t n, const hsa_executable_symbol_t *syms,
                                      HSA_EXECUTABLE_SYMBOL_INFO_NAME,
                                      pool_cursor);
       pool_cursor[name_sz] = '\0';
+
+      if (types[i] == HSA_SYMBOL_KIND_KERNEL) {
+         /* these descriptors live for the whole life of the program anyway
+          * so just leak them for now
+          */
+         auto descriptor = new hip_impl::Kernel_descriptor(hip_impl::kernel_object(syms[i]), std::string(pool_cursor));
+         descriptors[i] = reinterpret_cast<hipFunction_t>(descriptor);
+      }
+
       offsets[i] = pool_cursor - pool;
       pool_cursor += name_sz + 1;
    }

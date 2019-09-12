@@ -983,11 +983,11 @@ __wrapper_nw_lookup_kern_info(hipFunction_t f, struct nw_kern_info *info)
 }
 
 static hipError_t
-__wrapper___do_c_mass_symbol_info(size_t n, unsigned int *offsets, const hsa_executable_symbol_t * syms,
-    size_t pool_size, hsa_symbol_kind_t * types, char *pool)
+__wrapper___do_c_mass_symbol_info(size_t n, size_t pool_size, uint8_t * agents, hsa_symbol_kind_t * types,
+    hipFunction_t * descriptors, const hsa_executable_symbol_t * syms, unsigned int *offsets, char *pool)
 {
     hipError_t ret;
-    ret = __do_c_mass_symbol_info(n, syms, types, offsets, pool, pool_size);
+    ret = __do_c_mass_symbol_info(n, syms, types, descriptors, agents, offsets, pool, pool_size);
 
     /* Report resources */
 
@@ -5600,6 +5600,50 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
             offsets = NULL;
         }
 
+        /* Input: size_t pool_size */
+        size_t pool_size;
+        pool_size = __call->pool_size;
+        pool_size = __call->pool_size;
+
+        /* Input: uint8_t * agents */
+        uint8_t *agents;
+        agents =
+            ((__call->agents) != (NULL)) ? (((uint8_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->agents))) : (__call->agents);
+        if (__call->agents != NULL) {
+            const size_t __size = ((size_t) n * sizeof(agents));
+            agents = (uint8_t *) calloc(__size, sizeof(uint8_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, agents);
+        } else {
+            agents = NULL;
+        }
+
+        /* Input: hsa_symbol_kind_t * types */
+        hsa_symbol_kind_t *types;
+        types =
+            ((__call->types) != (NULL)) ? (((hsa_symbol_kind_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->types))) : (__call->types);
+        if (__call->types != NULL) {
+            const size_t __size = ((size_t) n);
+            types = (hsa_symbol_kind_t *) calloc(__size, sizeof(hsa_symbol_kind_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, types);
+        } else {
+            types = NULL;
+        }
+
+        /* Input: hipFunction_t * descriptors */
+        hipFunction_t *descriptors;
+        descriptors =
+            ((__call->descriptors) != (NULL)) ? (((hipFunction_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->descriptors))) : (__call->descriptors);
+        if (__call->descriptors != NULL) {
+            const size_t __size = ((size_t) n);
+            descriptors = (hipFunction_t *) calloc(__size, sizeof(hipFunction_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, descriptors);
+        } else {
+            descriptors = NULL;
+        }
+
         /* Input: const hsa_executable_symbol_t * syms */
         hsa_executable_symbol_t *syms;
         syms =
@@ -5636,24 +5680,6 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
             syms = NULL;
         }
 
-        /* Input: size_t pool_size */
-        size_t pool_size;
-        pool_size = __call->pool_size;
-        pool_size = __call->pool_size;
-
-        /* Input: hsa_symbol_kind_t * types */
-        hsa_symbol_kind_t *types;
-        types =
-            ((__call->types) != (NULL)) ? (((hsa_symbol_kind_t *) command_channel_get_buffer(__chan, __cmd,
-                    __call->types))) : (__call->types);
-        if (__call->types != NULL) {
-            const size_t __size = ((size_t) n);
-            types = (hsa_symbol_kind_t *) calloc(__size, sizeof(hsa_symbol_kind_t));
-            g_ptr_array_add(__ava_alloc_list___do_c_mass_symbol_info, types);
-        } else {
-            types = NULL;
-        }
-
         /* Input: char * pool */
         char *pool;
         pool =
@@ -5669,7 +5695,7 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
 
         /* Perform Call */
         hipError_t ret;
-        ret = __wrapper___do_c_mass_symbol_info(n, offsets, syms, pool_size, types, pool);
+        ret = __wrapper___do_c_mass_symbol_info(n, pool_size, agents, types, descriptors, syms, offsets, pool);
 
         ava_is_in = 0;
         ava_is_out = 1;
@@ -5679,9 +5705,19 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
                 __total_buffer_size += command_channel_buffer_size(__chan, (n) * sizeof(unsigned int));
             }
 
+            /* Size: uint8_t * agents */
+            if ((agents) != (NULL) && (n * sizeof(agents)) > (0)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (n * sizeof(agents)) * sizeof(uint8_t));
+            }
+
             /* Size: hsa_symbol_kind_t * types */
             if ((types) != (NULL) && (n) > (0)) {
                 __total_buffer_size += command_channel_buffer_size(__chan, (n) * sizeof(hsa_symbol_kind_t));
+            }
+
+            /* Size: hipFunction_t * descriptors */
+            if ((descriptors) != (NULL) && (n) > (0)) {
+                __total_buffer_size += command_channel_buffer_size(__chan, (n) * sizeof(hipFunction_t));
             }
 
             /* Size: char * pool */
@@ -5708,6 +5744,15 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
             __ret->offsets = NULL;
         }
 
+        /* Output: uint8_t * agents */
+        if ((agents) != (NULL) && (n * sizeof(agents)) > (0)) {
+            __ret->agents =
+                (uint8_t *) command_channel_attach_buffer(__chan, (struct command_base *)__ret, agents,
+                (n * sizeof(agents)) * sizeof(uint8_t));
+        } else {
+            __ret->agents = NULL;
+        }
+
         /* Output: hsa_symbol_kind_t * types */
         if ((types) != (NULL) && (n) > (0)) {
             __ret->types =
@@ -5715,6 +5760,15 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
                 (n) * sizeof(hsa_symbol_kind_t));
         } else {
             __ret->types = NULL;
+        }
+
+        /* Output: hipFunction_t * descriptors */
+        if ((descriptors) != (NULL) && (n) > (0)) {
+            __ret->descriptors =
+                (hipFunction_t *) command_channel_attach_buffer(__chan, (struct command_base *)__ret, descriptors,
+                (n) * sizeof(hipFunction_t));
+        } else {
+            __ret->descriptors = NULL;
         }
 
         /* Output: char * pool */

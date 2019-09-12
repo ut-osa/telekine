@@ -1294,7 +1294,9 @@ struct hip___do_c_mass_symbol_info_call {
     unsigned int *offsets;
     hsa_executable_symbol_t *syms;
     size_t pool_size;
+    uint8_t *agents;
     hsa_symbol_kind_t *types;
+    hipFunction_t *descriptors;
     char *pool;
 };
 
@@ -1302,7 +1304,9 @@ struct hip___do_c_mass_symbol_info_ret {
     struct command_base base;
     intptr_t __call_id;
     unsigned int *offsets;
+    uint8_t *agents;
     hsa_symbol_kind_t *types;
+    hipFunction_t *descriptors;
     char *pool;
     hipError_t ret;
 };
@@ -1312,7 +1316,9 @@ struct hip___do_c_mass_symbol_info_call_record {
     unsigned int *offsets;
     hsa_executable_symbol_t *syms;
     size_t pool_size;
+    uint8_t *agents;
     hsa_symbol_kind_t *types;
+    hipFunction_t *descriptors;
     char *pool;
     hipError_t ret;
     char __handler_deallocate;
