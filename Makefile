@@ -36,7 +36,7 @@ CXXFLAGS = $(CFLAGS) -std=c++14 -Wno-ignored-attributes -Wno-deprecated-declarat
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) copy copy2 worker libguestlib.so guestshim.so manager
+all: $(EXECUTABLE) copy copy2 worker worker_reverse_socket libguestlib.so guestshim.so manager
 .PHONY: all
 
 GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
@@ -49,11 +49,19 @@ WORKER_SOURCES = hip_nw_worker.c \
 					  $(addprefix nw/common/,cmd_channel_shm_worker.c \
 					                         cmd_channel_min_worker.c \
 													 cmd_channel_socket_worker.c)
+WORKER_REVERSE_SOCKET_SOURCES = hip_nw_worker.c \
+					  $(addprefix nw/worker/,worker_reverse_socket.c) \
+					  $(addprefix nw/common/,cmd_channel_shm_worker.c \
+					                         cmd_channel_min_worker.c \
+													 cmd_channel_socket_worker.c)
 GUESTLIB_SOURCES = hip_nw_guestlib.c $(addprefix nw/guestlib/src/,init.c) \
 						 $(addprefix nw/common/,cmd_channel_shm.c cmd_channel_min.c \
 													   cmd_channel_socket.c)
 
 worker: $(GENERAL_SOURCES) $(WORKER_SOURCES) hip_cpp_bridge.o
+	$(CC) -O3 -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -lssl -lcrypto -o $@
+
+worker_reverse_socket: $(GENERAL_SOURCES) $(WORKER_REVERSE_SOCKET_SOURCES) hip_cpp_bridge.o
 	$(CC) -O3 -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -lssl -lcrypto -o $@
 
 libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)

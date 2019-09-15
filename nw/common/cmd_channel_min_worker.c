@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <netdb.h>
 
 static int ssl_enabled_impl(void)
 {
@@ -332,6 +333,61 @@ struct command_channel* command_channel_min_worker_new(int dummy1, int rt_type, 
         chan->ssl_ctx = create_ssl_server_context(cert_file, key_file);
         chan->ssl = create_ssl_session(chan->ssl_ctx, chan->guestlib_fd);
         ssl_accept(chan->ssl);
+    }
+    pthread_mutex_init(&chan->send_mutex, NULL);
+
+    return (struct command_channel *)chan;
+}
+
+struct command_channel* command_channel_min_worker_new_reverse_socket(const char* remote, int port)
+{
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+    struct command_channel_min *chan = (struct command_channel_min *)malloc(sizeof(struct command_channel_min));
+    command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
+    chan->init_command_type = 0;
+
+    struct addrinfo *result, *rp;
+    struct addrinfo hints = {
+       .ai_family = AF_INET,
+       .ai_socktype = SOCK_STREAM,
+    };
+
+    fprintf(stderr, "Start command_channel_min_worker_new_reverse_socket\n");
+
+    char port_buf[128];
+    sprintf(port_buf, "%d", port);
+    if (getaddrinfo(remote, port_buf, &hints, &result)) {
+       perror(remote);
+       abort();
+    }
+
+    int sock_fd;
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+       sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+       if (sock_fd == -1)
+          continue;
+       if (connect(sock_fd, rp->ai_addr, rp->ai_addrlen) != -1)
+          break;
+       close(sock_fd);
+    }
+    if (rp == NULL) {
+       fprintf(stderr, "%s:%d couldn't connect!\n", __FILE__, __LINE__);
+       abort();
+    }
+
+    chan->listen_fd = -1;
+    chan->guestlib_fd = sock_fd;
+
+    chan->pfd.fd = chan->guestlib_fd;
+    chan->pfd.events = POLLIN | POLLRDHUP;
+
+    if (ssl_enabled()) {
+        fprintf(stderr, "Init SSL connection\n");
+        init_ssl();
+        chan->ssl_ctx = create_ssl_client_context();
+        chan->ssl = create_ssl_session(chan->ssl_ctx, chan->guestlib_fd);
+        ssl_connect(chan->ssl);
     }
     pthread_mutex_init(&chan->send_mutex, NULL);
 
