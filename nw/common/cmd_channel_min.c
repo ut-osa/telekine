@@ -238,6 +238,69 @@ struct command_channel* command_channel_min_new(int chan_no)
     struct command_channel_min *chan = (struct command_channel_min *)malloc(sizeof(struct command_channel_min));
     command_channel_preinitialize((struct command_channel *)chan, &command_channel_min_vtable);
 
+    if (getenv("AVA_REVERSE_SOCKET") && atoi(getenv("AVA_REVERSE_SOCKET")) == 1) {
+        fprintf(stderr, "Reverse socket enabled\n");
+        if (chan_no == 0) {
+            const char *ava_port = getenv("AVA_PORT");
+            if (!ava_port) ava_port = "4000";
+            worker_port = atoi(ava_port);
+        }
+        struct sockaddr_in address;
+        int addrlen = sizeof(address);
+        int sock_opt = 1;
+        int opt;
+        int listen_fd;
+        if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+            perror("socket");
+            abort();
+        }
+        // Forcefully attaching socket to the port 4000
+        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &sock_opt, sizeof(sock_opt))) {
+            perror("setsockopt");
+            abort();
+        }
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = INADDR_ANY;
+        address.sin_port = htons( worker_port );
+
+        if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address))<0) {
+            perror("bind failed");
+            abort();
+        }
+        if (listen(listen_fd, 10) < 0) {
+            perror("listen");
+            abort();
+        }
+
+        int fd = accept(listen_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen);
+        if (fd < 0) {
+            perror("accept failed");
+            abort();
+        }
+
+        chan->sock_fd = fd;
+        chan->pfd.fd = chan->sock_fd;
+        chan->pfd.events = POLLIN | POLLRDHUP;
+        worker_port += CHANNEL_OFFSET;
+
+        if (ssl_enabled()) {
+            fprintf(stderr, "Init SSL connection\n");
+            init_ssl();
+            const char* cert_file = getenv("AVA_SSL_CERT_FILE");
+            const char* key_file = getenv("AVA_SSL_KEY_FILE");
+            if (cert_file == NULL || key_file == NULL) {
+                fprintf(stderr, "Empty AVA_SSL_CERT_FILE or AVA_SSL_KEY_FILE!\n");
+                abort();
+            }
+            chan->ssl_ctx = create_ssl_server_context(cert_file, key_file);
+            chan->ssl = create_ssl_session(chan->ssl_ctx, chan->sock_fd);
+            ssl_accept(chan->ssl);
+        }
+        pthread_mutex_init(&chan->send_mutex, NULL);
+
+        return (struct command_channel *)chan;
+    }
+
     /* connect manager to get worker port */
     int ret;
     int manager_fd;

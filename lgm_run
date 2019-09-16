@@ -52,7 +52,10 @@ extra_client_env = {
 
 def ava_env_client():
     new_env = dict(os.environ)
-    new_env['AVA_IP'] = ava_ip
+    if ava_reverse_socket:
+        new_env['AVA_REVERSE_SOCKET'] = '1'
+    else:
+        new_env['AVA_IP'] = ava_ip
     new_env['AVA_PORT'] = str(ava_port)
     new_env.update(extra_client_env)
     return new_env
@@ -67,6 +70,7 @@ click_option = functools.partial(click.option, show_default=True)
 @click.argument('test-cmd', nargs=-1)
 @click_option('--server', default="localhost")
 @click_option('--server-port', type=int, default=4000)
+@click_option('--reverse-socket', is_flag=True)
 @click_option('--enable-ssl', is_flag=True)
 @click_option('--gpu-op-batch-size', default=32)
 @click_option('--gpu-op-batching/--no-gpu-op-batching', default=False)
@@ -77,13 +81,14 @@ click_option = functools.partial(click.option, show_default=True)
 @click_option('--kernel-fr-interval-us', type=int, help="if not set, kernel launches are not fixed rated")
 @click_option('--memcpy-fr-interval-us', type=int, help="if not set, memcpys are not fixed rated")
 @click_option('--hip-memcpy-n-staging-buffers', type=int, help="specify number of staging buffers (default 256)")
-def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, gpu_op_batch_size,
+def main(run_type, test_cmd, server, server_port, reverse_socket, enable_ssl, gpu_op_batching, gpu_op_batch_size,
          hip_memcpy_fixed_size, hip_memcpy_encrypted, gpu_op_sep_memcpy,
          hip_check_complete, kernel_fr_interval_us, memcpy_fr_interval_us,
          hip_memcpy_n_staging_buffers, exec_xfer_stream, data_encryption,
          data_obv_scheduling, batching):
     global ava_ip
     global ava_port
+    global ava_reverse_socket
 
     if data_obv_scheduling:
         data_encryption = True
@@ -104,8 +109,12 @@ def main(run_type, test_cmd, server, server_port, enable_ssl, gpu_op_batching, g
     if len(test_cmd) == 0:
         print("no command given exiting!")
         sys.exit(1)
-    if server:
-        ava_ip = server
+    if reverse_socket:
+        ava_reverse_socket = True
+    else:
+        ava_reverse_socket = False
+        if server:
+            ava_ip = server
     ava_port = server_port
     if enable_ssl:
         print("SSL on")
