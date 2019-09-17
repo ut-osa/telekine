@@ -508,15 +508,19 @@ void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t 
    // we need fixed size buffers because we have this statically allocated ciphertext buffer
    lgm::CPUEncrypt(ciphertext, src, sizeBytes, *h2d_encryption_state.get());
    h2d_encryption_state->nextNonceCPU();
-   hipError_t err = nw_hipMemcpySync(in_stg_buf, ciphertext,
-      sizeBytes + crypto_aead_aes256gcm_ABYTES, kind, stream);
-   assert(err == hipSuccess);
-   hip_launch_batch_t batch;
+
+   hip_launch_memcpy_batch_t batch;
+
+   batch.src = in_stg_buf;
+   batch.dst = ciphertext;
+   batch.sizeBytes = sizeBytes + crypto_aead_aes256gcm_ABYTES;
+   batch.kind = kind;
+
    lgm::DecryptAsync(&batch, dst, in_stg_buf, sizeBytes + crypto_aead_aes256gcm_ABYTES, stream,
            *h2d_encryption_state.get());
    h2d_encryption_state->nextNonceGPU(&batch, stream);
    hipLaunchAddToBatch(&batch, set_tag, dim3(1), dim3(1), 0, stream, BUF_TAG(dst), tag);
-   hipLaunchBatchNOW(&batch, stream);
+   hipLaunchMemcpyBatchNOW(&batch, stream);
 }
 
 void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t sizeBytes,

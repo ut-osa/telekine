@@ -542,6 +542,25 @@ __wrapper___do_c_hipHccModuleLaunchMultiKernel(int numKernels, size_t * extra_si
     return ret;
 }
 
+static hipError_t
+__wrapper___do_c_hipHccModuleLaunchMultiKernel_and_memcpy(int numKernels, hsa_kernel_dispatch_packet_t * aql,
+    size_t * extra_size, hipEvent_t * stop, hipStream_t stream, hipEvent_t * start, size_t total_extra_size,
+    size_t sizeBytes, char *all_extra, hipMemcpyKind kind, void *dst, const void *src)
+{
+    hipError_t ret;
+    ret =
+        __do_c_hipHccModuleLaunchMultiKernel_and_memcpy(numKernels, aql, stream, all_extra, total_extra_size,
+        extra_size, start, stop, dst, src, sizeBytes, kind);
+
+    /* Report resources */
+
+#ifdef AVA_API_FUNCTION_CALL_RESOURCE
+    nw_report_throughput_resource_consumption("ava_api_function_call", 1);
+#endif
+
+    return ret;
+}
+
 static hsa_status_t
 __wrapper_nw_hsa_system_major_extension_supported(uint16_t extension, uint16_t version_major, uint16_t * version_minor,
     _Bool * result)
@@ -3056,6 +3075,273 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
 #endif
 
         g_ptr_array_unref(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel);       /* Deallocate all memory in the alloc list */
+        command_channel_free_command(__chan, (struct command_base *)__call);
+        command_channel_free_command(__chan, (struct command_base *)__ret);
+        break;
+    }
+    case CALL_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL_AND_MEMCPY:{
+        ava_is_in = 1;
+        ava_is_out = 0;
+        GPtrArray *__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy = g_ptr_array_new_full(0, free);
+        struct hip___do_c_hip_hcc_module_launch_multi_kernel_and_memcpy_call *__call =
+            (struct hip___do_c_hip_hcc_module_launch_multi_kernel_and_memcpy_call *)__cmd;
+        assert(__call->base.api_id == HIP_API);
+        assert(__call->base.command_size ==
+            sizeof(struct hip___do_c_hip_hcc_module_launch_multi_kernel_and_memcpy_call));
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Unpack and translate arguments */
+
+        /* Input: int numKernels */
+        int numKernels;
+        numKernels = __call->numKernels;
+        numKernels = __call->numKernels;
+
+        /* Input: hsa_kernel_dispatch_packet_t * aql */
+        hsa_kernel_dispatch_packet_t *aql;
+        aql =
+            ((__call->aql) != (NULL)) ? (((hsa_kernel_dispatch_packet_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->aql))) : (__call->aql);
+        if (__call->aql != NULL) {
+            const size_t __size = ((size_t) numKernels);
+            aql = (hsa_kernel_dispatch_packet_t *) calloc(__size, sizeof(hsa_kernel_dispatch_packet_t));
+            g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy, aql);
+            hsa_kernel_dispatch_packet_t *__tmp_aql_0;
+            __tmp_aql_0 =
+                ((__call->aql) != (NULL)) ? (((hsa_kernel_dispatch_packet_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->aql))) : (__call->aql);
+            memcpy(aql, __tmp_aql_0, sizeof(hsa_kernel_dispatch_packet_t) * __size);
+        } else {
+            aql = NULL;
+        }
+
+        /* Input: size_t * extra_size */
+        size_t *extra_size;
+        extra_size =
+            ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->extra_size))) : (__call->extra_size);
+        if (__call->extra_size != NULL)
+            extra_size =
+                ((__call->extra_size) != (NULL)) ? (((size_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->extra_size))) : (__call->extra_size);
+        else
+            extra_size = NULL;
+
+        /* Input: hipEvent_t * stop */
+        hipEvent_t *stop;
+        stop =
+            ((__call->stop) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->stop))) : (__call->stop);
+        if (__call->stop != NULL)
+            stop =
+                ((__call->stop) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->stop))) : (__call->stop);
+        else
+            stop = NULL;
+
+        /* Input: hipStream_t stream */
+        hipStream_t stream;
+        stream = __call->stream;
+        stream = __call->stream;
+
+        /* Input: hipEvent_t * start */
+        hipEvent_t *start;
+        start =
+            ((__call->start) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                    __call->start))) : (__call->start);
+        if (__call->start != NULL)
+            start =
+                ((__call->start) != (NULL)) ? (((hipEvent_t *) command_channel_get_buffer(__chan, __cmd,
+                        __call->start))) : (__call->start);
+        else
+            start = NULL;
+
+        /* Input: size_t total_extra_size */
+        size_t total_extra_size;
+        total_extra_size = __call->total_extra_size;
+        total_extra_size = __call->total_extra_size;
+
+        /* Input: size_t sizeBytes */
+        size_t sizeBytes;
+        sizeBytes = __call->sizeBytes;
+        sizeBytes = __call->sizeBytes;
+
+        /* Input: char * all_extra */
+        char *all_extra;
+        all_extra =
+            ((__call->all_extra) != (NULL)) ? (((char *)command_channel_get_buffer(__chan, __cmd,
+                    __call->all_extra))) : (__call->all_extra);
+        if (__call->all_extra != NULL)
+            all_extra =
+                ((__call->all_extra) != (NULL)) ? (((char *)command_channel_get_buffer(__chan, __cmd,
+                        __call->all_extra))) : (__call->all_extra);
+        else
+            all_extra = NULL;
+
+        /* Input: hipMemcpyKind kind */
+        hipMemcpyKind kind;
+        kind = __call->kind;
+        kind = __call->kind;
+
+        /* Input: void * dst */
+        void *dst;
+        dst = (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && (__call->dst) != (NULL)) ? (((void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->dst))) : (__call->dst);
+        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+            if (__call->dst != NULL) {
+                const size_t __size = ((size_t) (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0));
+                dst = (void *)calloc(__size, sizeof(void));
+                g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy, dst);
+            } else {
+                dst = NULL;
+            }
+        } else {
+            dst = __call->dst;
+        }
+
+        /* Input: const void * src */
+        void *src;
+        src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                    __call->src))) : (__call->src);
+        if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+            && kind == hipMemcpyHostToDevice) {
+            if (__call->src != NULL)
+                src = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+                    && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                            __call->src))) : (__call->src);
+            else
+                src = NULL;
+        } else {
+            if (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (__call->src != NULL) {
+                    const size_t __size = ((size_t) (kind == hipMemcpyHostToDevice) ? (sizeBytes) : (0));
+                    src = (void *)calloc(__size, sizeof(const void));
+                    g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy, src);
+                    if (kind == hipMemcpyHostToDevice) {
+                        void *__tmp_src_0;
+                        __tmp_src_0 = (((kind == hipMemcpyHostToDevice) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)
+                            && (__call->src) != (NULL)) ? (((const void *)command_channel_get_buffer(__chan, __cmd,
+                                    __call->src))) : (__call->src);
+                        const size_t __src_size_0 = (__size);
+                        for (size_t __src_index_0 = 0; __src_index_0 < __src_size_0; __src_index_0++) {
+                            const size_t ava_index = __src_index_0;
+
+                            char *__src_a_0;
+                            __src_a_0 = (src) + __src_index_0;
+
+                            char *__src_b_0;
+                            __src_b_0 = (__tmp_src_0) + __src_index_0;
+
+                            *__src_a_0 = *__src_b_0;
+                            *__src_a_0 = *__src_b_0;
+                    }}
+                } else {
+                    src = NULL;
+                }
+            } else {
+                src = __call->src;
+            }
+        }
+
+        /* Perform Call */
+        hipError_t ret;
+        ret =
+            __wrapper___do_c_hipHccModuleLaunchMultiKernel_and_memcpy(numKernels, aql, extra_size, stop, stream, start,
+            total_extra_size, sizeBytes, all_extra, kind, dst, src);
+
+        ava_is_in = 0;
+        ava_is_out = 1;
+        size_t __total_buffer_size = 0; {
+            /* Size: void * dst */
+            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                    __total_buffer_size +=
+                        command_channel_buffer_size(__chan,
+                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                }
+            } else {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                    if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                        && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                        __total_buffer_size +=
+                            command_channel_buffer_size(__chan,
+                            ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                    }
+                }
+        }}
+        struct hip___do_c_hip_hcc_module_launch_multi_kernel_and_memcpy_ret *__ret =
+            (struct hip___do_c_hip_hcc_module_launch_multi_kernel_and_memcpy_ret *)command_channel_new_command(__chan,
+            sizeof(struct hip___do_c_hip_hcc_module_launch_multi_kernel_and_memcpy_ret), __total_buffer_size);
+        __ret->base.api_id = HIP_API;
+        __ret->base.command_id = RET_HIP___DO_C_HIP_HCC_MODULE_LAUNCH_MULTI_KERNEL_AND_MEMCPY;
+        __ret->__call_id = __call->__call_id;
+
+        /* Output: hipError_t ret */
+        __ret->ret = ret;
+
+        /* Output: void * dst */
+        if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+            if (kind == hipMemcpyDeviceToHost
+                && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                __ret->dst =
+                    (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, dst,
+                    ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+            } else {
+                __ret->dst = NULL;
+            }
+        } else {
+            if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER)) {
+                if (kind == hipMemcpyDeviceToHost
+                    && ((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_BUFFER) && (dst) != (NULL)
+                    && ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) > (0)) {
+                    const size_t __size = (kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0);
+                    void *__tmp_dst_0;
+                    __tmp_dst_0 = (void *)calloc(__size, sizeof(void));
+                    g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy, __tmp_dst_0);
+                    const size_t __dst_size_0 = (__size);
+                    for (size_t __dst_index_0 = 0; __dst_index_0 < __dst_size_0; __dst_index_0++) {
+                        const size_t ava_index = __dst_index_0;
+
+                        char *__dst_a_0;
+                        __dst_a_0 = (__tmp_dst_0) + __dst_index_0;
+
+                        char *__dst_b_0;
+                        __dst_b_0 = (dst) + __dst_index_0;
+
+                        *__dst_a_0 = *__dst_b_0;
+                    }
+                    __ret->dst =
+                        (void *)command_channel_attach_buffer(__chan, (struct command_base *)__ret, __tmp_dst_0,
+                        ((kind == hipMemcpyDeviceToHost) ? (sizeBytes) : (0)) * sizeof(void));
+                } else {
+                    __ret->dst = NULL;
+                }
+            } else {
+                if (((kind == hipMemcpyDeviceToHost) ? (NW_BUFFER) : (NW_OPAQUE)) == (NW_OPAQUE)) {
+                    __ret->dst = dst;
+                }
+            }
+        }
+
+#ifdef AVA_RECORD_REPLAY
+
+#endif
+
+        /* Send reply message */
+        command_channel_send_command(__chan, (struct command_base *)__ret);
+
+#ifdef AVA_RECORD_REPLAY
+        /* Record call in object metadata */
+
+#endif
+
+        g_ptr_array_unref(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy);    /* Deallocate all memory in the alloc list */
         command_channel_free_command(__chan, (struct command_base *)__call);
         command_channel_free_command(__chan, (struct command_base *)__ret);
         break;

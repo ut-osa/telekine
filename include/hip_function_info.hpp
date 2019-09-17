@@ -43,6 +43,13 @@ struct hip_launch_batch_t {
     std::vector<char> all_kernarg;
 };
 
+struct hip_launch_memcpy_batch_t: public hip_launch_batch_t{
+    void *dst;
+    void *src;
+    size_t sizeBytes;
+    hipMemcpyKind kind;
+};
+
 /* TODO double check this .... */
 #define DIM3_TO_AQL(blocks, threads) \
    (blocks.x * threads.x), (threads.y * blocks.y), (threads.z * blocks.z), \
@@ -92,6 +99,21 @@ inline void hipLaunchBatchNOW(hip_launch_batch_t* batch, hipStream_t stream)
         n_kernels, batch->aqls.data(), stream,
         batch->all_kernarg.data(), batch->all_kernarg.size(),
         batch->kernarg_sizes.data(), null_events.data(), null_events.data());
+}
+
+inline void hipLaunchMemcpyBatchNOW(hip_launch_memcpy_batch_t* batch, hipStream_t stream)
+{
+    int n_kernels = batch->aqls.size();
+    std::vector<hipEvent_t> null_events;
+    for (int i = 0; i < n_kernels; i++) {
+        null_events.push_back(nullptr);
+    }
+
+    __do_c_hipHccModuleLaunchMultiKernel_and_memcpy(
+        n_kernels, batch->aqls.data(), stream,
+        batch->all_kernarg.data(), batch->all_kernarg.size(),
+        batch->kernarg_sizes.data(), null_events.data(), null_events.data(),
+        batch->dst, batch->src, batch->sizeBytes, batch->kind);
 }
 
 

@@ -423,6 +423,24 @@ __do_c_hipHccModuleLaunchMultiKernel(
    return hipSuccess;
 }
 
+hipError_t
+__do_c_hipHccModuleLaunchMultiKernel_and_memcpy(
+      int numKernels, hsa_kernel_dispatch_packet_t *aql,
+      hipStream_t stream,
+      char* all_extra, size_t total_extra_size, size_t* extra_size,
+      hipEvent_t *start, hipEvent_t *stop,
+      void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
+{
+   hipError_t ret;
+
+   ret = nw_hipMemcpySync(dst, src, sizeBytes, kind, stream);
+   if (ret != hipSuccess)
+      return ret;
+
+   return __do_c_hipHccModuleLaunchMultiKernel(numKernels, aql, stream,
+                     all_extra, total_extra_size, extra_size, start, stop);
+}
+
 extern "C"
 hsa_status_t HSA_API nw_hsa_executable_create_alt(
     hsa_profile_t profile,

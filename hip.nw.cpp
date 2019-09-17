@@ -294,6 +294,58 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels,
    }
 }
 
+hipError_t
+__do_c_hipHccModuleLaunchMultiKernel_and_memcpy(
+      int numKernels, hsa_kernel_dispatch_packet_t *aql,
+      hipStream_t stream,
+      char* all_extra, size_t total_extra_size, size_t* extra_size,
+      hipEvent_t *start, hipEvent_t *stop,
+      void *dst, const void *src, size_t sizeBytes, hipMemcpyKind kind)
+{
+   ava_argument(aql) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(stream) {
+      ava_opaque;
+   }
+   ava_argument(all_extra) {
+      ava_in; ava_buffer(total_extra_size);
+   }
+   ava_argument(extra_size) {
+      ava_in; ava_buffer(numKernels);
+   }
+   ava_argument(start) {
+      ava_in; ava_buffer(numKernels);
+      ava_element {
+         ava_opaque;
+      }
+   }
+   ava_argument(stop) {
+      ava_in; ava_buffer(numKernels);
+      ava_element {
+         ava_opaque;
+      }
+   }
+   ava_argument(dst) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyDeviceToHost) {
+         ava_out;
+         ava_buffer(sizeBytes);
+      } else {
+         ava_opaque;
+      }
+   }
+   ava_argument(src) {
+      ava_depends_on(kind);
+      if (kind == hipMemcpyHostToDevice) {
+         ava_in;
+         ava_buffer(sizeBytes);
+      } else {
+         ava_opaque;
+      }
+   }
+}
+
 hsa_status_t
 HSA_API nw_hsa_system_major_extension_supported(
       uint16_t extension,
