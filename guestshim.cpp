@@ -511,8 +511,8 @@ void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t 
 
    hip_launch_memcpy_batch_t batch;
 
-   batch.src = in_stg_buf;
-   batch.dst = ciphertext;
+   batch.dst = in_stg_buf;
+   batch.src = ciphertext;
    batch.sizeBytes = sizeBytes + crypto_aead_aes256gcm_ABYTES;
    batch.kind = hipMemcpyHostToDevice;
 
@@ -540,8 +540,8 @@ void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t 
         sizeBytes + crypto_aead_aes256gcm_ABYTES, hipMemcpyDeviceToHost, stream);
         */
 
-   batch.src = ciphertext;
-   batch.dst = encrypt_out_buf;
+   batch.dst = ciphertext;
+   batch.src = encrypt_out_buf;
    batch.sizeBytes = sizeBytes + crypto_aead_aes256gcm_ABYTES;
    batch.kind = hipMemcpyDeviceToHost;
 
