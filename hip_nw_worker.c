@@ -3112,7 +3112,17 @@ __handle_command_hip(struct command_base *__cmd, int chan_no)
             __tmp_aql_0 =
                 ((__call->aql) != (NULL)) ? (((hsa_kernel_dispatch_packet_t *) command_channel_get_buffer(__chan, __cmd,
                         __call->aql))) : (__call->aql);
-            memcpy(aql, __tmp_aql_0, sizeof(hsa_kernel_dispatch_packet_t) * __size);
+            const size_t __aql_size_0 = (__size);
+            for (size_t __aql_index_0 = 0; __aql_index_0 < __aql_size_0; __aql_index_0++) {
+                const size_t ava_index = __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_a_0;
+                __aql_a_0 = (aql) + __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_b_0;
+                __aql_b_0 = (__tmp_aql_0) + __aql_index_0;
+                memcpy(__aql_a_0, __aql_b_0, sizeof(hsa_kernel_dispatch_packet_t));
+            }
         } else {
             aql = NULL;
         }

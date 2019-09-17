@@ -4137,7 +4137,17 @@ __do_c_hipHccModuleLaunchMultiKernel(int numKernels, hsa_kernel_dispatch_packet_
             __tmp_aql_0 =
                 (hsa_kernel_dispatch_packet_t *) calloc(1, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
             g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel, __tmp_aql_0);
-            memcpy(__tmp_aql_0, aql, sizeof(hsa_kernel_dispatch_packet_t) * numKernels);
+            const size_t __aql_size_0 = (numKernels);
+            for (size_t __aql_index_0 = 0; __aql_index_0 < __aql_size_0; __aql_index_0++) {
+                const size_t ava_index = __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_a_0;
+                __aql_a_0 = (aql) + __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_b_0;
+                __aql_b_0 = (__tmp_aql_0) + __aql_index_0;
+                memcpy(__aql_b_0, __aql_a_0, sizeof(hsa_kernel_dispatch_packet_t));
+            }
             __cmd->aql =
                 (hsa_kernel_dispatch_packet_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd,
                 __tmp_aql_0, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
@@ -4306,7 +4316,17 @@ __do_c_hipHccModuleLaunchMultiKernel_and_memcpy(int numKernels, hsa_kernel_dispa
             __tmp_aql_0 =
                 (hsa_kernel_dispatch_packet_t *) calloc(1, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
             g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy, __tmp_aql_0);
-            memcpy(__tmp_aql_0, aql, sizeof(hsa_kernel_dispatch_packet_t) * numKernels);
+            const size_t __aql_size_0 = (numKernels);
+            for (size_t __aql_index_0 = 0; __aql_index_0 < __aql_size_0; __aql_index_0++) {
+                const size_t ava_index = __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_a_0;
+                __aql_a_0 = (aql) + __aql_index_0;
+
+                hsa_kernel_dispatch_packet_t *__aql_b_0;
+                __aql_b_0 = (__tmp_aql_0) + __aql_index_0;
+                memcpy(__aql_b_0, __aql_a_0, sizeof(hsa_kernel_dispatch_packet_t));
+            }
             __cmd->aql =
                 (hsa_kernel_dispatch_packet_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd,
                 __tmp_aql_0, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
