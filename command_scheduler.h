@@ -201,7 +201,7 @@ protected:
     void H2DMemcpyThread();
     void D2HMemcpyThread();
     void do_next_h2d();
-    virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
+    virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag);
     void do_next_d2h();
     virtual void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
 
@@ -267,7 +267,7 @@ public:
                               int memcpy_fixed_rate_interval_us, size_t n_staging_buffers);
     ~EncryptedSepMemcpyCommandScheduler(void);
 protected:
-    void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
+    void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag) override;
     void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
 private:
     std::unique_ptr<lgm::EncryptionState> h2d_encryption_state;

@@ -425,10 +425,10 @@ void SepMemcpyCommandScheduler::do_next_h2d()
     pending_h2d_mutex_.unlock();
 
     // XXX overloaded by subclasses to add encryption, etc.
-    h2d(param.dst, param.src, FIXED_SIZE_FULL, param.kind, h2d_xfer_stream_);
+    h2d(param.dst, param.src, FIXED_SIZE_FULL, param.kind, h2d_xfer_stream_, param.tag);
 
-    hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, h2d_xfer_stream_,
-                 BUF_TAG(param.dst), param.tag);
+    // hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, h2d_xfer_stream_,
+                //  BUF_TAG(param.dst), param.tag);
     if (real_copy) {
        free((void *)param.src);
 
@@ -441,11 +441,12 @@ void SepMemcpyCommandScheduler::do_next_h2d()
 }
 
 void SepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes,
-        hipMemcpyKind kind, hipStream_t stream) {
+        hipMemcpyKind kind, hipStream_t stream, tag_t tag) {
    // XXX in_stg_buf is global for scheduler
    hipError_t ret(nw_hipMemcpySync(in_stg_buf, src, sizeBytes, kind, stream));
    assert(ret == hipSuccess);
    hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, stream, dst, in_stg_buf, sizeBytes);
+   hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, stream, BUF_TAG(dst), tag);
    // XXX check launch dimensions, for optimality 
 }
 
@@ -498,7 +499,7 @@ EncryptedSepMemcpyCommandScheduler::EncryptedSepMemcpyCommandScheduler(hipStream
 EncryptedSepMemcpyCommandScheduler::~EncryptedSepMemcpyCommandScheduler(void) {}
 
 void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes,
-        hipMemcpyKind kind, hipStream_t stream) {
+        hipMemcpyKind kind, hipStream_t stream, tag_t tag) {
    if (h2d_encryption_state == nullptr) {
        h2d_encryption_state.reset(new lgm::EncryptionState(stream));
    }
@@ -514,6 +515,7 @@ void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t 
    lgm::DecryptAsync(&batch, dst, in_stg_buf, sizeBytes + crypto_aead_aes256gcm_ABYTES, stream,
            *h2d_encryption_state.get());
    h2d_encryption_state->nextNonceGPU(&batch, stream);
+   hipLaunchAddToBatch(&batch, set_tag, dim3(1), dim3(1), 0, stream, BUF_TAG(dst), tag);
    hipLaunchBatchNOW(&batch, stream);
 }
 
@@ -647,6 +649,8 @@ void BatchCommandScheduler::ProcessThread() {
             }
         }
 
+        // if (params.size() > 0) fprintf(stderr, "%d real kernels\n", (int) params.size());
+
         std::vector<KernelLaunchParam> extra_kerns;
         add_extra_kernels(extra_kerns, params);
 
@@ -726,7 +730,10 @@ hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
 extern "C" hipError_t
 hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind,
                hipStream_t stream) {
-    return lgm::hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+    // fprintf(stderr, "Start hipMemcpyAsync (kind %d, size %d)\n", (int) kind, (int) sizeBytes);
+    hipError_t ret = lgm::hipMemcpyAsync(dst, src, sizeBytes, kind, stream);
+    // fprintf(stderr, "Finish hipMemcpyAsync (kind %d, size %d)\n", (int) kind, (int) sizeBytes);
+    return ret;
 }
 
 extern "C" hipError_t
@@ -739,7 +746,10 @@ hipMemcpyPeerAsync(void* dst, int dstDeviceId, const void* src, int srcDevice,
 extern "C" hipError_t
 hipMemcpy(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind)
 {
-    return lgm::hipMemcpy(dst, src, sizeBytes, kind);
+    // fprintf(stderr, "Start hipMemcpy (kind %d, size %d)\n", (int) kind, (int) sizeBytes);
+    hipError_t ret = lgm::hipMemcpy(dst, src, sizeBytes, kind);
+    // fprintf(stderr, "Finish hipMemcpy (kind %d, size %d)\n", (int) kind, (int) sizeBytes);
+    return ret;
 }
 
 extern "C" hipError_t
