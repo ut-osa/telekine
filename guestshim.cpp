@@ -514,7 +514,7 @@ void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t 
    batch.src = in_stg_buf;
    batch.dst = ciphertext;
    batch.sizeBytes = sizeBytes + crypto_aead_aes256gcm_ABYTES;
-   batch.kind = kind;
+   batch.kind = hipMemcpyHostToDevice;
 
    lgm::DecryptAsync(&batch, dst, in_stg_buf, sizeBytes + crypto_aead_aes256gcm_ABYTES, stream,
            *h2d_encryption_state.get());
@@ -530,15 +530,23 @@ void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t 
    }
    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
    assert(sizeBytes == FIXED_SIZE_FULL && "encryption needs fixed size buffers");
-   hip_launch_batch_t batch;
+   hip_launch_memcpy_batch_t batch;
    // we need fixed size buffers because we have this statically allocated ciphertext buffer
    gpu_snapshot_tagged_buf_on_batch(&batch, out_stg_buf, src, stream);
    lgm::EncryptAsync(&batch, encrypt_out_buf, out_stg_buf, sizeBytes, stream, *d2h_encryption_state.get());
    d2h_encryption_state->nextNonceGPU(&batch, stream);
-   hipLaunchBatchNOW(&batch, stream);
+   /*
    hipError_t err = nw_hipMemcpySync(ciphertext, encrypt_out_buf,
         sizeBytes + crypto_aead_aes256gcm_ABYTES, hipMemcpyDeviceToHost, stream);
-   assert(err == hipSuccess);
+        */
+
+   batch.src = ciphertext;
+   batch.dst = encrypt_out_buf;
+   batch.sizeBytes = sizeBytes + crypto_aead_aes256gcm_ABYTES;
+   batch.kind = hipMemcpyDeviceToHost;
+
+   hipLaunchMemcpyBatchNOW(&batch, stream);
+
    lgm::CPUDecrypt(dst, ciphertext, sizeBytes + crypto_aead_aes256gcm_ABYTES, *d2h_encryption_state.get());
    d2h_encryption_state->nextNonceCPU();
 }

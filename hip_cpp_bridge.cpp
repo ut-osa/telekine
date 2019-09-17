@@ -416,6 +416,7 @@ __do_c_hipHccModuleLaunchMultiKernel(
       hipError_t status = __do_c_hipHccModuleLaunchKernel(
          aql+i, stream, nullptr, extra, extra_size[i], start[i], stop[i]);
       if (status != hipSuccess) {
+         fprintf(stderr, "Returning and error for a kernel!\n");
          return status;
       }
       extra += extra_size[i];
@@ -433,12 +434,18 @@ __do_c_hipHccModuleLaunchMultiKernel_and_memcpy(
 {
    hipError_t ret;
 
-   ret = nw_hipMemcpySync(dst, src, sizeBytes, kind, stream);
+   if (kind == hipMemcpyHostToDevice) {
+      ret = nw_hipMemcpySync(dst, src, sizeBytes, kind, stream);
+      if (ret != hipSuccess)
+         return ret;
+   }
+   ret = __do_c_hipHccModuleLaunchMultiKernel(numKernels, aql, stream,
+                     all_extra, total_extra_size, extra_size, start, stop);
    if (ret != hipSuccess)
       return ret;
-
-   return __do_c_hipHccModuleLaunchMultiKernel(numKernels, aql, stream,
-                     all_extra, total_extra_size, extra_size, start, stop);
+   if (kind == hipMemcpyDeviceToHost)
+      ret = nw_hipMemcpySync(dst, src, sizeBytes, kind, stream);
+   return ret;
 }
 
 extern "C"
