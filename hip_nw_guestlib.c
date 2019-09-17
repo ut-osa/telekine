@@ -4307,6 +4307,9 @@ __do_c_hipHccModuleLaunchMultiKernel_and_memcpy(int numKernels, hsa_kernel_dispa
                 (hsa_kernel_dispatch_packet_t *) calloc(1, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
             g_ptr_array_add(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy, __tmp_aql_0);
             memcpy(__tmp_aql_0, aql, sizeof(hsa_kernel_dispatch_packet_t) * numKernels);
+            __cmd->aql =
+                (hsa_kernel_dispatch_packet_t *) command_channel_attach_buffer(__chan, (struct command_base *)__cmd,
+                __tmp_aql_0, (numKernels) * sizeof(hsa_kernel_dispatch_packet_t));
         } else {
             __cmd->aql = NULL;
         }
