@@ -4472,17 +4472,23 @@ __do_c_hipHccModuleLaunchMultiKernel_and_memcpy(int numKernels, hsa_kernel_dispa
     __call_record->src = src;
 
     __call_record->__call_complete = 0;
-    __call_record->__handler_deallocate = 0;
+
+    __call_record->__handler_deallocate = (kind == hipMemcpyHostToDevice);
+
     ava_add_call(__call_id, __call_record);
 
     command_channel_send_command(__chan, (struct command_base *)__cmd);
 
     g_ptr_array_unref(__ava_alloc_list___do_c_hipHccModuleLaunchMultiKernel_and_memcpy);        /* Deallocate all memory in the alloc list */
 
-    handle_commands_until(HIP_API, __call_record->__call_complete);
     hipError_t ret;
-    ret = __call_record->ret;
-    free(__call_record);
+    if (kind != hipMemcpyHostToDevice) {
+       handle_commands_until(HIP_API, __call_record->__call_complete);
+       ret = __call_record->ret;
+       free(__call_record);
+    } else {
+       ret = hipSuccess;
+    }
     command_channel_free_command(__chan, (struct command_base *)__cmd);
     return ret;
 }
