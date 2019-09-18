@@ -4,6 +4,7 @@ hip_nw
 *.so
 *.guesses
 worker
+worker_reverse_socket
 manager_tcp
 *.swp
 *.swn
