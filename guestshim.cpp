@@ -402,10 +402,15 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
 
 void SepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t sizeBytes,
         hipMemcpyKind kind, hipStream_t stream) {
-   gpu_snapshot_tagged_buf(encrypt_out_buf, src, stream);
-   hipError_t err = nw_hipMemcpySync(dst, encrypt_out_buf, sizeBytes, hipMemcpyDeviceToHost,
-         stream);
-   assert(err == hipSuccess);
+   hip_launch_memcpy_batch_t batch;
+   gpu_snapshot_tagged_buf_on_batch(&batch, encrypt_out_buf, src, stream);
+
+   batch.dst = dst;
+   batch.src = encrypt_out_buf;
+   batch.sizeBytes = sizeBytes;
+   batch.kind = hipMemcpyDeviceToHost;
+
+   hipLaunchMemcpyBatchNOW(&batch, stream);
 }
 
 void SepMemcpyCommandScheduler::do_next_h2d()
@@ -443,10 +448,15 @@ void SepMemcpyCommandScheduler::do_next_h2d()
 void SepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes,
         hipMemcpyKind kind, hipStream_t stream, tag_t tag) {
    // XXX in_stg_buf is global for scheduler
-   hipError_t ret(nw_hipMemcpySync(in_stg_buf, src, sizeBytes, kind, stream));
-   assert(ret == hipSuccess);
-   hipLaunchNOW(vector_copy, dim3(512), dim3(256), 0, stream, dst, in_stg_buf, sizeBytes);
-   hipLaunchNOW(set_tag, dim3(1), dim3(1), 0, stream, BUF_TAG(dst), tag);
+   hip_launch_memcpy_batch_t batch;
+   batch.dst = in_stg_buf;
+   batch.src = (void*) src;
+   batch.sizeBytes = sizeBytes;
+   batch.kind = hipMemcpyHostToDevice;
+
+   hipLaunchAddToBatch(&batch, vector_copy, dim3(512), dim3(256), 0, stream, dst, in_stg_buf, sizeBytes);
+   hipLaunchAddToBatch(&batch, set_tag, dim3(1), dim3(1), 0, stream, BUF_TAG(dst), tag);
+   hipLaunchMemcpyBatchNOW(&batch, stream);
    // XXX check launch dimensions, for optimality 
 }
 
