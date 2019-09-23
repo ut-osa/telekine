@@ -6,9 +6,9 @@ hip_nw
 worker
 worker_reverse_socket
 manager_tcp
-*.swp
-*.swn
-*.swo
+*.sw[a-p]
 copy
 copy2
 .d
+*.pem
+cscope.out
