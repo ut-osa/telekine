@@ -106,7 +106,7 @@ ava_get_coupled_record(const void *coupled)
     struct ava_coupled_record_t *rec = g_hash_table_lookup(hip_managed_by_coupled_map, coupled);
     if (rec == NULL) {
         rec = ava_coupled_record_new();
-        g_hash_table_insert(hip_managed_by_coupled_map, coupled, rec);
+        g_hash_table_insert(hip_managed_by_coupled_map, (void *)coupled, rec);
     }
     return rec;
 }

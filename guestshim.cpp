@@ -132,13 +132,14 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream, int bat
                                                      int fixed_rate_interval_us,
                                                      int memcpy_fixed_rate_interval_us,
                                                      size_t n_staging_buffers)
-   : status_buf(nullptr), last_real_batch(0), stg_in_idx(0), stg_out_idx(0),
-     cur_batch_id(0), batches_finished(0), n_staging_buffers(n_staging_buffers),
+   : BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us),
+     cur_batch_id(0), last_real_batch(0), batches_finished(0),
+     n_staging_buffers(n_staging_buffers), status_buf(nullptr),
+     stg_in_idx(0), stg_out_idx(0),
      h2d_memcpy_waiter_((memcpy_fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
            std::unique_ptr<QuantumWaiter>(new QuantumWaiter(memcpy_fixed_rate_interval_us))),
      d2h_memcpy_waiter_((memcpy_fixed_rate_interval_us == DEFAULT_FIXED_RATE_INTERVAL_US) ? nullptr :
-           std::unique_ptr<QuantumWaiter>(new QuantumWaiter(memcpy_fixed_rate_interval_us))),
-     BatchCommandScheduler(stream, batch_size, fixed_rate_interval_us)
+           std::unique_ptr<QuantumWaiter>(new QuantumWaiter(memcpy_fixed_rate_interval_us)))
 {
    hipError_t ret;
    ret = hipStreamCreate(&h2d_xfer_stream_);
@@ -219,9 +220,7 @@ hipError_t BatchCommandScheduler::AddMemcpyAsync(void* dst, const void* src, siz
 hipError_t SepMemcpyCommandScheduler::AddMemcpyAsync(void* dst, const void* src, size_t size,
         hipMemcpyKind kind)
 {
-   hipEvent_t event;
    void *sb1;
-   hipError_t err;
    tag_t tag;
    static uint8_t *plaintext;
 
@@ -368,7 +367,6 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
    static uint8_t plaintext[FIXED_SIZE_FULL];
    bool real_copy = false;
 
-   hipError_t err;
    MemcpyParam param(nullptr, status_buf, 0, hipMemcpyDeviceToHost, 0);
 
    pending_d2h_mutex_.lock();
@@ -415,7 +413,6 @@ void SepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t sizeBytes
 
 void SepMemcpyCommandScheduler::do_next_h2d()
 {
-    hipError_t err;
     static uint8_t filler_buf[FIXED_SIZE_FULL];
     MemcpyParam param((void *)nop_buffer, (void *)filler_buf, FIXED_SIZE_FULL,
                       hipMemcpyHostToDevice, 0);
@@ -822,7 +819,7 @@ hipMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t spitch,
 					  size_t width, size_t height, hipMemcpyKind kind,
 					  hipStream_t stream)
 {
-	 hipError_t e;
+	hipError_t e = hipSuccess;
     if((width == dpitch) && (width == spitch)) {
             e = hipMemcpyAsync(dst, src, width*height, kind, stream);
     } else {

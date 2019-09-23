@@ -28,7 +28,7 @@
 
 class CommandScheduler {
 public:
-    CommandScheduler(hipStream_t stream) : stream_(stream), destroy_stream(false){
+    CommandScheduler(hipStream_t stream) : destroy_stream(false), stream_(stream) { 
        hipGetDevice(&device_index);
        if (!stream_) {
           hipStreamCreate(&stream_);
@@ -99,7 +99,7 @@ protected:
         template <typename... Args, typename F = void (*)(Args...)>
         KernelLaunchParam(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
                           std::uint32_t sharedMemBytes, hipStream_t stream,
-                          Args... args) : aql{0}, kernArg{0}, kernArgSize(FIXED_EXTRA_SIZE),
+                          Args... args) : aql{0}, kernArgSize(FIXED_EXTRA_SIZE), kernArg{0}, 
             start(nullptr), stop(nullptr)
         {
            auto kern_args = hip_impl::make_kernarg(std::move(args)...);
@@ -120,7 +120,7 @@ protected:
         hipMemcpyKind kind;
         MemcpyParam(void *_dst, const void *_src, size_t _size, hipMemcpyKind _kind,
                     tag_t _tag) :
-           dst(_dst), src(_src), size(_size), kind(_kind), tag(_tag) {}
+           dst(_dst), src(_src), size(_size), tag(_tag), kind(_kind) {}
         MemcpyParam() : dst(nullptr), src(nullptr), size(0), tag(0) {}
     };
 

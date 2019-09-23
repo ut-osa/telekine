@@ -26,10 +26,6 @@ tag_copy(tag_t *dst, tag_t *src)
 __global__ void
 check_tag(tag_t *tag_p, tag_t tag)
 {
-    size_t offset = (blockIdx.x * blockDim.x + threadIdx.x);
-    size_t stride = blockDim.x * gridDim.x ;
-    int n = 0;
-
     /* TODO: one  thread  only */
     while (atomicExch((unsigned long long *)tag_p, 1) != tag)
       /* spin */;

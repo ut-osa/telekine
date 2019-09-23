@@ -1,8 +1,11 @@
 HIP_PATH = /opt/rocm/hip
 export HIP_PATH
 
-HIPCC_VERBOSE = 1
+ifdef $(VERBOSE)
+HIPCC_VERBOSE := $(VERBOSE)
 export HIPCC_VERBOSE
+endif
+
 HIP_PLATFORM = hcc
 export HIP_PLATFORM
 HIPCC = ./hipcc --amdgpu-target=gfx900
@@ -10,120 +13,74 @@ ifeq ($(NW_PATH),)
 	NW_PATH := /home/thunt/nightwatch-combined/nwcc
 endif
 
-
-TARGET = hcc
-
-GEN_CFLAGS += -g -fmax-errors=10 `pkg-config --cflags glib-2.0` -pthread \
-	-lrt -ldl -D_GNU_SOURCE -Wall -Wno-unused-but-set-variable \
-	-Wno-unused-variable -Wno-unused-function -Wno-discarded-qualifiers \
-	-Wno-deprecated-declarations -Wno-deprecated-declarations -Wl,-z,defs \
-	-D__HIP_PLATFORM_HCC__=1 -Wno-enum-compare -Wno-strict-aliasing
-
-SOURCES = MatrixTranspose.cpp
-OBJECTS = $(SOURCES:.cpp=.o)
-
-EXECUTABLE = ./MatrixTranspose
-
 includes = -I$(PWD)/include -I/opt/rocm/include -I/opt/rocm/hcc/bin/../include \
 			  -I/opt/rocm/hcc/bin/../hcc/include -I/opt/rocm/hcc/include \
 			  -I/opt/rocm/hip/include/hip/hcc_detail/cuda -I/opt/rocm/hsa/include \
-			  -I/opt/rocm/hip/include
+			  -I/opt/rocm/hip/include -I./nw/worker/include -I./nw/guestlib/include
 
-clangargs = -D__HIP_PLATFORM_HCC__=1
+FLAGS = -g -O3 -fPIC $(includes) $(shell pkg-config --cflags glib-2.0) -fmax-errors=10 \
+         -D_GNU_SOURCE -Wall -Werror -Wno-deprecated-declarations \
+         -Wno-unused-variable -Wno-unused-function -Wl,-z,defs \
+         -Wno-enum-compare -Wno-strict-aliasing \
+         -Wl,--no-allow-shlib-undefined -Wl,--no-undefined
 
-CFLAGS = -g -Og -fPIC $(includes)
-CXXFLAGS = $(CFLAGS) -std=c++14 -Wno-ignored-attributes -Wno-deprecated-declarations \
+CFLAGS = $(FLAGS) -Wno-discarded-qualifiers -Wno-unused-but-set-variable  -D__HIP_PLATFORM_HCC__=1
+CXXFLAGS = $(FLAGS) -std=c++14 -Wno-ignored-attributes -Wno-deprecated-declarations \
 			  -Wno-unused-command-line-argument
 CXX=$(HIPCC)
 
-all: $(EXECUTABLE) copy copy2 worker worker_reverse_socket libguestlib.so guestshim.so manager
+NW_CFLAGS += $(CFLAGS) -fvisibility=hidden
+
+LIBS := $(shell pkg-config --libs glib-2.0) -lrt -ldl -lstdc++ -lssl -lcrypto -pthread
+libguestlib.so_LIBS := -shared -fvisibility=hidden $(LIBS)
+worker_LIBS := -L/opt/rocm/lib -lhip_hcc -lhsa-runtime64 $(LIBS)
+worker_reverse_socket_LIBS := $(worker_LIBS)
+
+NW_SRCS := nw/common/cmd_channel.c nw/common/murmur3.c nw/common/cmd_handler.c \
+			  nw/common/endpoint_lib.c nw/common/socket.c
+worker_SRCS := $(NW_SRCS) hip_nw_worker.o hip_cpp_bridge.o nw/worker/worker.c \
+			      nw/common/cmd_channel_shm_worker.c \
+					nw/common/cmd_channel_min_worker.c \
+			      nw/common/cmd_channel_socket_worker.c
+worker_reverse_socket_SRCS := $(filter-out nw/worker/worker.c,$(worker_SRCS)) \
+	                           nw/worker/worker_reverse_socket.c
+libguestlib.so_SRCS = $(NW_SRCS) hip_nw_guestlib.c nw/guestlib/src/init.c \
+						 nw/common/cmd_channel_shm.c nw/common/cmd_channel_min.c \
+					    nw/common/cmd_channel_socket.c
+
+NW_BINS = worker worker_reverse_socket libguestlib.so
+TESTS = MatrixTranspose copy copy2
+
+all: $(TESTS) $(NW_BINS) guestshim.so manager
 .PHONY: all
 
-GUESTLIB_LIBS+=`pkg-config --libs glib-2.0` -fvisibility=hidden
-WORKER_LIBS+=`pkg-config --libs glib-2.0` -L/opt/rocm/lib -lhip_hcc -lhsa-runtime64
+.SECONDEXPANSION:
+$(NW_BINS): %: $$(%_SRCS)
+	@echo "  LINK $@"
+	@$(CC) -I./nw/worker/include $(NW_CFLAGS) $^ $($*_LIBS) -o $@
 
-GENERAL_SOURCES = $(addprefix nw/common/,cmd_channel.c murmur3.c cmd_handler.c \
-													endpoint_lib.c socket.c)
-WORKER_SOURCES = hip_nw_worker.c \
-					  $(addprefix nw/worker/,worker.c) \
-					  $(addprefix nw/common/,cmd_channel_shm_worker.c \
-					                         cmd_channel_min_worker.c \
-													 cmd_channel_socket_worker.c)
-WORKER_REVERSE_SOCKET_SOURCES = hip_nw_worker.c \
-					  $(addprefix nw/worker/,worker_reverse_socket.c) \
-					  $(addprefix nw/common/,cmd_channel_shm_worker.c \
-					                         cmd_channel_min_worker.c \
-													 cmd_channel_socket_worker.c)
-GUESTLIB_SOURCES = hip_nw_guestlib.c $(addprefix nw/guestlib/src/,init.c) \
-						 $(addprefix nw/common/,cmd_channel_shm.c cmd_channel_min.c \
-													   cmd_channel_socket.c)
-
-worker: $(GENERAL_SOURCES) $(WORKER_SOURCES) hip_cpp_bridge.o
-	$(CC) -O3 -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -lssl -lcrypto -o $@
-
-worker_reverse_socket: $(GENERAL_SOURCES) $(WORKER_REVERSE_SOCKET_SOURCES) hip_cpp_bridge.o
-	$(CC) -O3 -I./nw/worker/include $(includes) $(GEN_CFLAGS) $^ $(WORKER_LIBS) -lstdc++ -lssl -lcrypto -o $@
-
-libguestlib.so: $(GENERAL_SOURCES) $(GUESTLIB_SOURCES)
-	$(CC) -O3 -I./nw/guestlib/include $(includes) -shared -fPIC $(GEN_CFLAGS) $^ $(GUESTLIB_LIBS) -lssl -lcrypto -o $@
-
-
-$(EXECUTABLE): $(OBJECTS) guestshim.so libguestlib.so libgpucrypto.so
-	$(HIPCC) -std=c++14 $^ -o $@ -Wl,-rpath=$(PWD)
-
-copy: copy.o guestshim.so libguestlib.so libgpucrypto.so
-	$(HIPCC) -std=c++14 $^ -o $@ -Wl,-rpath=$(PWD)
-
-copy2: copy2.o guestshim.so libguestlib.so libgpucrypto.so
-	$(HIPCC) -O3 -std=c++14 $^ -o $@ -Wl,-rpath=$(PWD)
-
-regen: hip.nw.cpp
-	$(NW_PATH)/nwcc $(includes) -X="$(clangargs) -DPWD=\"$(PWD)\"" ./hip.nw.cpp
-.PHONY: regen
+$(TESTS): %: %.o guestshim.so libguestlib.so
+	@echo "  LINK $@"
+	@$(HIPCC) $^ -o $@ -Wl,-rpath=$(PWD)
 
 manager:
 	$(MAKE) -C nw/worker && ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
-guestshim.so: lgm_memcpy.o guestshim.o program_state.o code_object_bundle.o hip_function_info.o \
-				  lgm_kernels.o
-	$(HIPCC) -fPIC -shared $(includes) -o $@ $^ \
-	   -Wl,--no-allow-shlib-undefined \
-		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib -lpthread -lssl -lcrypto -lgpucrypto
-guestshim.so: libguestlib.so libgpucrypto.so
-
-libgpucrypto.so: crypto/aes_gcm.cpp crypto/aes_gcm.h
-	$(HIPCC) $(includes) -shared -O3 -fPIC crypto/aes_gcm.cpp -o $@ -ldl
+guestshim.so: lgm_memcpy.o guestshim.o program_state.o code_object_bundle.o \
+              hip_function_info.o lgm_kernels.o aes_gcm.o
+	@echo "  LINK $@"
+	@$(HIPCC) -fPIC -shared $(includes) -o $@ $^ -Wl,--no-allow-shlib-undefined \
+		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib $(LIBS)
+guestshim.so: libguestlib.so
 
 clean:
-	rm -rf hip_nw *.o *.so manager_tcp MatrixTranspose copy
+	rm -rf hip_nw *.o .d *.so manager_tcp $(TESTS) $(NW_BINS)
 	$(MAKE) -C nw/worker clean
-
 .PHONY: clean
-DEPDIR := .d
-$(shell mkdir -p $(DEPDIR) >/dev/null)
-DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
-COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
-COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
-POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
+regen: hip.nw.cpp
+	$(NW_PATH)/nwcc $(includes) -X="-D__HIP_PLATFORM_HCC__=1 -DPWD=\"$(PWD)\"" ./hip.nw.cpp
+.PHONY: regen
 
-%.o : %.c
-%.o : %.c $(DEPDIR)/%.d
-	$(COMPILE.c) $(OUTPUT_OPTION) $<
-	$(POSTCOMPILE)
-
-%.o : %.cc
-%.o : %.cc $(DEPDIR)/%.d
-	$(COMPILE.cc) $(OUTPUT_OPTION) $<
-	$(POSTCOMPILE)
-
-%.o : %.cpp
-%.o : %.cpp $(DEPDIR)/%.d
-	$(COMPILE.cc) $(OUTPUT_OPTION) $<
-	$(POSTCOMPILE)
-
-$(DEPDIR)/%.d: ;
-.PRECIOUS: $(DEPDIR)/%.d
-
-include $(wildcard $(DEPDIR)/*.d)
+include trackdeps.make

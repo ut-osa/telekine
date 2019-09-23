@@ -120,22 +120,6 @@ inline section* find_section_if(elfio& reader, P p) {
     return it != reader.sections.end() ? *it : nullptr;
 }
 
-vector<string> copy_names_of_undefined_symbols(const symbol_section_accessor& section) {
-    vector<string> r;
-
-    for (auto i = 0u; i != section.get_symbols_num(); ++i) {
-        // TODO: this is boyscout code, caching the temporaries
-        //       may be of worth.
-
-        auto tmp = read_symbol(section, i);
-        if (tmp.sect_idx == SHN_UNDEF && !tmp.name.empty()) {
-            r.push_back(std::move(tmp.name));
-        }
-    }
-
-    return r;
-}
-
 const std::unordered_map<std::string, std::pair<ELFIO::Elf64_Addr, ELFIO::Elf_Xword>>&
 symbol_addresses() {
     static unordered_map<string, pair<Elf64_Addr, Elf_Xword>> r;
@@ -353,36 +337,6 @@ const unordered_map<string, vector<kernel_info>>& kernels() {
     return r;
 }
 
-void load_code_object_and_freeze_executable(
-    const string& file, hsa_agent_t agent,
-    hsa_executable_t
-        executable) {  // TODO: the following sequence is inefficient, should be refactored
-    //       into a single load of the file and subsequent ELFIO
-    //       processing.
-    static const auto cor_deleter = [](hsa_code_object_reader_t* p) {
-        if (p) {
-            hsa_code_object_reader_destroy(*p);
-            delete p;
-        }
-    };
-
-    using RAII_code_reader = unique_ptr<hsa_code_object_reader_t, decltype(cor_deleter)>;
-
-    if (!file.empty()) {
-        RAII_code_reader tmp{new hsa_code_object_reader_t, cor_deleter};
-        hsa_code_object_reader_create_from_memory(file.data(), file.size(), tmp.get());
-
-        hsa_executable_load_agent_code_object(executable, agent, *tmp, nullptr, nullptr);
-
-        hsa_executable_freeze(executable, nullptr);
-
-        static vector<RAII_code_reader> code_readers;
-        static mutex mtx;
-
-        lock_guard<mutex> lck{mtx};
-        code_readers.push_back(move(tmp));
-    }
-}
 }  // namespace
 
 #define MAX_AGENTS 16

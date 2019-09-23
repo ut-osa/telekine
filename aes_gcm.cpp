@@ -1,5 +1,5 @@
 #include "hip_cpp_bridge.h"
-#include "aes_gcm.h"
+#include "crypto/aes_gcm.h"
 
 namespace {
 
@@ -238,6 +238,7 @@ __device__ void MixColumns(state_t* state)
   }
 }
 
+#if 0
 __device__ uint8_t Multiply(uint8_t x, uint8_t y)
 {
   return (((y & 1) * x) ^
@@ -313,6 +314,7 @@ __device__ void InvShiftRows(state_t* state)
   (*state)[2][3] = (*state)[3][3];
   (*state)[3][3] = temp;
 }
+#endif
 
 // Cipher is the main function that encrypts the PlainText.
 __device__ void Cipher(const uint8_t* sbox, state_t* state, const uint8_t* RoundKey)
@@ -357,6 +359,7 @@ __device__ void Cipher(const uint8_t* sbox, state_t* state, const uint8_t* Round
   }
 }
 
+#if 0
 __device__ void InvCipher(const uint8_t* rsbox, state_t* state, const uint8_t* RoundKey)
 {
   uint8_t r = 0;
@@ -398,6 +401,7 @@ __device__ void InvCipher(const uint8_t* rsbox, state_t* state, const uint8_t* R
     }
   }
 }
+#endif
 
 __global__ void AES_key_expansion_kernel(const uint8_t* sbox, const uint8_t* Rcon,
     const uint8_t* key, uint8_t* roundkey) {

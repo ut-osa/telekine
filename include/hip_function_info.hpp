@@ -61,7 +61,6 @@ inline void hipLaunchNOW(F kernel, const dim3& numBlocks, const dim3& dimBlocks,
 {
     hsa_kernel_dispatch_packet_t aql = {0};
     auto kernarg = hip_impl::make_kernarg(std::move(args)...);
-    std::size_t kernarg_size = kernarg.size();
 
     auto fun = hip_function_lookup((uintptr_t)kernel, stream);
     hip_function_to_aql(&aql, fun, DIM3_TO_AQL(numBlocks, dimBlocks), 0);
@@ -76,7 +75,6 @@ inline void hipLaunchAddToBatch(hip_launch_batch_t* batch, F kernel, const dim3&
 {
     hsa_kernel_dispatch_packet_t aql = {0};
     auto kernarg = hip_impl::make_kernarg(std::move(args)...);
-    std::size_t kernarg_size = kernarg.size();
 
     auto fun = hip_function_lookup((uintptr_t)kernel, stream);
     hip_function_to_aql(&aql, fun, DIM3_TO_AQL(numBlocks, dimBlocks), 0);

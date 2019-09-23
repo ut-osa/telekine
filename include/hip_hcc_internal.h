@@ -137,9 +137,9 @@ extern std::vector<ProfTrigger> g_dbStopTriggers;
 
 //---
 // Forward defs:
-class ihipStream_t;
-class ihipDevice_t;
-class ihipCtx_t;
+struct ihipStream_t;
+struct ihipDevice_t;
+struct ihipCtx_t;
 struct ihipEventData_t;
 
 // Color defs for debug messages:
@@ -522,7 +522,7 @@ typedef LockedAccessor<ihipStreamCritical_t> LockedAccessor_StreamCrit_t;
 
 //---
 // Internal stream structure.
-class ihipStream_t {
+struct ihipStream_t {
    public:
     enum ScheduleMode { Auto, Spin, Yield };
     typedef uint64_t SeqNum_t;
@@ -703,7 +703,7 @@ typedef ihipEventCriticalBase_t<EventMutex> ihipEventCritical_t;
 typedef LockedAccessor<ihipEventCritical_t> LockedAccessor_EventCrit_t;
 
 // internal hip event structure.
-class ihipEvent_t {
+struct ihipEvent_t {
    public:
     explicit ihipEvent_t(unsigned flags);
     void attachToCompletionFuture(const hc::completion_future* cf, hipStream_t stream,
@@ -763,7 +763,7 @@ typedef LockedAccessor<ihipDeviceCritical_t> LockedAccessor_DeviceCrit_t;
 //----
 // Properties of the HIP device.
 // Multiple contexts can point to same device.
-class ihipDevice_t {
+struct ihipDevice_t {
    public:
     ihipDevice_t(unsigned deviceId, unsigned deviceCnt, hc::accelerator& acc);
     ~ihipDevice_t();
@@ -883,7 +883,7 @@ typedef LockedAccessor<ihipCtxCritical_t> LockedAccessor_CtxCrit_t;
 // peer-to-peer mappings, creation flags.  Multiple contexts can point to the same
 // device.
 //
-class ihipCtx_t {
+struct ihipCtx_t {
    public:  // Functions:
     ihipCtx_t(ihipDevice_t* device, unsigned deviceCnt,
               unsigned flags);  // note: calls constructor for _criticalData
