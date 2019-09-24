@@ -67,8 +67,8 @@ manager:
 	$(MAKE) -C nw/worker && ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
-guestshim.so: lgm_memcpy.o guestshim.o program_state.o code_object_bundle.o \
-              hip_function_info.o lgm_kernels.o aes_gcm.o
+guestshim.so: lgm_memcpy.o guestshim.o commandscheduler.o program_state.o \
+				  code_object_bundle.o hip_function_info.o lgm_kernels.o aes_gcm.o
 	@echo "  LINK $@"
 	@$(HIPCC) -fPIC -shared $(includes) -o $@ $^ -Wl,--no-allow-shlib-undefined \
 		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib $(LIBS)
@@ -83,4 +83,4 @@ regen: hip.nw.cpp
 	$(NW_PATH)/nwcc $(includes) -X="-D__HIP_PLATFORM_HCC__=1 -DPWD=\"$(PWD)\"" ./hip.nw.cpp
 .PHONY: regen
 
-include trackdeps.make
+include trackdeps.mk
