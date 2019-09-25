@@ -456,33 +456,29 @@ const unordered_map<uintptr_t, string>& function_names() {
     return r;
 }
 
-const std::shared_ptr<unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>> functions() {
-    static auto r = std::make_shared<unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>>();
-    static once_flag f;
+std::mutex program_state::init_mutex{};
+std::shared_ptr<program_state> program_state::instance{};
 
-    call_once(f, []() {
-        for (auto&& function : function_names()) {
-            const auto it = kernels().find(function.second);
+program_state::program_state() : stream_to_agent(), kern_info_cache()
+{
+    for (auto&& function : function_names()) {
+        const auto it = kernels().find(function.second);
 
-            if (it != kernels().cend()) {
-                for (auto&& kernel_symbol : it->second) {
-                /*
-                    hipFunction_t func;
-                    __do_c_get_kernel_descriptor(&kernel_symbol.symbol, it->first.c_str(),
-                                                 &func);
-                                                 */
-                    (*r)[function.first].emplace_back(
-                        kernel_symbol.agent /*agent(kernel_symbol.symbol)*/,
-                        kernel_symbol.descriptor/* func */);
-#if 0
-                        Kernel_descriptor{kernel_object(kernel_symbol), it->first});
-#endif
-                }
+        if (it != kernels().cend()) {
+            for (auto&& kernel_symbol : it->second) {
+                this->functions[function.first].emplace_back(
+                    kernel_symbol.agent /*agent(kernel_symbol.symbol)*/,
+                    kernel_symbol.descriptor/* func */);
             }
         }
-    });
+    }
+}
 
-    return r;
+std::shared_ptr<program_state> program_state_handle() {
+    std::lock_guard<std::mutex> lk(program_state::init_mutex);
+    if (! program_state::instance)
+        program_state::instance.reset(new program_state());
+    return program_state::instance;
 }
 
 unordered_map<string, void*>& globals() {

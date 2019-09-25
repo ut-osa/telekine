@@ -13,31 +13,23 @@
 #include <unordered_map>
 #include <pthread.h>
 
-static pthread_mutex_t stream_agent_lock = PTHREAD_MUTEX_INITIALIZER;
-static std::unordered_map<hipStream_t, hsa_agent_t> stream_to_agent;
-
 thread_local hipCtx_t current_ctx = nullptr;
 thread_local hipDevice_t current_ctx_device = -1;
 
 
 const struct nw_kern_info *hip_function_kernel_info(hipFunction_t f)
 {
-    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-    static std::unordered_map<hipFunction_t, struct nw_kern_info> cache;
+    auto handle = hip_impl::program_state_handle();
     const struct nw_kern_info *ret;
 
-    pthread_mutex_lock(&lock);
-    auto it0 = cache.find(f);
-    if (it0 == cache.end()) {
-        struct nw_kern_info *info = &cache[f];
-        if (nw_lookup_kern_info(f, info) != hipSuccess)
+    ret = handle->kern_info_cache.get_ptr(f);
+    if (!ret) {
+        struct nw_kern_info info;
+        if (nw_lookup_kern_info(f, &info) != hipSuccess)
             assert(0 && "failed to do lookup\n");
-        ret = info;
-    } else {
-        ret = &it0->second;
+        handle->kern_info_cache.add(f, info);
+        ret = handle->kern_info_cache.get_ptr(f);
     }
-    pthread_mutex_unlock(&lock);
-
     return ret;
 }
 
@@ -140,11 +132,8 @@ hipStreamCreate(hipStream_t* stream)
    hsa_agent_t agent;
 
    hipError_t ret = nw_hipStreamCreate(stream, &agent);
-   if (!ret) {
-      pthread_mutex_lock(&stream_agent_lock);
-      stream_to_agent.emplace(*stream, agent);
-      pthread_mutex_unlock(&stream_agent_lock);
-   }
+   if (!ret)
+      hip_impl::program_state_handle()->stream_to_agent.add(*stream, agent);
 
    return ret;
 }
@@ -153,13 +142,8 @@ hipError_t
 hipStreamDestroy(hipStream_t stream)
 {
    hipError_t ret = nw_hipStreamDestroy(stream);
-   if (!ret) {
-      pthread_mutex_lock(&stream_agent_lock);
-      auto it = stream_to_agent.find(stream);
-      if (it != stream_to_agent.end())
-         stream_to_agent.erase(it);
-      pthread_mutex_unlock(&stream_agent_lock);
-   }
+   if (!ret)
+      hip_impl::program_state_handle()->stream_to_agent.remove(stream);
    return ret;
 }
 
@@ -175,34 +159,9 @@ hsa_agent_t target_agent(hipStream_t stream)
       assert(n_agents > 0);
    });
 
-   if (stream) {
-      hsa_agent_t agent;
-      pthread_mutex_lock(&stream_agent_lock);
-      auto it = stream_to_agent.find(stream);
-      if (it == stream_to_agent.end()) {
-         std::printf("%s:%d no agent recoreded\n", __FILE__, __LINE__);
-         std::abort();
-      }
-      agent = it->second;
-      pthread_mutex_unlock(&stream_agent_lock);
-      return agent;
-   }
+   if (stream)
+      return hip_impl::program_state_handle()->stream_to_agent.get(stream);
    return agents[current_device];
-#if 0
-   if (stream) {
-       return *static_cast<hsa_agent_t*>(
-           stream->locked_getAv()->get_hsa_agent());
-   }
-   else if (
-       ihipGetTlsDefaultCtx() && ihipGetTlsDefaultCtx()->getDevice()) {
-       return ihipGetDevice(
-           ihipGetTlsDefaultCtx()->getDevice()->_deviceId)->_hsaAgent;
-   }
-   else {
-       return *static_cast<hsa_agent_t*>(
-           accelerator{}.get_default_view().get_hsa_agent());
-   }
-#endif
 }
 
 hipError_t
@@ -264,9 +223,10 @@ hipError_t hipCtxSetCurrent(hipCtx_t ctx)
 hipFunction_t hip_function_lookup(uintptr_t function_address,
                                   hipStream_t stream)
 {
-     const auto it0 = hip_impl::functions()->find(function_address);
+     static auto prog_state = hip_impl::program_state_handle();
+     const auto it0 = prog_state->functions.find(function_address);
 
-     if (it0 == hip_impl::functions()->cend()) {
+     if (it0 == prog_state->functions.cend()) {
          throw std::runtime_error{
              "No device code available for function: " +
              name(function_address)

@@ -3,18 +3,13 @@
 #include <stddef.h>
 #include <hsa/hsa.h>
 #include <hip/hip_runtime.h>
+#include <nw_kern_info.h>
 
 #include <amd_hsa_kernel_code.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-struct nw_kern_info {
-   uint64_t workgroup_group_segment_byte_size;
-   uint64_t workitem_private_segment_byte_size;
-   uint64_t _object;
-};
 
 struct hipFuncAttributes;
 typedef struct hipFuncAttributes hipFuncAttributes;

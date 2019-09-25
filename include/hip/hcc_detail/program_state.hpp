@@ -26,6 +26,7 @@ THE SOFTWARE.
 #include <hsa/hsa.h>
 #include <hsa/hsa_ext_amd.h>
 #include <hsa/hsa_ven_amd_loader.h>
+#include <nw_kern_info.h>
 
 #include <cstddef>
 #include <istream>
@@ -69,11 +70,68 @@ public:
 };
 
 const std::unordered_map<hsa_agent_t, std::vector<hsa_executable_t>>& executables();
-const std::shared_ptr<std::unordered_map<std::uintptr_t, std::vector<std::pair<hsa_agent_t, hipFunction_t>>>>
-functions();
 const std::unordered_map<std::uintptr_t, std::string>& function_names();
 std::unordered_map<std::string, void*>& globals();
 
 hsa_executable_t load_executable(const std::string& file, hsa_executable_t executable,
                                  hsa_agent_t agent);
+
+template <typename K, typename V>
+class LockedMap {
+private:
+    std::mutex lock;
+    std::unordered_map<K,V> _map;
+public:
+    LockedMap() : _map() {}
+    void add(const K& k, const V& v) {
+        std::lock_guard<std::mutex> lk(lock);
+        _map.emplace(k, v);
+    }
+    void remove(const K& k) {
+        std::lock_guard<std::mutex> lk(lock);
+        auto it = _map.find(k);
+        if (it != _map.end())
+            _map.erase(it);
+    }
+    V get(const K& k) {
+        std::lock_guard<std::mutex> lk(lock);
+        auto it = _map.find(k);
+        if (it == _map.end()) {
+            std::printf("%s:%d no key\n", __FILE__, __LINE__);
+            std::abort();
+        }
+        return it->second;
+    }
+    V* get_ptr(const K& k) {
+        std::lock_guard<std::mutex> lk(lock);
+        auto it = _map.find(k);
+        if (it == _map.end()) {
+           return nullptr;
+        }
+        return &it->second;
+    }
+};
+
+class program_state {
+private:
+    static std::shared_ptr<program_state> instance;
+    static std::mutex init_mutex;
+    std::mutex stream_agent_mutex;
+    program_state();
+
+    /* no copies */
+    program_state& operator=(const program_state&) = delete;
+    program_state(const program_state &) = delete;
+
+public:
+    std::unordered_map<std::uintptr_t, std::vector<std::pair<hsa_agent_t, hipFunction_t>>> functions;
+
+    LockedMap<hipStream_t, hsa_agent_t> stream_to_agent;
+    LockedMap<hipFunction_t, struct nw_kern_info> kern_info_cache;
+
+    friend std::shared_ptr<program_state> program_state_handle();
+};
+
+std::shared_ptr<program_state> program_state_handle();
+
 }  // Namespace hip_impl.

@@ -16,6 +16,7 @@
 #include "hip_function_info.hpp"
 #include "lgm_memcpy.hpp"
 #include "lgm_types.h"
+#include "hip/hcc_detail/program_state.hpp"
 
 #include "quantum_waiter.h"
 
@@ -38,7 +39,7 @@ enum SchedulerType {
 class CommandScheduler {
 public:
     CommandScheduler(hipStream_t stream) : destroy_stream(false), stream_(stream),
-      functions_(hip_impl::functions())
+      program_state_(hip_impl::program_state_handle())
     { 
        hipGetDevice(&device_index);
        if (!stream_) {
@@ -74,12 +75,9 @@ protected:
     bool destroy_stream;
     hipStream_t stream_;
     static std::mutex command_scheduler_map_mu_;
-    const std::shared_ptr<
-       std::unordered_map<uintptr_t,
-                          std::vector<std::pair<hsa_agent_t, hipFunction_t>>>> functions_;
+    std::shared_ptr<hip_impl::program_state> program_state_;
     virtual void nameStringStream(std::ostringstream &) const = 0;
     virtual void parametersStringStream(std::ostringstream &) const = 0;
-
 };
 
 template <typename CharT, typename Traits>
