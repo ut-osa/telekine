@@ -5,7 +5,7 @@
 namespace lgm {
 
 static bool memcpy_size_fixed(void) {
-  static bool ret = CHECK_ENV("LGM_MEMCPY_FIX_SIZE");
+  static bool ret = CHECK_ENV("LGM_MEMCPY_FIX_SIZE", false);
   return ret;
 }
 

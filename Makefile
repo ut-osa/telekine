@@ -67,8 +67,9 @@ manager:
 	$(MAKE) -C nw/worker && ln -fs ./nw/worker/manager_tcp manager_tcp
 .PHONY: manager
 
-guestshim.so: lgm_memcpy.o guestshim.o commandscheduler.o program_state.o \
-				  code_object_bundle.o hip_function_info.o lgm_kernels.o aes_gcm.o
+guestshim.so: lgm_memcpy.o guestshim.o command_scheduler.o program_state.o \
+				  code_object_bundle.o hip_function_info.o lgm_kernels.o aes_gcm.o \
+				  config.o
 	@echo "  LINK $@"
 	@$(HIPCC) -fPIC -shared $(includes) -o $@ $^ -Wl,--no-allow-shlib-undefined \
 		-Wl,--no-undefined -Wl,-rpath=$(PWD) -L$(PWD) -lguestlib $(LIBS)

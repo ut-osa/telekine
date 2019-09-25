@@ -9,6 +9,8 @@
 #include <map>
 #include <memory>
 #include <future>
+#include <ostream>
+#include <sstream>
 
 #include "hip/hip_runtime.h"
 #include "hip_function_info.hpp"
@@ -25,6 +27,13 @@
 #define FIXED_SIZE_B (FIXED_SIZE_FULL - sizeof(tag_t))
 #define BUF_TAG(buf) ((uint64_t *)(&(((uint8_t *)buf)[FIXED_SIZE_B])))
 #define FIXED_EXTRA_SIZE 256
+
+enum SchedulerType {
+   BASELINE,
+   BATCHED,
+   MANAGED,
+   ENCRYPTED,
+};
 
 class CommandScheduler {
 public:
@@ -45,6 +54,11 @@ public:
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) = 0;
     virtual hipError_t Wait(void) = 0;
 
+    void toStringStream(std::ostringstream &oss) const {
+       nameStringStream(oss);
+       oss << " with stream = " << stream_;
+       parametersStringStream(oss);
+    }
     static std::shared_ptr<CommandScheduler> GetForStream(hipStream_t stream);
     static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
     static hipStream_t GetDefStream() {
@@ -58,17 +72,39 @@ protected:
     bool destroy_stream;
     hipStream_t stream_;
     static std::mutex command_scheduler_map_mu_;
+
+    virtual void nameStringStream(std::ostringstream &) const = 0;
+    virtual void parametersStringStream(std::ostringstream &) const = 0;
+
 };
+
+template <typename CharT, typename Traits>
+std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& out,
+                                         const CommandScheduler& t)
+{
+   std::ostringstream oss;
+   t.toStringStream(oss);
+   return out << oss.str();
+}
+
 
 class BatchCommandScheduler : public CommandScheduler {
 public:
-    BatchCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us);
+    BatchCommandScheduler(hipStream_t stream);
     ~BatchCommandScheduler(void);
     hipError_t AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql, uint8_t *extra,
             size_t extra_size, hipEvent_t start, hipEvent_t stop) override;
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
     virtual hipError_t Wait(void) override;
 protected:
+    virtual void nameStringStream(std::ostringstream &oss) const override {
+       oss << "BatchCommandScheduler";
+    }
+    virtual void parametersStringStream(std::ostringstream &oss) const override {
+       oss << ", batch_size = " << batch_size_ << ", interval = "
+           << (quantum_waiter_ ? quantum_waiter_->interval_us_ : -1);
+    }
+
     void ProcessThread();
     void SetThreadPriority() {
       const char* nice_str = getenv("HIP_SCHEDULER_THREAD_NICE");
@@ -189,12 +225,18 @@ protected:
 
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
-    SepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us,
-                              int memcpy_fixed_rate_interval_us, size_t n_staging_buffers);
+    SepMemcpyCommandScheduler(hipStream_t stream);
     ~SepMemcpyCommandScheduler(void);
     virtual hipError_t Wait(void) override;
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
 protected:
+    virtual void nameStringStream(std::ostringstream &oss) const override {
+       oss << "SepMemcpyCommandScheduler";
+    }
+    virtual void parametersStringStream(std::ostringstream &oss) const override {
+       BatchCommandScheduler::parametersStringStream(oss);
+       oss << ", n_staging_buffers = " << n_staging_buffers;
+    }
     void add_extra_kernels(std::vector<KernelLaunchParam> &extrakerns,
                              const std::vector<KernelLaunchParam *> &params) override;
     void enqueue_device_copy(void *dst, const void *src, size_t size, tag_t tag, bool in);
@@ -263,10 +305,12 @@ protected:
 
 class EncryptedSepMemcpyCommandScheduler : public SepMemcpyCommandScheduler {
 public:
-    EncryptedSepMemcpyCommandScheduler(hipStream_t stream, int batch_size, int fixed_rate_interval_us,
-                              int memcpy_fixed_rate_interval_us, size_t n_staging_buffers);
+    EncryptedSepMemcpyCommandScheduler(hipStream_t stream);
     ~EncryptedSepMemcpyCommandScheduler(void);
 protected:
+    virtual void nameStringStream(std::ostringstream &oss) const override {
+       oss << "EncryptedSepMemcpyCommandScheduler";
+    }
     void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag) override;
     void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
 private:
@@ -281,5 +325,11 @@ public:
             size_t extra_size, hipEvent_t start, hipEvent_t stop) override;
     hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
     hipError_t Wait(void) override;
+protected:
+    virtual void nameStringStream(std::ostringstream &oss) const override {
+       oss << "BaselineCommandScheduler";
+    }
+    virtual void parametersStringStream(std::ostringstream &oss) const override {
+    }
 };
 #endif

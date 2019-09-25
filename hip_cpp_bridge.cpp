@@ -31,7 +31,7 @@ inline std::uint64_t kernel_object(hsa_executable_symbol_t x) {
 static void *allocate_pinned_buf()
 {
    void *pinned;
-   static int device = GET_ENV_INT("NW_WORKER_HIP_DEVICE_ID");
+   static int device = CHECK_ENV("NW_WORKER_HIP_DEVICE_ID", 0);
    assert(hipSetDevice(device) == hipSuccess);
    unsigned int flags = hipHostMallocPortable|hipHostMallocCoherent|hipHostMallocMapped;
    assert(hipHostMalloc(&pinned, pinned_buf_size, flags) == hipSuccess);

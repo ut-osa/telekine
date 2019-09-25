@@ -40,7 +40,6 @@ public:
         // }
     }
 
-private:
     int timer_fd_;
     int interval_us_;
 };
