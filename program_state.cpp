@@ -456,8 +456,8 @@ const unordered_map<uintptr_t, string>& function_names() {
     return r;
 }
 
-const unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>& functions() {
-    static unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>> r;
+const std::shared_ptr<unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>> functions() {
+    static auto r = std::make_shared<unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>>();
     static once_flag f;
 
     call_once(f, []() {
@@ -471,7 +471,7 @@ const unordered_map<uintptr_t, vector<pair<hsa_agent_t, hipFunction_t>>>& functi
                     __do_c_get_kernel_descriptor(&kernel_symbol.symbol, it->first.c_str(),
                                                  &func);
                                                  */
-                    r[function.first].emplace_back(
+                    (*r)[function.first].emplace_back(
                         kernel_symbol.agent /*agent(kernel_symbol.symbol)*/,
                         kernel_symbol.descriptor/* func */);
 #if 0

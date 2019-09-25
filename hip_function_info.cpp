@@ -264,9 +264,9 @@ hipError_t hipCtxSetCurrent(hipCtx_t ctx)
 hipFunction_t hip_function_lookup(uintptr_t function_address,
                                   hipStream_t stream)
 {
-     const auto it0 = hip_impl::functions().find(function_address);
+     const auto it0 = hip_impl::functions()->find(function_address);
 
-     if (it0 == hip_impl::functions().cend()) {
+     if (it0 == hip_impl::functions()->cend()) {
          throw std::runtime_error{
              "No device code available for function: " +
              name(function_address)

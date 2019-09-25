@@ -69,7 +69,7 @@ public:
 };
 
 const std::unordered_map<hsa_agent_t, std::vector<hsa_executable_t>>& executables();
-const std::unordered_map<std::uintptr_t, std::vector<std::pair<hsa_agent_t, hipFunction_t>>>&
+const std::shared_ptr<std::unordered_map<std::uintptr_t, std::vector<std::pair<hsa_agent_t, hipFunction_t>>>>
 functions();
 const std::unordered_map<std::uintptr_t, std::string>& function_names();
 std::unordered_map<std::string, void*>& globals();

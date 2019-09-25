@@ -37,7 +37,9 @@ enum SchedulerType {
 
 class CommandScheduler {
 public:
-    CommandScheduler(hipStream_t stream) : destroy_stream(false), stream_(stream) { 
+    CommandScheduler(hipStream_t stream) : destroy_stream(false), stream_(stream),
+      functions_(hip_impl::functions())
+    { 
        hipGetDevice(&device_index);
        if (!stream_) {
           hipStreamCreate(&stream_);
@@ -72,7 +74,9 @@ protected:
     bool destroy_stream;
     hipStream_t stream_;
     static std::mutex command_scheduler_map_mu_;
-
+    const std::shared_ptr<
+       std::unordered_map<uintptr_t,
+                          std::vector<std::pair<hsa_agent_t, hipFunction_t>>>> functions_;
     virtual void nameStringStream(std::ostringstream &) const = 0;
     virtual void parametersStringStream(std::ostringstream &) const = 0;
 
