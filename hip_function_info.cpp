@@ -126,27 +126,6 @@ std::string name(hsa_agent_t agent)
    return std::string{n};
 }
 
-hipError_t
-hipStreamCreate(hipStream_t* stream)
-{
-   hsa_agent_t agent;
-
-   hipError_t ret = nw_hipStreamCreate(stream, &agent);
-   if (!ret)
-      hip_impl::program_state_handle()->stream_to_agent.add(*stream, agent);
-
-   return ret;
-}
-
-hipError_t
-hipStreamDestroy(hipStream_t stream)
-{
-   hipError_t ret = nw_hipStreamDestroy(stream);
-   if (!ret)
-      hip_impl::program_state_handle()->stream_to_agent.remove(stream);
-   return ret;
-}
-
 inline
 hsa_agent_t target_agent(hipStream_t stream)
 {

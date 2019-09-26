@@ -28,6 +28,28 @@
 
 using namespace std;
 
+hipError_t
+hipStreamCreate(hipStream_t* stream)
+{
+   hsa_agent_t agent;
+
+   hipError_t ret = nw_hipStreamCreate(stream, &agent);
+   if (!ret)
+      hip_impl::program_state_handle()->stream_to_agent.add(*stream, agent);
+
+   return ret;
+}
+
+hipError_t
+hipStreamDestroy(hipStream_t stream)
+{
+   CommandScheduler::DestroyForStream(stream);
+   hipError_t ret = nw_hipStreamDestroy(stream);
+   if (!ret)
+      hip_impl::program_state_handle()->stream_to_agent.remove(stream);
+   return ret;
+}
+
 hipError_t hipHccModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
                                     uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
                                     uint32_t localWorkSizeX, uint32_t localWorkSizeY,

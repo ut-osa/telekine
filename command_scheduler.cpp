@@ -35,9 +35,9 @@ static std::shared_ptr<CommandScheduler> make_scheduler(hipStream_t stream)
 {
      switch (tlkine::config.sched_type) {
      case ENCRYPTED:
-         return std::make_shared<EncryptedSepMemcpyCommandScheduler>(stream);
+         return std::make_shared<SepMemcpyCommandScheduler>(stream, std::make_unique<GPUXfer_crypto_ops>(stream));
      case MANAGED:
-         return std::make_shared<SepMemcpyCommandScheduler>(stream);
+         return std::make_shared<SepMemcpyCommandScheduler>(stream, std::make_unique<GPUXfer_normal_ops>());
      case BATCHED:
          return std::make_shared<BatchCommandScheduler>(stream);
      case BASELINE:
@@ -58,6 +58,14 @@ std::shared_ptr<CommandScheduler> CommandScheduler::GetForStream(hipStream_t str
                   << *command_scheduler_map_.at(stream) << std::endl;
     }
     return command_scheduler_map_.at(stream);
+}
+
+void CommandScheduler::DestroyForStream(hipStream_t stream)
+{
+    std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
+    auto it = command_scheduler_map_.find(stream);
+    if (it != command_scheduler_map_.end())
+        command_scheduler_map_.erase(it);
 }
 
 /**** BaselineCommandScheduler ****/
@@ -90,11 +98,17 @@ BatchCommandScheduler::BatchCommandScheduler(hipStream_t stream) :
 {
 }
 
+void BatchCommandScheduler::stop_threads(void)
+{
+   running = false;
+   pending_commands_cv_.notify_all();
+   if (process_thread_->joinable())
+      process_thread_->join();
+}
+
 BatchCommandScheduler::~BatchCommandScheduler(void)
 {
-    running = false;
-    pending_commands_cv_.notify_all();
-    process_thread_->join();
+    stop_threads();
 }
 
 hipError_t BatchCommandScheduler::AddKernelLaunch(hsa_kernel_dispatch_packet_t *aql,
@@ -227,11 +241,13 @@ void BatchCommandScheduler::ProcessThread() {
 }
 
 /**** SepMemcpyCommandSchduler ****/
-SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream)
+SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream,
+                                                     std::unique_ptr<GPUXfer_ops> gpuxfers)
    : BatchCommandScheduler(stream),
      cur_batch_id(0), last_real_batch(0), batches_finished(0),
      n_staging_buffers(tlkine::config.memcpy_n_staging_buffers), status_buf(nullptr),
      stg_in_idx(0), stg_out_idx(0),
+     gpuxfers_(std::move(gpuxfers)),
      h2d_memcpy_waiter_((tlkine::config.memcpy_fixed_rate_interval_us < 0) ? nullptr :
            std::unique_ptr<QuantumWaiter>(new QuantumWaiter(tlkine::config.memcpy_fixed_rate_interval_us))),
      d2h_memcpy_waiter_((tlkine::config.memcpy_fixed_rate_interval_us < 0) ? nullptr :
@@ -250,13 +266,7 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream)
       assert(ret == hipSuccess);
       ret = hipMalloc(out_bufs + i, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
    }
-   ret = hipMalloc(&encrypt_out_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
-   assert(ret == hipSuccess);
    ret = hipMalloc(&status_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
-   assert(ret == hipSuccess);
-   ret = hipMalloc(&out_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
-   assert(ret == hipSuccess);
-   ret = hipMalloc(&in_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
    assert(ret == hipSuccess);
    ret = hipMalloc(&nop_buffer, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
    assert(ret == hipSuccess);
@@ -264,22 +274,29 @@ SepMemcpyCommandScheduler::SepMemcpyCommandScheduler(hipStream_t stream)
    d2h_memcpy_thread_ = std::make_unique<std::thread>(&SepMemcpyCommandScheduler::D2HMemcpyThread, this);
 }
 
-SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
+void SepMemcpyCommandScheduler::stop_threads(void)
 {
    running = false;
    pending_h2d_cv_.notify_all();
-   h2d_memcpy_thread_->join();
+   if (h2d_memcpy_thread_->joinable())
+      h2d_memcpy_thread_->join();
    pending_d2h_cv_.notify_all();
-   d2h_memcpy_thread_->join();
-   hipStreamDestroy(h2d_xfer_stream_);
-   hipStreamDestroy(d2h_xfer_stream_);
+   if (d2h_memcpy_thread_->joinable())
+      d2h_memcpy_thread_->join();
+   BatchCommandScheduler::stop_threads();
+}
+
+SepMemcpyCommandScheduler::~SepMemcpyCommandScheduler(void)
+{
+   stop_threads();
+   nw_hipStreamDestroy(h2d_xfer_stream_);
+   nw_hipStreamDestroy(d2h_xfer_stream_);
    for (int i = 0; i < n_staging_buffers; i++) {
       hipFree(in_bufs[i]);
       hipFree(out_bufs[i]);
    }
    free(in_bufs);
    free(out_bufs);
-   hipFree(encrypt_out_buf);
 }
 
 hipError_t SepMemcpyCommandScheduler::AddMemcpyAsync(void* dst, const void* src, size_t size,
@@ -420,7 +437,7 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
    pending_d2h_mutex_.unlock();
 
    assert(param.size <= FIXED_SIZE_B);
-   d2h(plaintext, param.src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost, d2h_xfer_stream_);
+   gpuxfers_->d2h(plaintext, param.src, FIXED_SIZE_FULL, hipMemcpyDeviceToHost, d2h_xfer_stream_);
 
    if (real_copy) {
       /* if the tag matches the buffer was ready and we can stop looking for it */
@@ -440,19 +457,6 @@ void SepMemcpyCommandScheduler::do_next_d2h(void)
    }
 }
 
-void SepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t sizeBytes,
-        hipMemcpyKind kind, hipStream_t stream) {
-   hip_launch_memcpy_batch_t batch;
-   gpu_snapshot_tagged_buf_on_batch(&batch, encrypt_out_buf, src, stream);
-
-   batch.dst = dst;
-   batch.src = encrypt_out_buf;
-   batch.sizeBytes = sizeBytes;
-   batch.kind = hipMemcpyDeviceToHost;
-
-   hipLaunchMemcpyBatchNOW(&batch, stream);
-}
-
 void SepMemcpyCommandScheduler::do_next_h2d()
 {
     static uint8_t filler_buf[FIXED_SIZE_FULL];
@@ -469,7 +473,7 @@ void SepMemcpyCommandScheduler::do_next_h2d()
     pending_h2d_mutex_.unlock();
 
     // XXX overloaded by subclasses to add encryption, etc.
-    h2d(param.dst, param.src, FIXED_SIZE_FULL, param.kind, h2d_xfer_stream_, param.tag);
+    gpuxfers_->h2d(param.dst, param.src, FIXED_SIZE_FULL, param.kind, h2d_xfer_stream_, param.tag);
 
     if (real_copy) {
        free((void *)param.src);
@@ -482,7 +486,33 @@ void SepMemcpyCommandScheduler::do_next_h2d()
     }
 }
 
-void SepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes,
+GPUXfer_ops::GPUXfer_ops() {
+   hipError_t ret;
+   ret = hipMalloc(&out_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+   assert(ret == hipSuccess);
+   ret = hipMalloc(&in_stg_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+   assert(ret == hipSuccess);
+}
+
+GPUXfer_ops::~GPUXfer_ops() {
+   hipFree(in_stg_buf);
+   hipFree(out_stg_buf);
+}
+
+void GPUXfer_normal_ops::d2h(void* dst, const void* src, size_t sizeBytes,
+        hipMemcpyKind kind, hipStream_t stream) {
+   hip_launch_memcpy_batch_t batch;
+   gpu_snapshot_tagged_buf_on_batch(&batch, out_stg_buf, src, stream);
+
+   batch.dst = dst;
+   batch.src = out_stg_buf;
+   batch.sizeBytes = sizeBytes;
+   batch.kind = hipMemcpyDeviceToHost;
+
+   hipLaunchMemcpyBatchNOW(&batch, stream);
+}
+
+void GPUXfer_normal_ops::h2d(void* dst, const void* src, size_t sizeBytes,
         hipMemcpyKind kind, hipStream_t stream, tag_t tag) {
    // XXX in_stg_buf is global for scheduler
    hip_launch_memcpy_batch_t batch;
@@ -538,20 +568,27 @@ void SepMemcpyCommandScheduler::D2HMemcpyThread()
 }
 
 /**** EncryptedSepMemcpyCommandScheduler ****/
-EncryptedSepMemcpyCommandScheduler::EncryptedSepMemcpyCommandScheduler(hipStream_t stream)
-      : SepMemcpyCommandScheduler(stream) {}
+GPUXfer_crypto_ops::GPUXfer_crypto_ops(hipStream_t stream)
+      :
+        h2d_encryption_state(std::make_unique<lgm::EncryptionState>(stream)),
+        d2h_encryption_state(std::make_unique<lgm::EncryptionState>(stream))
+{
+   hipError_t ret;
+   ret = hipMalloc(&out_crypto_buf, FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES);
+   assert(ret == hipSuccess);
+}
 
-EncryptedSepMemcpyCommandScheduler::~EncryptedSepMemcpyCommandScheduler(void) {}
+GPUXfer_crypto_ops::~GPUXfer_crypto_ops(void)
+{
+   hipFree(out_crypto_buf);
+}
 
-void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t sizeBytes,
+void GPUXfer_crypto_ops::h2d(void* dst, const void* src, size_t sizeBytes,
         hipMemcpyKind kind, hipStream_t stream, tag_t tag) {
-   if (h2d_encryption_state == nullptr) {
-       h2d_encryption_state.reset(new lgm::EncryptionState(stream));
-   }
    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
    assert(sizeBytes == FIXED_SIZE_FULL && "encryption needs fixed size buffers");
    // we need fixed size buffers because we have this statically allocated ciphertext buffer
-   lgm::CPUEncrypt(ciphertext, src, sizeBytes, *h2d_encryption_state.get());
+   lgm::CPUEncrypt(ciphertext, src, sizeBytes, *h2d_encryption_state);
    h2d_encryption_state->nextNonceCPU();
 
    hip_launch_memcpy_batch_t batch;
@@ -562,32 +599,29 @@ void EncryptedSepMemcpyCommandScheduler::h2d(void* dst, const void* src, size_t 
    batch.kind = hipMemcpyHostToDevice;
 
    lgm::DecryptAsync(&batch, dst, in_stg_buf, sizeBytes + crypto_aead_aes256gcm_ABYTES, stream,
-           *h2d_encryption_state.get());
+           *h2d_encryption_state);
    h2d_encryption_state->nextNonceGPU(&batch, stream);
    hipLaunchAddToBatch(&batch, set_tag, dim3(1), dim3(1), 0, stream, BUF_TAG(dst), tag);
    hipLaunchMemcpyBatchNOW(&batch, stream);
 }
 
-void EncryptedSepMemcpyCommandScheduler::d2h(void* dst, const void* src, size_t sizeBytes,
+void GPUXfer_crypto_ops::d2h(void* dst, const void* src, size_t sizeBytes,
         hipMemcpyKind kind, hipStream_t stream) {
-   if (d2h_encryption_state == nullptr) {
-       d2h_encryption_state.reset(new lgm::EncryptionState(stream));
-   }
    static uint8_t ciphertext[FIXED_SIZE_FULL + crypto_aead_aes256gcm_ABYTES];
    assert(sizeBytes == FIXED_SIZE_FULL && "encryption needs fixed size buffers");
    hip_launch_memcpy_batch_t batch;
    // we need fixed size buffers because we have this statically allocated ciphertext buffer
    gpu_snapshot_tagged_buf_on_batch(&batch, out_stg_buf, src, stream);
-   lgm::EncryptAsync(&batch, encrypt_out_buf, out_stg_buf, sizeBytes, stream, *d2h_encryption_state.get());
+   lgm::EncryptAsync(&batch, out_crypto_buf, out_stg_buf, sizeBytes, stream, *d2h_encryption_state);
    d2h_encryption_state->nextNonceGPU(&batch, stream);
 
    batch.dst = ciphertext;
-   batch.src = encrypt_out_buf;
+   batch.src = out_crypto_buf;
    batch.sizeBytes = sizeBytes + crypto_aead_aes256gcm_ABYTES;
    batch.kind = hipMemcpyDeviceToHost;
 
    hipLaunchMemcpyBatchNOW(&batch, stream);
 
-   lgm::CPUDecrypt(dst, ciphertext, sizeBytes + crypto_aead_aes256gcm_ABYTES, *d2h_encryption_state.get());
+   lgm::CPUDecrypt(dst, ciphertext, sizeBytes + crypto_aead_aes256gcm_ABYTES, *d2h_encryption_state);
    d2h_encryption_state->nextNonceCPU();
 }

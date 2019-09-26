@@ -63,6 +63,7 @@ public:
        parametersStringStream(oss);
     }
     static std::shared_ptr<CommandScheduler> GetForStream(hipStream_t stream);
+    static void DestroyForStream(hipStream_t stream);
     static std::map<hipStream_t, std::shared_ptr<CommandScheduler>> command_scheduler_map_;
     static hipStream_t GetDefStream() {
        std::lock_guard<std::mutex> lk(command_scheduler_map_mu_);
@@ -99,6 +100,7 @@ public:
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
     virtual hipError_t Wait(void) override;
 protected:
+    virtual void stop_threads(void);
     virtual void nameStringStream(std::ostringstream &oss) const override {
        oss << "BatchCommandScheduler";
     }
@@ -225,13 +227,26 @@ protected:
     std::unique_ptr<std::thread> process_thread_;
 };
 
+class GPUXfer_ops {
+public:
+    virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag) = 0;
+    virtual void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) = 0;
+
+    virtual ~GPUXfer_ops(void);
+    GPUXfer_ops();
+protected:
+    void *out_stg_buf;
+    void *in_stg_buf;
+};
+
 class SepMemcpyCommandScheduler : public BatchCommandScheduler {
 public:
-    SepMemcpyCommandScheduler(hipStream_t stream);
+    SepMemcpyCommandScheduler(hipStream_t stream, std::unique_ptr<GPUXfer_ops>);
     ~SepMemcpyCommandScheduler(void);
     virtual hipError_t Wait(void) override;
     virtual hipError_t AddMemcpyAsync(void* dst, const void* src, size_t size, hipMemcpyKind kind) override;
 protected:
+    virtual void stop_threads(void) override;
     virtual void nameStringStream(std::ostringstream &oss) const override {
        oss << "SepMemcpyCommandScheduler";
     }
@@ -245,9 +260,7 @@ protected:
     void H2DMemcpyThread();
     void D2HMemcpyThread();
     void do_next_h2d();
-    virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag);
     void do_next_d2h();
-    virtual void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream);
 
     inline void *next_in_buf(void) {
       if (stg_in_idx >= n_staging_buffers)
@@ -266,13 +279,12 @@ protected:
     size_t n_staging_buffers;
     void **in_bufs;
     void **out_bufs;
-    void *encrypt_out_buf;
     void *status_buf;
-    void *out_stg_buf;
-    void *in_stg_buf;
     void *nop_buffer;
     unsigned stg_in_idx;
     unsigned stg_out_idx;
+
+    std::unique_ptr<GPUXfer_ops> gpuxfers_;
 
     hipStream_t h2d_xfer_stream_;
     std::mutex pending_h2d_mutex_;
@@ -305,19 +317,22 @@ protected:
 	 }
 };
 
-class EncryptedSepMemcpyCommandScheduler : public SepMemcpyCommandScheduler {
+class GPUXfer_normal_ops : public GPUXfer_ops {
 public:
-    EncryptedSepMemcpyCommandScheduler(hipStream_t stream);
-    ~EncryptedSepMemcpyCommandScheduler(void);
-protected:
-    virtual void nameStringStream(std::ostringstream &oss) const override {
-       oss << "EncryptedSepMemcpyCommandScheduler";
-    }
-    void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag) override;
-    void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
+    virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag) override;
+    virtual void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
+};
+
+class GPUXfer_crypto_ops : public GPUXfer_ops {
+public:
+    virtual void h2d(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream, tag_t tag) override;
+    virtual void d2h(void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream) override;
+    GPUXfer_crypto_ops(hipStream_t stream);
+    ~GPUXfer_crypto_ops();
 private:
     std::unique_ptr<lgm::EncryptionState> h2d_encryption_state;
     std::unique_ptr<lgm::EncryptionState> d2h_encryption_state;
+    void *out_crypto_buf;
 };
 
 class BaselineCommandScheduler : public CommandScheduler {
