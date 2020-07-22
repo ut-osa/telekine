@@ -1,6 +1,6 @@
 #include "hip/hcc_detail/code_object_bundle.hpp"
 #include "hip_cpp_bridge.h"
-#include "check_env.h"
+#include "check_env.hpp"
 #include "nw/include/n_ava_channels.h"
 
 #include "hip_hcc_internal.h"

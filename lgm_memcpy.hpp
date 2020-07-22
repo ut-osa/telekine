@@ -1,7 +1,7 @@
 #ifndef LGM_MEMCPY_H
 #define LGM_MEMCPY_H
 
-#include "check_env.h"
+#include "check_env.hpp"
 
 #include "crypto/aes_gcm.h"
 #include <algorithm>

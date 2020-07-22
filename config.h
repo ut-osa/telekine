@@ -2,7 +2,7 @@
 #define _TLKINE_CONFIG_
 
 #include "command_scheduler.h"
-#include "check_env.h"
+#include "check_env.hpp"
 
 namespace tlkine {
 

@@ -17,7 +17,6 @@
 #include "hip_cpp_bridge.h"
 #include "lgm_kernels.hpp"
 
-#include "check_env.h"
 #include "./command_scheduler.h"
 #include "hip_function_info.hpp"
 #include "nw/include/n_ava_channels.h"
